@@ -20,7 +20,7 @@ import ProfilePage from "./pages/ProfilePage";
 import ChangePasswordPage from "./pages/ChangePasswordPage";
 import "./index.css";
 
-const STAFF_ROLES = ["TECHNICIAN", "MONITOR", "ADMIN"];
+const STAFF_ROLES = ["TECHNICIAN", "ADMIN"];
 
 function Protected({ children, adminOnly = false, staffOnly = false }) {
   const { user, loading } = useAuth();
@@ -41,7 +41,7 @@ function Protected({ children, adminOnly = false, staffOnly = false }) {
   if (adminOnly && user.role !== "ADMIN") return <Navigate to="/painel" replace />;
 
   if (staffOnly && !STAFF_ROLES.includes(user.role)) {
-    return <Navigate to="/perfil" replace />;
+    return <Navigate to="/" replace />;
   }
 
   return children;
@@ -67,7 +67,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
                 <Route path="/perfil" element={<Protected><ProfilePage /></Protected>} />
                 <Route path="/trocar-senha" element={<Protected><ChangePasswordPage /></Protected>} />
 
-                {/* Staff (TECHNICIAN, MONITOR, ADMIN) */}
+                {/* Staff (TECHNICIAN, ADMIN) */}
                 <Route path="/painel" element={<Protected staffOnly><DashboardPage /></Protected>} />
                 <Route path="/painel/chamado/:id" element={<Protected staffOnly><TicketDetailPage /></Protected>} />
                 <Route path="/painel/relatorios" element={<Protected staffOnly><AnalyticsPage /></Protected>} />

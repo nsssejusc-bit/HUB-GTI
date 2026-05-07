@@ -25,7 +25,10 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const user = await login(cpf, password);
-      const dest = next || (["TECHNICIAN", "MONITOR", "ADMIN"].includes(user.role) ? "/painel" : "/novo-chamado");
+      const isStaff = ["TECHNICIAN", "ADMIN"].includes(user.role);
+      const dest = isStaff
+        ? (next?.startsWith("/painel") ? next : "/painel")
+        : "/";
       nav(dest, { replace: true });
     } catch (ex) {
       setErr(ex.response?.data?.error || "Credenciais incorretas.");

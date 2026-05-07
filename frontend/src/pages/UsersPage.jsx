@@ -5,9 +5,9 @@ import { Alert, Spinner } from "../components/ui";
 import { maskCpf } from "../lib/cpf";
 import { useAuth } from "../context/AuthContext";
 import {
-  CheckCircle2, XCircle, UserCheck, UserX, ShieldCheck,
-  Shield, Clock, Building2, Trash2, AlertTriangle, Crown,
-  KeyRound, Copy, Check as CheckIcon, Phone, Bell,
+  CheckCircle2, XCircle, UserCheck,
+  Clock, Building2, Shield, Trash2, AlertTriangle, Crown,
+  KeyRound, Copy, Check as CheckIcon, Phone, Bell, Pencil, X,
 } from "lucide-react";
 
 export default function UsersPage() {
@@ -100,20 +100,18 @@ export default function UsersPage() {
     setTimeout(() => setCopied(false), 2000);
   }
 
-  const base     = users.filter((u) => u.role === "USER");
-  const active   = users.filter((u) => u.active && u.role === "TECHNICIAN");
-  const monitors = users.filter((u) => u.role === "MONITOR");
-  const admins   = users.filter((u) => u.role === "ADMIN");
+  const base   = users.filter((u) => u.role === "USER");
+  const active = users.filter((u) => u.active && u.role === "TECHNICIAN");
+  const admins = users.filter((u) => u.role === "ADMIN");
 
-  const tabData = { base, active, monitors, admins, all: users };
+  const tabData = { base, active, admins, all: users };
 
   const tabs = [
-    { key: "base",     label: "Usuários",       count: base.length,             highlight: false },
-    { key: "active",   label: "Técnicos",       count: active.length,           highlight: false },
-    { key: "monitors", label: "Monitores",      count: monitors.length,         highlight: false },
-    { key: "admins",   label: "Admins",         count: admins.length,           highlight: false },
-    { key: "all",      label: "Todos",          count: users.length,            highlight: false },
-    { key: "resets",   label: "Senhas",         count: resetRequests.length,    highlight: resetRequests.length > 0 },
+    { key: "base",   label: "Usuários", count: base.length,          highlight: false },
+    { key: "active", label: "Técnicos", count: active.length,        highlight: false },
+    { key: "admins", label: "Admins",   count: admins.length,        highlight: false },
+    { key: "all",    label: "Todos",    count: users.length,         highlight: false },
+    { key: "resets", label: "Senhas",   count: resetRequests.length, highlight: resetRequests.length > 0 },
   ];
 
   return (
@@ -122,7 +120,10 @@ export default function UsersPage() {
 
       {/* Modal: senha temporária gerada */}
       {resetResult && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) { setResetResult(null); setCopied(false); } }}
+        >
           <div className="card w-full max-w-sm p-6 space-y-4">
             <div className="flex items-center gap-3">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-100 dark:bg-brand-900/40 text-brand-600 dark:text-brand-400">
@@ -173,7 +174,10 @@ export default function UsersPage() {
 
       {/* Modal: confirmação de permissão Admin */}
       {confirmAdmin && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setConfirmAdmin(null); }}
+        >
           <div className="card w-full max-w-sm p-6 space-y-4">
             <div className="flex items-center gap-3">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400">
@@ -214,7 +218,10 @@ export default function UsersPage() {
 
       {/* Modal: confirmação de exclusão */}
       {confirmDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setConfirmDelete(null); }}
+        >
           <div className="card w-full max-w-sm p-6 space-y-4">
             <div className="flex items-center gap-3">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400">
@@ -347,6 +354,9 @@ export default function UsersPage() {
 function UserRow({ user, units, me, onUpdate, onDelete, onGrantAdmin, onRevokeAdmin, onResetPassword }) {
   const [unitId, setUnitId] = useState(user.unit?.id || "");
   const [changing, setChanging] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [nameValue, setNameValue] = useState(user.name);
+  const [savingName, setSavingName] = useState(false);
 
   async function applyUnit() {
     setChanging(true);
@@ -354,35 +364,68 @@ function UserRow({ user, units, me, onUpdate, onDelete, onGrantAdmin, onRevokeAd
     setChanging(false);
   }
 
-  const isAdmin   = user.role === "ADMIN";
-  const isMe      = me?.id === user.id;
-  const isBase    = user.role === "USER";
-  const isTech    = user.role === "TECHNICIAN";
-  const isMonitor = user.role === "MONITOR";
+  async function saveName() {
+    if (!nameValue.trim() || nameValue.trim() === user.name) { setEditingName(false); return; }
+    setSavingName(true);
+    await onUpdate(user.id, { name: nameValue.trim() });
+    setSavingName(false);
+    setEditingName(false);
+  }
+
+  function cancelName() {
+    setNameValue(user.name);
+    setEditingName(false);
+  }
+
+  const isAdmin = user.role === "ADMIN";
+  const isMe    = me?.id === user.id;
+  const isBase  = user.role === "USER";
+  const isTech  = user.role === "TECHNICIAN";
 
   return (
     <div className="px-5 py-4 flex flex-wrap items-center gap-4">
       {/* Avatar + info */}
       <div className="flex items-center gap-3 flex-1 min-w-0">
         <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
-          isAdmin   ? "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400"
-          : isMonitor ? "bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-400"
-          : isTech  ? "bg-slate-100 dark:bg-gray-700 text-slate-600 dark:text-gray-300"
+          isAdmin  ? "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400"
+          : isTech ? "bg-slate-100 dark:bg-gray-700 text-slate-600 dark:text-gray-300"
           : "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400"
         }`}>
           {user.name.charAt(0).toUpperCase()}
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-medium text-slate-900 dark:text-gray-100 text-sm">{user.name}</span>
+            {editingName ? (
+              <div className="flex items-center gap-1.5">
+                <input
+                  autoFocus
+                  value={nameValue}
+                  onChange={(e) => setNameValue(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") saveName(); if (e.key === "Escape") cancelName(); }}
+                  className="field-input py-1 text-sm w-48"
+                />
+                <button onClick={saveName} disabled={savingName} className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-600 hover:bg-brand-700 text-white transition" title="Salvar">
+                  {savingName ? <Spinner className="h-3 w-3" /> : <CheckIcon size={13} />}
+                </button>
+                <button onClick={cancelName} className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-gray-700 transition" title="Cancelar">
+                  <X size={13} />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1 group">
+                <span className="font-medium text-slate-900 dark:text-gray-100 text-sm">{user.name}</span>
+                <button
+                  onClick={() => { setNameValue(user.name); setEditingName(true); }}
+                  className="opacity-0 group-hover:opacity-100 flex h-5 w-5 items-center justify-center rounded text-slate-400 hover:text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-900/20 transition"
+                  title="Editar nome"
+                >
+                  <Pencil size={11} />
+                </button>
+              </div>
+            )}
             {isAdmin && (
               <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 dark:bg-amber-900/30 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400 ring-1 ring-amber-200 dark:ring-amber-700">
                 <Crown size={10} /> Admin
-              </span>
-            )}
-            {isMonitor && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 dark:bg-brand-900/30 px-2 py-0.5 text-xs font-medium text-brand-700 dark:text-brand-400 ring-1 ring-brand-200 dark:ring-brand-800">
-                <ShieldCheck size={10} /> Monitor
               </span>
             )}
             {isTech && user.active && (
@@ -425,8 +468,8 @@ function UserRow({ user, units, me, onUpdate, onDelete, onGrantAdmin, onRevokeAd
       {/* Ações */}
       <div className="flex items-center gap-2 shrink-0 flex-wrap">
 
-        {/* Atribuir unidade (apenas para técnicos e monitores) */}
-        {(isTech || isMonitor) && (
+        {/* Atribuir unidade (apenas para técnicos) */}
+        {isTech && (
           <div className="flex items-center gap-1.5">
             <select
               className="field-input py-1.5 text-xs min-w-[140px]"
@@ -456,30 +499,6 @@ function UserRow({ user, units, me, onUpdate, onDelete, onGrantAdmin, onRevokeAd
           >
             <UserCheck size={13} />
             Tornar Técnico
-          </button>
-        )}
-
-        {/* TECHNICIAN → Monitor */}
-        {isTech && user.active && (
-          <button
-            onClick={() => onUpdate(user.id, { role: "MONITOR" })}
-            className="btn-secondary text-xs py-1.5 px-2.5 whitespace-nowrap"
-            title="Promover a monitor"
-          >
-            <Shield size={13} className="text-brand-600 dark:text-brand-400" />
-            Monitor
-          </button>
-        )}
-
-        {/* MONITOR → Técnico */}
-        {isMonitor && (
-          <button
-            onClick={() => onUpdate(user.id, { role: "TECHNICIAN" })}
-            className="btn-secondary text-xs py-1.5 px-2.5 whitespace-nowrap"
-            title="Rebaixar a técnico"
-          >
-            <UserX size={13} className="text-slate-500 dark:text-gray-400" />
-            Técnico
           </button>
         )}
 

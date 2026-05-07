@@ -4,16 +4,8 @@ import { api } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { StatusBadge, InfoItem, Alert, Spinner } from "../components/ui";
 import AppHeader from "../components/AppHeader";
-import { formatElapsed } from "../lib/statuses";
+import { formatElapsed, STATUS_LABEL } from "../lib/statuses";
 import { ArrowLeft, Clock, CheckCircle2, ChevronRight, Trash2, AlertTriangle, MonitorSmartphone, Copy, Check as CheckIcon } from "lucide-react";
-
-const STATUS_LABEL = {
-  OPEN:       "Aberto",
-  VIEWED:     "Visualizado",
-  EN_ROUTE:   "Técnico a caminho",
-  IN_SERVICE: "Em atendimento",
-  COMPLETED:  "Concluído",
-};
 
 const TRANSITION_LABEL = {
   VIEWED:     "Marcar como Visualizado",
@@ -100,10 +92,10 @@ export default function TicketDetailPage() {
     </div>
   );
 
-  const isMonitor = ["MONITOR", "ADMIN"].includes(user?.role);
-  const isAdmin   = user?.role === "ADMIN";
+  const canTransition = ["TECHNICIAN", "ADMIN"].includes(user?.role);
+  const isAdmin       = user?.role === "ADMIN";
   const filteredTechs = form.unitId
-    ? techs.filter((t) => t.unitId === Number(form.unitId) || ["ADMIN", "MONITOR"].includes(t.role))
+    ? techs.filter((t) => t.unitId === Number(form.unitId) || t.role === "ADMIN")
     : techs;
 
   return (
@@ -112,7 +104,10 @@ export default function TicketDetailPage() {
 
       {/* Modal de confirmação de exclusão */}
       {showDeleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowDeleteModal(false); }}
+        >
           <div className="card w-full max-w-sm p-6 space-y-4">
             <div className="flex items-center gap-3">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400">
@@ -275,20 +270,20 @@ export default function TicketDetailPage() {
           <div className="card p-5 space-y-3">
             <h3 className="text-sm font-semibold text-slate-900 dark:text-gray-100">Ações</h3>
 
-            {!isMonitor && (
+            {!canTransition && (
               <p className="text-xs text-slate-500 dark:text-gray-400 bg-slate-50 dark:bg-gray-800 rounded-lg p-3">
-                Apenas o monitor de plantão pode alterar o status do chamado.
+                Apenas técnicos e administradores podem alterar o status do chamado.
               </p>
             )}
 
-            {isMonitor && ticket.allowedNext.length === 0 && (
+            {canTransition && ticket.allowedNext.length === 0 && (
               <div className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl p-3">
                 <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
                 Chamado concluído
               </div>
             )}
 
-            {isMonitor && ticket.allowedNext.length > 0 && (
+            {canTransition && ticket.allowedNext.length > 0 && (
               <>
                 {ticket.allowedNext.includes("VIEWED") && (
                   <>

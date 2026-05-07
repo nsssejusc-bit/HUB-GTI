@@ -559,6 +559,7 @@ export default function AnalyticsPage() {
   const [others,   setOthers]  = useState([]);
   const [loading,  setLoading] = useState(true);
   const [pdfBusy,  setPdfBusy] = useState(false);
+  const [pdfErr,   setPdfErr]  = useState("");
 
   useEffect(() => {
     setLoading(true);
@@ -590,8 +591,11 @@ export default function AnalyticsPage() {
 
   async function handleExportPdf() {
     setPdfBusy(true);
+    setPdfErr("");
     try {
       await exportPdf(data, monthly, range);
+    } catch {
+      setPdfErr("Não foi possível gerar o PDF. Tente novamente.");
     } finally {
       setPdfBusy(false);
     }
@@ -631,7 +635,10 @@ export default function AnalyticsPage() {
               />
             </div>
           </div>
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-2 flex-wrap justify-end">
+            {pdfErr && (
+              <span className="text-xs text-red-600 dark:text-red-400">{pdfErr}</span>
+            )}
             <button
               onClick={handleExportPdf}
               disabled={loading || pdfBusy}

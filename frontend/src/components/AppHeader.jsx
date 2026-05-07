@@ -4,18 +4,17 @@ import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { api } from "../lib/api";
 import {
-  LayoutDashboard, BarChart2, LogOut, Users, ShieldCheck,
+  LayoutDashboard, BarChart2, LogOut, Users,
   Crown, Sun, Moon, Building2, ChevronDown, UserCircle, Ticket,
 } from "lucide-react";
 
 const ROLE_LABEL = {
   ADMIN:      "Administrador",
-  MONITOR:    "Monitor de plantão",
   TECHNICIAN: "Técnico",
   USER:       "Usuário",
 };
 
-const STAFF_ROLES = ["TECHNICIAN", "MONITOR", "ADMIN"];
+const STAFF_ROLES = ["TECHNICIAN", "ADMIN"];
 
 export default function AppHeader() {
   const { user, logout } = useAuth();
@@ -23,7 +22,6 @@ export default function AppHeader() {
   const loc = useLocation();
   const nav = useNavigate();
   const [pendingCount, setPendingCount] = useState(0);
-  const [monitors, setMonitors] = useState([]);
   const [adminOpen, setAdminOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
   const adminRef = useRef(null);
@@ -41,12 +39,10 @@ export default function AppHeader() {
   }, []);
 
   useEffect(() => {
-    api.get("/monitors").then((r) => setMonitors(r.data));
     if (user?.role === "ADMIN") {
       api.get("/users?role=USER").then((r) => setPendingCount(r.data.length));
     }
     const t = setInterval(() => {
-      api.get("/monitors").then((r) => setMonitors(r.data));
       if (user?.role === "ADMIN") {
         api.get("/users?role=USER").then((r) => setPendingCount(r.data.length));
       }
@@ -164,16 +160,6 @@ export default function AppHeader() {
         {/* ── Lado direito ── */}
         <div className="flex items-center gap-2 shrink-0">
 
-          {/* Monitor de plantão */}
-          {monitors.length > 0 && user?.role !== "ADMIN" && isStaff && (
-            <div className="hidden lg:flex items-center gap-1.5 rounded-lg bg-brand-50 dark:bg-brand-900/30 px-2.5 py-1 text-xs text-brand-700 dark:text-brand-400">
-              <ShieldCheck size={12} />
-              <span className="font-medium truncate max-w-[120px]">
-                {monitors.map((m) => m.name.split(" ")[0]).join(", ")}
-              </span>
-            </div>
-          )}
-
           {/* Toggle tema */}
           <button
             onClick={toggle}
@@ -217,7 +203,7 @@ export default function AppHeader() {
                 </Link>
                 <div className="h-px bg-slate-100 dark:bg-gray-700/60" />
                 <button
-                  onClick={() => { setUserOpen(false); logout(); nav("/login"); }}
+                  onClick={async () => { setUserOpen(false); await logout(); nav("/login"); }}
                   className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition"
                 >
                   <LogOut size={15} />
@@ -229,7 +215,7 @@ export default function AppHeader() {
 
           {/* Logout mobile (só icone) */}
           <button
-            onClick={() => { logout(); nav("/login"); }}
+            onClick={async () => { await logout(); nav("/login"); }}
             title="Sair"
             className="sm:hidden flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition"
           >

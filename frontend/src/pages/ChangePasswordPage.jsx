@@ -31,7 +31,8 @@ export default function ChangePasswordPage() {
         newPassword: form.newPassword,
       });
       await refreshUser();
-      nav(isForced ? "/painel" : "/perfil");
+      const isStaff = ["TECHNICIAN", "ADMIN"].includes(user?.role);
+      nav(isForced ? (isStaff ? "/painel" : "/") : (isStaff ? "/perfil" : "/"));
     } catch (ex) {
       setErr(ex.response?.data?.error || "Erro ao alterar senha");
     } finally {

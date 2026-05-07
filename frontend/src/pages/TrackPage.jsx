@@ -1,21 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../lib/api";
-import { STATUS_ORDER, statusIndex, formatElapsed } from "../lib/statuses";
+import { STATUS_ORDER, STATUS_LABEL, statusIndex, formatElapsed } from "../lib/statuses";
 import { StatusBadge, InfoItem, Spinner } from "../components/ui";
 import { Home, Clock, CheckCircle2, Circle, Star, MonitorSmartphone, Wifi } from "lucide-react";
 
-const STATUS_LABEL = {
-  OPEN:       "Aberto",
-  VIEWED:     "Visualizado",
-  EN_ROUTE:   "Técnico a caminho",
-  IN_SERVICE: "Em atendimento",
-  COMPLETED:  "Concluído",
-};
-
 const STATUS_DESC = {
   OPEN:       "Chamado registrado, aguardando análise",
-  VIEWED:     "Monitor visualizou e atribuiu responsável",
+  VIEWED:     "Técnico visualizou e atribuiu responsável",
   EN_ROUTE:   "Técnico a caminho do seu departamento",
   IN_SERVICE: "Atendimento em andamento",
   COMPLETED:  "Problema resolvido",

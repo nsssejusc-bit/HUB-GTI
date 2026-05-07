@@ -2,7 +2,7 @@ import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import { login, me, logout, forgotPassword, listResetRequests, resolveResetRequest } from "../controllers/authController.js";
 import {
-  register, listUsers, updateUser, deleteUser, listMonitors,
+  register, listUsers, updateUser, deleteUser,
   resetPassword, changePassword, myTickets,
 } from "../controllers/userController.js";
 import {
@@ -61,11 +61,8 @@ router.get("/auth/me",               authRequired, me);
 router.post("/auth/change-password", authRequired, changePassword);
 
 // ── Solicitações de reset de senha ────────────────────────────────────────────
-router.get("/password-reset-requests",           authRequired, requireRole("MONITOR", "ADMIN"), listResetRequests);
-router.post("/password-reset-requests/:id/resolve", authRequired, requireRole("MONITOR", "ADMIN"), resolveResetRequest);
-
-// ── Monitores (público — exibição no dashboard/login) ─────────────────────────
-router.get("/monitors", listMonitors);
+router.get("/password-reset-requests",              authRequired, requireRole("ADMIN"), listResetRequests);
+router.post("/password-reset-requests/:id/resolve", authRequired, requireRole("ADMIN"), resolveResetRequest);
 
 // ── Perfil do usuário logado ───────────────────────────────────────────────────
 router.get("/users/me/tickets", authRequired, myTickets);
@@ -86,11 +83,11 @@ router.post("/users/:id/reset-password", authRequired, requireRole("ADMIN"), res
 router.get("/technicians", authRequired, listTechnicians);
 router.get("/tickets",     authRequired, listTickets);
 router.get("/tickets/:id", authRequired, getTicket);
-router.post("/tickets/:id/transition", authRequired, requireRole("MONITOR", "ADMIN"), transitionTicket);
+router.post("/tickets/:id/transition", authRequired, requireRole("TECHNICIAN", "ADMIN"), transitionTicket);
 router.delete("/tickets/:id", authRequired, requireRole("ADMIN"), deleteTicket);
 
 // ── Analytics ──────────────────────────────────────────────────────────────────
-const analyticsAccess = [authRequired, requireRole("TECHNICIAN", "MONITOR", "ADMIN")];
+const analyticsAccess = [authRequired, requireRole("TECHNICIAN", "ADMIN")];
 router.get("/analytics/by-unit",        ...analyticsAccess, ticketsByUnit);
 router.get("/analytics/by-technician",  ...analyticsAccess, ticketsByTechnician);
 router.get("/analytics/by-department",  ...analyticsAccess, ticketsByDepartment);

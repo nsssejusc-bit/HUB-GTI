@@ -69,7 +69,9 @@ export default function NewTicketPage() {
         departmentId: Number(form.departmentId) || null,
         categoryId: form.categoryId,
         subcategoryId: selectedCategory?.allowsFreeText || isRemote ? null : form.subcategoryId,
-        freeTextDescription: selectedCategory?.allowsFreeText && !isRemote ? form.freeTextDescription : null,
+        freeTextDescription: isRemote
+          ? (form.freeTextDescription?.trim() || null)
+          : (selectedCategory?.allowsFreeText ? form.freeTextDescription : null),
         anyDeskCode: isRemote ? form.anyDeskCode.trim() : null,
       };
       const { data } = await api.post("/tickets", payload);
@@ -125,7 +127,7 @@ export default function NewTicketPage() {
         <h1 className="text-sm font-semibold text-slate-800 dark:text-gray-100">Abrir chamado</h1>
         <div className="ml-auto">
           <button
-            onClick={() => { logout(); }}
+            onClick={async () => { await logout(); nav("/"); }}
             className="flex items-center gap-1.5 text-sm text-slate-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition"
             title="Sair"
           >
@@ -417,7 +419,7 @@ function AnyDeskStep({ value, onChange, description, onDescriptionChange }) {
         <ol className="text-xs text-cyan-700 dark:text-cyan-400 space-y-1 pl-1">
           <li>1. Abra o aplicativo <strong>AnyDesk</strong> no seu computador</li>
           <li>2. O código aparece no campo <strong>"Esta estação de trabalho"</strong></li>
-          <li>3. Copie e cole o número abaixo</li>
+          <li>3. Copie e cole o número no campo abaixo:</li>
         </ol>
       </div>
       <div>

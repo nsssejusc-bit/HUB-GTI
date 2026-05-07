@@ -9,14 +9,12 @@ import { maskCpf } from "../lib/cpf";
 
 const ROLE_LABEL = {
   ADMIN:      "Administrador",
-  MONITOR:    "Monitor de plantão",
   TECHNICIAN: "Técnico",
   USER:       "Usuário",
 };
 
 const ROLE_COLOR = {
   ADMIN:      "bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 ring-amber-200 dark:ring-amber-700",
-  MONITOR:    "bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-400 ring-brand-200 dark:ring-brand-700",
   TECHNICIAN: "bg-slate-50 dark:bg-gray-800 text-slate-700 dark:text-gray-300 ring-slate-200 dark:ring-gray-600",
   USER:       "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 ring-emerald-200 dark:ring-emerald-700",
 };

@@ -65,7 +65,7 @@ export default function RegisterPage() {
               Seu acesso está pronto. Faça login para continuar.
             </p>
           </div>
-          <button onClick={() => nav("/login")} className="btn-primary w-full justify-center">
+          <button onClick={() => nav("/")} className="btn-primary w-full justify-center">
             Fazer login
           </button>
         </div>

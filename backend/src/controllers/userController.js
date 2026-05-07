@@ -73,7 +73,7 @@ export async function listUsers(req, res) {
 // PATCH /api/users/:id — atualiza usuário (ADMIN only)
 export async function updateUser(req, res) {
   const id = Number(req.params.id);
-  const { active, unitId, role } = req.body || {};
+  const { active, unitId, role, name } = req.body || {};
 
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) return res.status(404).json({ error: "Usuário não encontrado" });
@@ -85,9 +85,14 @@ export async function updateUser(req, res) {
   const data = {};
   if (active !== undefined) data.active = active;
   if (unitId !== undefined) data.unitId = unitId ? Number(unitId) : null;
+  if (name !== undefined) {
+    const trimmed = name.trim();
+    if (trimmed.length < 3) return res.status(400).json({ error: "Nome muito curto (mínimo 3 caracteres)" });
+    data.name = toTitleCase(trimmed);
+  }
 
   if (role !== undefined) {
-    const validRoles = ["USER", "MONITOR", "TECHNICIAN", "ADMIN"];
+    const validRoles = ["USER", "TECHNICIAN", "ADMIN"];
     if (!validRoles.includes(role)) {
       return res.status(400).json({ error: "Papel inválido" });
     }
@@ -205,12 +210,3 @@ export async function myTickets(req, res) {
   })));
 }
 
-// GET /api/monitors — monitores ativos (público)
-export async function listMonitors(req, res) {
-  const monitors = await prisma.user.findMany({
-    where: { role: "MONITOR", active: true },
-    select: { id: true, name: true, unit: { select: { name: true } } },
-    orderBy: { name: "asc" },
-  });
-  res.json(monitors);
-}
