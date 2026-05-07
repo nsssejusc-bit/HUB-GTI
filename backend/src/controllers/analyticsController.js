@@ -193,6 +193,32 @@ export async function ticketsByMonth(req, res) {
   })));
 }
 
+export async function avgResolutionByUnit(req, res) {
+  const where = { ...parseRange(req.query), status: "COMPLETED" };
+  const tickets = await prisma.ticket.findMany({
+    where,
+    select: { unitId: true, openedAt: true, completedAt: true },
+  });
+  const units = await prisma.unit.findMany();
+  const map = new Map(units.map((u) => [u.id, u.name]));
+  const buckets = {};
+  for (const t of tickets) {
+    if (!t.completedAt) continue;
+    const mins = (t.completedAt - t.openedAt) / 60000;
+    const key = t.unitId ?? "null";
+    buckets[key] = buckets[key] || { sum: 0, n: 0 };
+    buckets[key].sum += mins;
+    buckets[key].n += 1;
+  }
+  const result = Object.entries(buckets).map(([unitId, b]) => ({
+    unitId: unitId === "null" ? null : Number(unitId),
+    unit: unitId === "null" ? "Sem unidade" : (map.get(Number(unitId)) || "-"),
+    avgMinutes: Math.round(b.sum / b.n),
+    samples: b.n,
+  }));
+  res.json(result);
+}
+
 export async function otherReclassified(req, res) {
   const where = {
     ...parseRange(req.query),

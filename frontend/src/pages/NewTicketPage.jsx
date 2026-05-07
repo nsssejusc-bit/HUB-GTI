@@ -5,7 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { Alert, Spinner } from "../components/ui";
 import {
   ArrowLeft, ArrowRight, Monitor, Wifi, KeyRound, HelpCircle,
-  CheckCircle2, MonitorSmartphone, Copy, Check as CheckIcon, ChevronDown, Printer, LogOut,
+  CheckCircle2, MonitorSmartphone, Copy, Check as CheckIcon, Printer, LogOut,
 } from "lucide-react";
 
 const CATEGORY_ICONS = {
@@ -32,10 +32,8 @@ export default function NewTicketPage() {
   const nav = useNavigate();
   const { user, logout } = useAuth();
   const [categories, setCategories] = useState([]);
-  const [departments, setDepartments] = useState([]);
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({
-    departmentId: "",
     categoryId: null,
     subcategoryId: null,
     freeTextDescription: "",
@@ -47,14 +45,7 @@ export default function NewTicketPage() {
 
   useEffect(() => {
     api.get("/categories").then((r) => setCategories(r.data));
-    api.get("/departments").then((r) => {
-      setDepartments(r.data);
-      // Pré-preenche o setor do usuário logado
-      if (user?.department?.id) {
-        setForm((f) => ({ ...f, departmentId: String(user.department.id) }));
-      }
-    });
-  }, [user]);
+  }, []);
 
   const selectedCategory = categories.find((c) => c.id === form.categoryId);
   const isRemote = selectedCategory?.code === "REMOTE";
@@ -66,7 +57,6 @@ export default function NewTicketPage() {
     setSubmitting(true);
     try {
       const payload = {
-        departmentId: Number(form.departmentId) || null,
         categoryId: form.categoryId,
         subcategoryId: selectedCategory?.allowsFreeText || isRemote ? null : form.subcategoryId,
         freeTextDescription: isRemote
@@ -140,32 +130,14 @@ export default function NewTicketPage() {
       <main className="flex-1 p-4 md:p-8 max-w-2xl w-full mx-auto">
 
         {/* Identidade do solicitante */}
-        <div className="mb-5 rounded-xl bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3">
-          <div className="flex-1 min-w-0">
+        <div className="mb-5 rounded-xl bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 px-4 py-3 flex items-center justify-between gap-4">
+          <div className="min-w-0">
             <p className="text-xs text-slate-500 dark:text-gray-400">Chamado aberto por</p>
             <p className="text-sm font-semibold text-slate-800 dark:text-gray-100 truncate">{user?.name}</p>
           </div>
-          <div className="sm:w-56">
-            <label className="text-xs text-slate-500 dark:text-gray-400 block mb-1">Setor solicitante</label>
-            {departments.length === 0 ? (
-              <div className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-gray-500">
-                <Spinner className="h-3.5 w-3.5" /> Carregando...
-              </div>
-            ) : (
-              <div className="relative">
-                <select
-                  className="field-input text-sm pr-8 appearance-none"
-                  value={form.departmentId}
-                  onChange={(e) => setForm({ ...form, departmentId: e.target.value })}
-                >
-                  <option value="">Selecione...</option>
-                  {departments.map((d) => (
-                    <option key={d.id} value={d.id}>{d.name}</option>
-                  ))}
-                </select>
-                <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-gray-500" />
-              </div>
-            )}
+          <div className="text-right shrink-0">
+            <p className="text-xs text-slate-500 dark:text-gray-400">Setor</p>
+            <p className="text-sm font-semibold text-slate-800 dark:text-gray-100">{user?.department?.name || "—"}</p>
           </div>
         </div>
 
@@ -284,11 +256,11 @@ export default function NewTicketPage() {
               </div>
 
               <button
-                disabled={!form.categoryId || !form.departmentId}
+                disabled={!form.categoryId}
                 onClick={() => setStep(2)}
                 className="btn-primary w-full py-3"
               >
-                {!form.departmentId ? "Selecione o setor antes de continuar" : "Continuar"} <ArrowRight size={16} />
+                Continuar <ArrowRight size={16} />
               </button>
             </div>
           )}

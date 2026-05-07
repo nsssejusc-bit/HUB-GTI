@@ -24,9 +24,8 @@ function fmtMonthLong(ym) {
   return `${MONTH_NAMES[Number(m) - 1]} de ${y}`;
 }
 
-// Strips diacritics for jsPDF default fonts
 function ascii(s) {
-  return String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "");
+  return String(s ?? "");
 }
 
 
@@ -63,6 +62,10 @@ async function exportPdf(data, monthly, range) {
 
   // ── Tabela compacta numa coluna ─────────────────────────────────────────────
   function halfTable(startY, x, w, title, head, body, maxRows = 7) {
+    const rows = body.slice(0, maxRows);
+    const colTotal = rows.reduce((s, row) => s + (Number(row[row.length - 1]) || 0), 0);
+    const footRow  = head[0].map((_, i) => i === 0 ? ascii("Total") : (i === head[0].length - 1 ? colTotal : ""));
+
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8);
     doc.setTextColor(...BLUE);
@@ -74,14 +77,19 @@ async function exportPdf(data, monthly, range) {
     autoTable(doc, {
       startY: startY + 4,
       head,
-      body: body.slice(0, maxRows),
+      body: rows,
+      foot: [footRow],
       margin: { left: x, right: W - x - w },
       tableWidth: w,
       headStyles: { fillColor: BLUE, textColor: 255, fontSize: 7.5, fontStyle: "bold" },
       bodyStyles: { textColor: DARK, fontSize: 7.5 },
       alternateRowStyles: { fillColor: LIGHT },
+      footStyles: { fillColor: [226, 232, 240], textColor: DARK, fontSize: 7.5, fontStyle: "bold" },
       styles: { cellPadding: 1.5, font: "helvetica" },
-      columnStyles: { [head[0].length - 1]: { cellWidth: 18, halign: "right" } },
+      columnStyles: { [head[0].length - 1]: { cellWidth: 18 } },
+      didParseCell: (data) => {
+        if (data.column.index > 0) data.cell.styles.halign = "right";
+      },
     });
     return doc.lastAutoTable.finalY;
   }
@@ -98,22 +106,15 @@ async function exportPdf(data, monthly, range) {
     curY = Math.max(lEnd, rEnd) + 5;
   }
 
-  // ── Gráfico vertical numa coluna de 3 ──────────────────────────────────────
-  function vertChart(startY, colIdx, title, rows, labelKey, valueKey, maxRows = 6) {
+  // ── Gráfico pizza numa coluna de 3 ──────────────────────────────────────────
+  function pieChart(startY, colIdx, title, rows, labelKey, valueKey, maxRows = 6) {
     const x     = RX3[colIdx];
     const w     = COL3;
-    const slice = rows.slice(0, maxRows);
+    const slice = rows.slice(0, maxRows).filter((r) => (Number(r[valueKey]) || 0) > 0);
     if (slice.length === 0) return startY + 52;
 
-    const maxVal = Math.max(...slice.map((d) => d[valueKey]), 1);
-    const chartH = 36;
-    const n      = slice.length;
-    const spacing = 2;
-    const barW   = Math.min(Math.floor((w - 10) / n) - spacing, 14);
-    const totalW = n * (barW + spacing) - spacing;
-    const ox     = x + (w - totalW) / 2;
+    const total = slice.reduce((s, r) => s + Number(r[valueKey] || 0), 0);
 
-    // col title
     doc.setFont("helvetica", "bold");
     doc.setFontSize(7.5);
     doc.setTextColor(...BLUE);
@@ -122,57 +123,54 @@ async function exportPdf(data, monthly, range) {
     doc.setLineWidth(0.2);
     doc.line(x, startY + 1.2, x + w, startY + 1.2);
 
-    const chartTop = startY + 5;
+    const cx   = x + w / 2;
+    const pieR = Math.min(w / 2 - 4, 16);
+    const cy   = startY + 6 + pieR;
 
-    // grid lines
-    for (let lvl = 1; lvl <= 3; lvl++) {
-      const ly = chartTop + chartH - (lvl / 3) * chartH;
-      doc.setDrawColor(235, 240, 245);
-      doc.setLineWidth(0.15);
-      doc.line(x + 3, ly, x + w, ly);
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(5.5);
-      doc.setTextColor(185, 195, 210);
-      doc.text(String(Math.round((lvl / 3) * maxVal)), x + 2, ly + 1, { align: "right" });
-    }
-
-    // baseline
-    doc.setDrawColor(200, 210, 225);
-    doc.setLineWidth(0.3);
-    doc.line(x + 3, chartTop + chartH, x + w, chartTop + chartH);
-
+    let angle = -Math.PI / 2;
     slice.forEach((item, i) => {
-      const bh    = Math.max((item[valueKey] / maxVal) * chartH, 1.5);
-      const bx    = ox + i * (barW + spacing);
-      const by    = chartTop + chartH - bh;
+      const sweep = (Number(item[valueKey]) / total) * 2 * Math.PI;
+      const steps = Math.max(20, Math.ceil(Math.abs(sweep) * 20));
       const color = COLORS[i % COLORS.length];
 
+      const pts = [];
+      for (let s = 0; s <= steps; s++) {
+        const a = angle + (sweep * s) / steps;
+        pts.push([cx + pieR * Math.cos(a), cy + pieR * Math.sin(a)]);
+      }
+      const segs = [[pts[0][0] - cx, pts[0][1] - cy]];
+      for (let s = 1; s < pts.length; s++) {
+        segs.push([pts[s][0] - pts[s - 1][0], pts[s][1] - pts[s - 1][1]]);
+      }
       doc.setFillColor(...color);
-      const r = Math.min(2, barW / 2);
-      doc.roundedRect(bx, by, barW, bh, r, r, "F");
-      doc.rect(bx, by + bh / 2, barW, bh / 2, "F");
+      doc.lines(segs, cx, cy, [1, 1], "F", true);
+      angle += sweep;
+    });
 
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(6);
-      doc.setTextColor(...DARK);
-      doc.text(String(item[valueKey]), bx + barW / 2, by - 1.5, { align: "center" });
-
+    const legendY = cy + pieR + 5;
+    slice.forEach((item, i) => {
+      const col = i % 2;
+      const row = Math.floor(i / 2);
+      const lx  = x + col * (w / 2);
+      const ly  = legendY + row * 5.5;
+      doc.setFillColor(...COLORS[i % COLORS.length]);
+      doc.rect(lx, ly - 2.5, 2.5, 2.5, "F");
       doc.setFont("helvetica", "normal");
       doc.setFontSize(5.5);
       doc.setTextColor(...SLATE);
-      const label = ascii(String(item[labelKey])).substring(0, 9);
-      doc.text(label, bx + barW / 2, chartTop + chartH + 4.5, { align: "center" });
+      doc.text(ascii(String(item[labelKey])).substring(0, 11), lx + 3.5, ly - 0.3);
     });
 
-    return chartTop + chartH + 9;
+    const legendRows = Math.ceil(slice.length / 2);
+    return legendY + legendRows * 5.5 + 2;
   }
 
-  // ── Grade de gráficos 3 colunas ─────────────────────────────────────────────
+  // ── Grade de gráficos pizza 3 colunas ───────────────────────────────────────
   function chartRow(s0, s1, s2) {
-    needPage(58);
+    needPage(65);
     const sy = curY;
     const ends = [s0, s1, s2].map((s, i) =>
-      s ? vertChart(sy, i, s.title, s.rows, s.lk, s.vk) : sy
+      s ? pieChart(sy, i, s.title, s.rows, s.lk, s.vk) : sy
     );
     curY = Math.max(...ends) + 4;
   }
@@ -189,7 +187,7 @@ async function exportPdf(data, monthly, range) {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.5);
   doc.setTextColor(...SLATE);
-  doc.text("Relatorio de Chamados", M, 26);
+  doc.text("Relatório de Chamados", M, 26);
   doc.text(
     `Periodo: ${range.from} a ${range.to}   |   Gerado: ${new Date().toLocaleDateString("pt-BR")}`,
     M, 32,
@@ -214,21 +212,33 @@ async function exportPdf(data, monthly, range) {
 
     autoTable(doc, {
       startY: curY,
-      head: [["Mes", "Total", "Concluidos", "Em Atend.", "Abertos"]],
+      head: [["Mês", "Abertos","Em Atend.", "Concluídos", "Total"]],
       body: monthly.map((m) => [
-        ascii(fmtMonthLong(m.month)), m.total, m.completed, m.inProgress, m.open,
+        ascii(fmtMonthLong(m.month)), m.open, m.inProgress, m.completed, m.total
       ]),
+      foot: [[
+        ascii("Total"),
+        monthly.reduce((s, m) => s + (m.open       || 0), 0),
+        monthly.reduce((s, m) => s + (m.inProgress || 0), 0),
+        monthly.reduce((s, m) => s + (m.completed  || 0), 0),
+        monthly.reduce((s, m) => s + (m.total      || 0), 0),
+      ]],
       margin: { left: M, right: M },
+      tableWidth: CW,
       headStyles: { fillColor: BLUE, textColor: 255, fontSize: 8, fontStyle: "bold" },
       bodyStyles: { textColor: DARK, fontSize: 8 },
       alternateRowStyles: { fillColor: LIGHT },
+      footStyles: { fillColor: [226, 232, 240], textColor: DARK, fontSize: 8, fontStyle: "bold" },
       styles: { cellPadding: 1.8, font: "helvetica" },
       columnStyles: {
-        0: { cellWidth: 46 },
-        1: { cellWidth: 20, halign: "right" },
-        2: { cellWidth: 26, halign: "right" },
-        3: { cellWidth: 26, halign: "right" },
-        4: { cellWidth: 20, halign: "right" },
+        0: { cellWidth: 58 },
+        1: { cellWidth: 30 },
+        2: { cellWidth: 34 },
+        3: { cellWidth: 34 },
+        4: { cellWidth: 30 },
+      },
+      didParseCell: (data) => {
+        if (data.column.index > 0) data.cell.styles.halign = "right";
       },
     });
     curY = doc.lastAutoTable.finalY + 6;
@@ -236,28 +246,28 @@ async function exportPdf(data, monthly, range) {
 
   // Pares de tabelas 2 colunas
   tableRow(
-    "Chamados por Unidade",
-    [["Unidade", "Total"]],
+    "Chamados por Núcleo",
+    [["Núcleo", "Total"]],
     (data.byUnit || []).map((r) => [ascii(r.unit), r.total]),
-    "Chamados por Tecnico",
-    [["Tecnico", "Total"]],
+    "Chamados por Técnico",
+    [["Técnico", "Total"]],
     (data.byTech || []).map((r) => [ascii(r.technician), r.total]),
   );
   tableRow(
     "Por Categoria",
     [["Categoria", "Total"]],
     (data.byCat || []).map((r) => [ascii(r.category), r.total]),
-    "Por Departamento",
-    [["Departamento", "Total"]],
+    "Por Setor",
+    [["Setor", "Total"]],
     (data.byDept || []).map((r) => [ascii(r.department), r.total]),
   );
   tableRow(
     "Mais Solicitantes",
     [["Nome", "Total"]],
     (data.topRequesters || []).map((r) => [ascii(r.name), r.total]),
-    "Tempo Medio de Resolucao (min)",
-    [["Categoria", "Media"]],
-    (data.avg || []).map((r) => [ascii(r.category), r.avgMinutes]),
+    "Tempo Médio por Núcleo (min)",
+    [["Núcleo", "Média"]],
+    (data.avgByUnit || []).map((r) => [ascii(r.unit), r.avgMinutes]),
   );
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -277,14 +287,14 @@ async function exportPdf(data, monthly, range) {
   // PARTE INFERIOR — GRÁFICOS VERTICAIS (grade 3 colunas)
   // ═══════════════════════════════════════════════════════════════════════════
   chartRow(
-    { title: "Por Unidade",   rows: data.byUnit  || [], lk: "unit",       vk: "total" },
-    { title: "Por Tecnico",   rows: data.byTech  || [], lk: "technician", vk: "total" },
+    { title: "Por Núcleo",    rows: data.byUnit  || [], lk: "unit",       vk: "total" },
+    { title: "Por Técnico",  rows: data.byTech  || [], lk: "technician", vk: "total" },
     { title: "Por Categoria", rows: data.byCat   || [], lk: "category",   vk: "total" },
   );
   chartRow(
-    { title: "Por Departamento", rows: data.byDept  || [], lk: "department", vk: "total" },
-    { title: "Mais Solicitantes",rows: data.topRequesters || [], lk: "name", vk: "total" },
-    { title: "Tempo Medio (min)",rows: data.avg     || [], lk: "category",   vk: "avgMinutes" },
+    { title: "Por Setor",          rows: data.byDept        || [], lk: "department", vk: "total"      },
+    { title: "Mais Solicitantes",  rows: data.topRequesters || [], lk: "name",       vk: "total"      },
+    { title: "Tempo Médio por Núcleo (min)", rows: data.avgByUnit || [], lk: "unit", vk: "avgMinutes" },
   );
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -570,17 +580,19 @@ export default function AnalyticsPage() {
       api.get(`/analytics/by-department${q}`),
       api.get(`/analytics/by-category${q}`),
       api.get(`/analytics/avg-resolution${q}`),
+      api.get(`/analytics/avg-resolution-by-unit${q}`),
       api.get(`/analytics/other${q}`),
       api.get(`/analytics/top-requesters${q}&limit=10`),
       api.get(`/analytics/by-day${q}`),
       api.get(`/analytics/by-month${q}`),
-    ]).then(([u, t, d, c, a, o, r, day, mon]) => {
+    ]).then(([u, t, d, c, a, au, o, r, day, mon]) => {
       setData({
         byUnit:        u.data,
         byTech:        t.data,
         byDept:        d.data,
         byCat:         c.data,
         avg:           a.data,
+        avgByUnit:     au.data,
         topRequesters: r.data.map((x) => ({ name: x.name, total: x.total })),
       });
       setOthers(o.data);
@@ -660,17 +672,17 @@ export default function AnalyticsPage() {
 
         {/* Grid de gráficos */}
         <div className="grid md:grid-cols-2 gap-5">
-          <ChartCard title="Chamados por unidade"    data={data.byUnit  || []} xKey="unit"        loading={loading} />
+          <ChartCard title="Chamados por Núcleo"    data={data.byUnit  || []} xKey="unit"        loading={loading} />
           <ChartCard title="Chamados por técnico"    data={data.byTech  || []} xKey="technician"  loading={loading} />
-          <ChartCard title="Top departamentos"       data={data.byDept  || []} xKey="department"  loading={loading} />
-          <ChartCard title="Categorias mais abertas" data={data.byCat   || []} xKey="category"    loading={loading} />
-          <ChartCard title="Mais solicitantes"       data={data.topRequesters || []} xKey="name"  loading={loading} />
+          <ChartCard title="Setores mais Solicitantes" data={data.byDept  || []} xKey="department"  loading={loading} />
+          <ChartCard title="Categorias mais solicitadas" data={data.byCat   || []} xKey="category"    loading={loading} />
+          <ChartCard title="Usuários mais solicitantes"       data={data.topRequesters || []} xKey="name"  loading={loading} />
         </div>
 
         <ChartCard
-          title="Tempo médio de resolução por categoria (minutos)"
-          data={data.avg || []}
-          xKey="category"
+          title="Tempo médio de resolução por núcleo (minutos)"
+          data={data.avgByUnit || []}
+          xKey="unit"
           yKey="avgMinutes"
           loading={loading}
           onlyBar
