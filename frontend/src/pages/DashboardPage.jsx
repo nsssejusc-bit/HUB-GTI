@@ -38,10 +38,25 @@ export default function DashboardPage() {
     try {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const params = { from: today.toISOString() };
-      if (categoryFilter) params.categoryId = categoryFilter;
-      const { data } = await api.get("/tickets", { params });
-      setTickets(data.tickets);
+
+      const activeParams = {};
+      const completedParams = { status: "COMPLETED", from: today.toISOString() };
+      if (categoryFilter) {
+        activeParams.categoryId = categoryFilter;
+        completedParams.categoryId = categoryFilter;
+      }
+
+      // Ativos: sem filtro de data (mostra todos em aberto independente de quando foram criados)
+      // Concluídos: apenas os de hoje
+      const [activeRes, completedRes] = await Promise.all([
+        api.get("/tickets", { params: { ...activeParams, limit: 500 } }),
+        api.get("/tickets", { params: completedParams }),
+      ]);
+
+      const activeTickets    = activeRes.data.tickets.filter((t) => ACTIVE_STATUSES.includes(t.status));
+      const completedTickets = completedRes.data.tickets;
+
+      setTickets([...activeTickets, ...completedTickets]);
       setLastUpdated(new Date());
     } finally {
       setLoading(false);
@@ -81,7 +96,9 @@ export default function DashboardPage() {
   // KPI counts
   const active    = tickets.filter((t) => ACTIVE_STATUSES.includes(t.status));
   const completed = tickets.filter((t) => t.status === "COMPLETED");
-  const noUnit    = tickets.filter((t) => !t.unit);
+  const noUnit    = tickets.filter((t) => ACTIVE_STATUSES.includes(t.status) && !t.unit);
+  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+  const todayTotal = tickets.filter((t) => new Date(t.openedAt) >= todayStart);
 
   // Filtro de exibição
   let visible = filter === "active" ? active : filter === "completed" ? completed : tickets;
@@ -128,10 +145,10 @@ export default function DashboardPage() {
 
         {/* KPIs */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <KpiCard title="Total hoje"    value={tickets.length} icon={Ticket}       sub={`${active.length} ativo${active.length !== 1 ? "s" : ""}`} />
-          <KpiCard title="Em andamento" value={active.length}   icon={Activity} />
-          <KpiCard title="Concluídos"   value={completed.length} icon={CheckCircle2} sub={tickets.length ? `${Math.round((completed.length / tickets.length) * 100)}% do total` : "—"} />
-          <KpiCard title="Sem unidade"  value={noUnit.length}   icon={AlertCircle}  highlight={noUnit.length > 0} />
+          <KpiCard title="Total hoje"    value={todayTotal.length} icon={Ticket}       sub={`${active.length} ativo${active.length !== 1 ? "s" : ""}`} />
+          <KpiCard title="Em andamento" value={active.length}     icon={Activity} />
+          <KpiCard title="Concluídos"   value={completed.length}  icon={CheckCircle2} sub={todayTotal.length ? `${Math.round((completed.length / todayTotal.length) * 100)}% de hoje` : "—"} />
+          <KpiCard title="Sem unidade"  value={noUnit.length}     icon={AlertCircle}  highlight={noUnit.length > 0} />
         </div>
 
         {/* Filtros */}

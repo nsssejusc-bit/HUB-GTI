@@ -5,7 +5,7 @@ import { useTheme } from "../context/ThemeContext";
 import { api } from "../lib/api";
 import {
   LayoutDashboard, BarChart2, LogOut, Users,
-  Crown, Sun, Moon, Building2, ChevronDown, UserCircle, Ticket,
+  Crown, Sun, Moon, Building2, ChevronDown, UserCircle, Ticket, KeyRound,
 } from "lucide-react";
 
 const ROLE_LABEL = {
@@ -22,6 +22,7 @@ export default function AppHeader() {
   const loc = useLocation();
   const nav = useNavigate();
   const [pendingCount, setPendingCount] = useState(0);
+  const [resetCount,   setResetCount]   = useState(0);
   const [adminOpen, setAdminOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
   const adminRef = useRef(null);
@@ -39,14 +40,13 @@ export default function AppHeader() {
   }, []);
 
   useEffect(() => {
-    if (user?.role === "ADMIN") {
+    if (user?.role !== "ADMIN") return;
+    function fetchCounts() {
       api.get("/users?role=USER").then((r) => setPendingCount(r.data.length));
+      api.get("/password-reset-requests").then((r) => setResetCount(r.data.length)).catch(() => {});
     }
-    const t = setInterval(() => {
-      if (user?.role === "ADMIN") {
-        api.get("/users?role=USER").then((r) => setPendingCount(r.data.length));
-      }
-    }, 30000);
+    fetchCounts();
+    const t = setInterval(fetchCounts, 30000);
     return () => clearInterval(t);
   }, [user]);
 
@@ -110,9 +110,9 @@ export default function AppHeader() {
                     : "text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-gray-800"
                 }`}
               >
-                {pendingCount > 0 && (
+                {(pendingCount + resetCount) > 0 && (
                   <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-white text-[10px] font-bold z-10">
-                    {pendingCount > 9 ? "9+" : pendingCount}
+                    {(pendingCount + resetCount) > 9 ? "9+" : (pendingCount + resetCount)}
                   </span>
                 )}
                 <Crown size={14} className="text-amber-500" />
@@ -150,6 +150,20 @@ export default function AppHeader() {
                   >
                     <Building2 size={15} />
                     Setores
+                  </Link>
+                  {resetCount > 0 && <div className="h-px bg-slate-100 dark:bg-gray-700/60" />}
+                  <Link
+                    to="/painel/usuarios?tab=resets"
+                    onClick={() => setAdminOpen(false)}
+                    className="flex items-center gap-2.5 px-3.5 py-2.5 text-sm transition text-slate-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-800"
+                  >
+                    <KeyRound size={15} />
+                    Redefinições
+                    {resetCount > 0 && (
+                      <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400 text-[10px] font-bold">
+                        {resetCount}
+                      </span>
+                    )}
                   </Link>
                 </div>
               )}

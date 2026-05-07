@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { api } from "../lib/api";
 import AppHeader from "../components/AppHeader";
 import { Alert, Spinner } from "../components/ui";
@@ -12,11 +13,12 @@ import {
 
 export default function UsersPage() {
   const { user: me } = useAuth();
+  const [searchParams] = useSearchParams();
   const [users, setUsers] = useState([]);
   const [units, setUnits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
-  const [tab, setTab] = useState("base");
+  const [tab, setTab] = useState(searchParams.get("tab") || "base");
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [confirmAdmin, setConfirmAdmin] = useState(null);
   const [resetResult, setResetResult] = useState(null);
@@ -107,11 +109,10 @@ export default function UsersPage() {
   const tabData = { base, active, admins, all: users };
 
   const tabs = [
-    { key: "base",   label: "Usuários", count: base.length,          highlight: false },
-    { key: "active", label: "Técnicos", count: active.length,        highlight: false },
-    { key: "admins", label: "Admins",   count: admins.length,        highlight: false },
-    { key: "all",    label: "Todos",    count: users.length,         highlight: false },
-    { key: "resets", label: "Senhas",   count: resetRequests.length, highlight: resetRequests.length > 0 },
+    { key: "base",   label: "Usuários", count: base.length,   highlight: false },
+    { key: "active", label: "Técnicos", count: active.length, highlight: false },
+    { key: "admins", label: "Admins",   count: admins.length, highlight: false },
+    { key: "all",    label: "Todos",    count: users.length,  highlight: false },
   ];
 
   return (
