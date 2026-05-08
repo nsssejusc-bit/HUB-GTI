@@ -18,7 +18,7 @@ export default function UsersPage() {
   const [units, setUnits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
-  const [tab, setTab] = useState(searchParams.get("tab") || "base");
+  const [tab, setTab] = useState(searchParams.get("tab") || "all");
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [confirmAdmin, setConfirmAdmin] = useState(null);
   const [resetResult, setResetResult] = useState(null);
@@ -102,17 +102,17 @@ export default function UsersPage() {
     setTimeout(() => setCopied(false), 2000);
   }
 
-  const base   = users.filter((u) => u.role === "USER");
-  const active = users.filter((u) => u.active && u.role === "TECHNICIAN");
-  const admins = users.filter((u) => u.role === "ADMIN");
+  const servidores = users.filter((u) => u.role === "USER");
+  const tecnicos   = users.filter((u) => u.active && u.role === "TECHNICIAN");
+  const admins     = users.filter((u) => u.role === "ADMIN");
 
-  const tabData = { base, active, admins, all: users };
+  const tabData = { all: users, servidores, tecnicos, admins };
 
   const tabs = [
-    { key: "base",   label: "Usuários", count: base.length,   highlight: false },
-    { key: "active", label: "Técnicos", count: active.length, highlight: false },
-    { key: "admins", label: "Admins",   count: admins.length, highlight: false },
-    { key: "all",    label: "Todos",    count: users.length,  highlight: false },
+    { key: "all",        label: "Todos",     count: users.length,       highlight: false },
+    { key: "servidores", label: "Servidores", count: servidores.length,  highlight: false },
+    { key: "tecnicos",   label: "Técnicos",  count: tecnicos.length,    highlight: false },
+    { key: "admins",     label: "Admins",    count: admins.length,      highlight: false },
   ];
 
   return (
@@ -328,7 +328,7 @@ export default function UsersPage() {
           </div>
         ) : tabData[tab].length === 0 ? (
           <div className="card p-10 text-center text-slate-400 dark:text-gray-500">
-            {tab === "base" ? "Nenhum usuário sem função definida 🎉" : "Nenhum usuário nesta categoria"}
+            Nenhum usuário nesta categoria
           </div>
         ) : (
           <div className="card divide-y divide-slate-100 dark:divide-gray-700/60">

@@ -23,16 +23,14 @@ export default function AppHeader() {
   const nav = useNavigate();
   const [pendingCount, setPendingCount] = useState(0);
   const [resetCount,   setResetCount]   = useState(0);
-  const [adminOpen, setAdminOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
-  const adminRef = useRef(null);
   const userRef = useRef(null);
 
   const isStaff = STAFF_ROLES.includes(user?.role);
+  const isAdmin = user?.role === "ADMIN";
 
   useEffect(() => {
     function handle(e) {
-      if (adminRef.current && !adminRef.current.contains(e.target)) setAdminOpen(false);
       if (userRef.current && !userRef.current.contains(e.target)) setUserOpen(false);
     }
     document.addEventListener("mousedown", handle);
@@ -40,7 +38,7 @@ export default function AppHeader() {
   }, []);
 
   useEffect(() => {
-    if (user?.role !== "ADMIN") return;
+    if (!isAdmin) return;
     function fetchCounts() {
       api.get("/users?role=USER").then((r) => setPendingCount(r.data.length));
       api.get("/password-reset-requests").then((r) => setResetCount(r.data.length)).catch(() => {});
@@ -48,18 +46,17 @@ export default function AppHeader() {
     fetchCounts();
     const t = setInterval(fetchCounts, 30000);
     return () => clearInterval(t);
-  }, [user]);
+  }, [isAdmin]);
 
-  const isActive = (to) => loc.pathname === to;
+  const isActive = (path) => loc.pathname === path;
+  const isActiveSearch = (path, search) => loc.pathname === path && loc.search.includes(search);
 
-  const navCls = (to) =>
-    `flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg transition whitespace-nowrap ${
-      isActive(to)
+  const navCls = (active) =>
+    `relative flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg transition whitespace-nowrap ${
+      active
         ? "bg-brand-50 text-brand-700 dark:bg-brand-900/40 dark:text-brand-400"
         : "text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-gray-800"
     }`;
-
-  const adminIsActive = ["/painel/usuarios", "/painel/setores"].includes(loc.pathname);
 
   return (
     <header className="sticky top-0 z-30 bg-white/90 dark:bg-gray-900/95 backdrop-blur-md border-b border-slate-200 dark:border-gray-700">
@@ -75,99 +72,62 @@ export default function AppHeader() {
           </span>
         </Link>
 
-        {/* ── Nav principal (só para staff) ── */}
+        {/* ── Nav ── */}
         <nav className="flex items-center gap-0.5 flex-1 min-w-0">
-          {isStaff && (
-            <>
-              <Link to="/painel" className={navCls("/painel")}>
-                <LayoutDashboard size={15} />
-                <span className="hidden sm:inline">Painel</span>
-              </Link>
 
-              <Link to="/painel/relatorios" className={navCls("/painel/relatorios")}>
-                <BarChart2 size={15} />
-                <span className="hidden sm:inline">Relatórios</span>
-              </Link>
-            </>
-          )}
-
-          {/* Link Meus Chamados para USER simples */}
+          {/* USER */}
           {!isStaff && (
-            <Link to="/perfil" className={navCls("/perfil")}>
+            <Link to="/perfil" className={navCls(isActive("/perfil"))}>
               <Ticket size={15} />
               <span className="hidden sm:inline">Meus chamados</span>
             </Link>
           )}
 
-          {/* Dropdown Admin */}
-          {user?.role === "ADMIN" && (
-            <div className="relative" ref={adminRef}>
-              <button
-                onClick={() => setAdminOpen((o) => !o)}
-                className={`relative flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg transition ${
-                  adminIsActive
-                    ? "bg-brand-50 text-brand-700 dark:bg-brand-900/40 dark:text-brand-400"
-                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-gray-800"
-                }`}
-              >
-                {(pendingCount + resetCount) > 0 && (
-                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-white text-[10px] font-bold z-10">
-                    {(pendingCount + resetCount) > 9 ? "9+" : (pendingCount + resetCount)}
-                  </span>
-                )}
-                <Crown size={14} className="text-amber-500" />
-                <span className="hidden sm:inline">Admin</span>
-                <ChevronDown size={13} className={`transition-transform duration-200 ${adminOpen ? "rotate-180" : ""}`} />
-              </button>
+          {/* STAFF + ADMIN */}
+          {isStaff && (
+            <Link to="/painel" className={navCls(isActive("/painel"))}>
+              <LayoutDashboard size={15} />
+              <span className="hidden sm:inline">Painel</span>
+            </Link>
+          )}
 
-              {adminOpen && (
-                <div className="absolute left-0 top-full mt-1.5 w-44 rounded-xl border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg overflow-hidden z-50">
-                  <Link
-                    to="/painel/usuarios"
-                    onClick={() => setAdminOpen(false)}
-                    className={`flex items-center gap-2.5 px-3.5 py-2.5 text-sm transition ${
-                      isActive("/painel/usuarios")
-                        ? "bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-400 font-medium"
-                        : "text-slate-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-800"
-                    }`}
-                  >
-                    <Users size={15} />
-                    Usuários
-                    {pendingCount > 0 && (
-                      <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 text-[10px] font-bold">
-                        {pendingCount}
-                      </span>
-                    )}
-                  </Link>
-                  <Link
-                    to="/painel/setores"
-                    onClick={() => setAdminOpen(false)}
-                    className={`flex items-center gap-2.5 px-3.5 py-2.5 text-sm transition ${
-                      isActive("/painel/setores")
-                        ? "bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-400 font-medium"
-                        : "text-slate-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-800"
-                    }`}
-                  >
-                    <Building2 size={15} />
-                    Setores
-                  </Link>
-                  {resetCount > 0 && <div className="h-px bg-slate-100 dark:bg-gray-700/60" />}
-                  <Link
-                    to="/painel/usuarios?tab=resets"
-                    onClick={() => setAdminOpen(false)}
-                    className="flex items-center gap-2.5 px-3.5 py-2.5 text-sm transition text-slate-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-800"
-                  >
-                    <KeyRound size={15} />
-                    Redefinições
-                    {resetCount > 0 && (
-                      <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400 text-[10px] font-bold">
-                        {resetCount}
-                      </span>
-                    )}
-                  </Link>
-                </div>
+          {isStaff && (
+            <Link to="/painel/relatorios" className={navCls(isActive("/painel/relatorios"))}>
+              <BarChart2 size={15} />
+              <span className="hidden sm:inline">Relatórios</span>
+            </Link>
+          )}
+
+          {/* ADMIN only */}
+          {isAdmin && (
+            <Link to="/painel/usuarios" className={navCls(isActive("/painel/usuarios") && !loc.search.includes("tab=resets"))}>
+              {pendingCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-white text-[10px] font-bold">
+                  {pendingCount > 9 ? "9+" : pendingCount}
+                </span>
               )}
-            </div>
+              <Users size={15} />
+              <span className="hidden sm:inline">Usuários</span>
+            </Link>
+          )}
+
+          {isAdmin && (
+            <Link to="/painel/setores" className={navCls(isActive("/painel/setores"))}>
+              <Building2 size={15} />
+              <span className="hidden sm:inline">Setores</span>
+            </Link>
+          )}
+
+          {isAdmin && (
+            <Link to="/painel/usuarios?tab=resets" className={navCls(isActiveSearch("/painel/usuarios", "tab=resets"))}>
+              {resetCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold">
+                  {resetCount > 9 ? "9+" : resetCount}
+                </span>
+              )}
+              <KeyRound size={15} />
+              <span className="hidden sm:inline">Redefinições</span>
+            </Link>
           )}
         </nav>
 
@@ -189,7 +149,7 @@ export default function AppHeader() {
               onClick={() => setUserOpen((o) => !o)}
               className="hidden sm:flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-100 dark:hover:bg-gray-800 transition"
             >
-              {user?.role === "ADMIN" && <Crown size={11} className="text-amber-500 shrink-0" />}
+              {isAdmin && <Crown size={11} className="text-amber-500 shrink-0" />}
               <div className="text-right leading-tight max-w-[120px]">
                 <div className="text-sm font-medium text-slate-800 dark:text-gray-100 truncate">
                   {user?.name?.split(" ")[0]}

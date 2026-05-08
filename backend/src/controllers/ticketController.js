@@ -308,6 +308,7 @@ export async function deleteTicket(req, res) {
   const ticket = await prisma.ticket.findUnique({ where: { id } });
   if (!ticket) return res.status(404).json({ error: "Chamado não encontrado" });
   await prisma.ticket.delete({ where: { id } });
+  req.app.get("io")?.emit("ticket:deleted", { id });
   res.json({ ok: true });
 }
 

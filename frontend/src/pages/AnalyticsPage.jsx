@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { api } from "../lib/api";
 import AppHeader from "../components/AppHeader";
 import { Spinner } from "../components/ui";
 import { useTheme } from "../context/ThemeContext";
+import { useSocket } from "../context/SocketContext";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell,
   PieChart, Pie, Legend, AreaChart, Area,
@@ -393,7 +394,7 @@ function ChartCard({ title, data, xKey, yKey = "total", loading, onlyBar = false
               height={data.length > 4 ? 50 : 30}
             />
             <YAxis tick={{ fontSize: 11, fill: tick }} tickLine={false} axisLine={false} />
-            <Tooltip contentStyle={tooltip} />
+            <Tooltip contentStyle={tooltip} cursor={false} />
             <Bar dataKey={yKey} radius={[6, 6, 0, 0]} maxBarSize={48}>
               {data.map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
             </Bar>
@@ -492,6 +493,7 @@ function DailyChart({ data, loading }) {
             <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: tick }} tickLine={false} axisLine={false} />
             <Tooltip
               contentStyle={tooltip}
+              cursor={false}
               labelFormatter={(d) => { const [y, m, day] = d.split("-"); return `${day}/${m}/${y}`; }}
               formatter={(v) => [v, "Chamados"]}
             />
@@ -535,6 +537,7 @@ function MonthlyChart({ data, loading }) {
             <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: tick }} tickLine={false} axisLine={false} />
             <Tooltip
               contentStyle={tooltip}
+              cursor={false}
               labelFormatter={fmtMonthLong}
               formatter={(v, name) => {
                 const labels = { completed: "Concluídos", inProgress: "Em Atendimento", open: "Abertos" };
@@ -562,6 +565,8 @@ export default function AnalyticsPage() {
   const today     = new Date().toISOString().slice(0, 10);
   const thirtyAgo = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
 
+  const socket = useSocket();
+
   const [range,    setRange]   = useState({ from: thirtyAgo, to: today });
   const [data,     setData]    = useState({});
   const [daily,    setDaily]   = useState([]);
@@ -571,9 +576,9 @@ export default function AnalyticsPage() {
   const [pdfBusy,  setPdfBusy] = useState(false);
   const [pdfErr,   setPdfErr]  = useState("");
 
-  useEffect(() => {
+  const load = useCallback((from, to) => {
     setLoading(true);
-    const q = `?from=${range.from}&to=${range.to}T23:59:59`;
+    const q = `?from=${from}&to=${to}T23:59:59`;
     Promise.all([
       api.get(`/analytics/by-unit${q}`),
       api.get(`/analytics/by-technician${q}`),
@@ -599,7 +604,19 @@ export default function AnalyticsPage() {
       setDaily(day.data);
       setMonthly(mon.data);
     }).finally(() => setLoading(false));
-  }, [range]);
+  }, []);
+
+  useEffect(() => {
+    load(range.from, range.to);
+  }, [range, load]);
+
+  useEffect(() => {
+    const s = socket?.current;
+    if (!s) return;
+    const onDeleted = () => load(range.from, range.to);
+    s.on("ticket:deleted", onDeleted);
+    return () => s.off("ticket:deleted", onDeleted);
+  }, [socket, load, range]);
 
   async function handleExportPdf() {
     setPdfBusy(true);

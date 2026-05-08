@@ -83,13 +83,16 @@ export default function DashboardPage() {
       load();
     };
 
-    const onUpdated = () => load();
+    const onUpdated  = () => load();
+    const onDeleted  = ({ id }) => setTickets((prev) => prev.filter((t) => t.id !== id));
 
     s.on("ticket:created", onCreated);
     s.on("ticket:updated", onUpdated);
+    s.on("ticket:deleted", onDeleted);
     return () => {
       s.off("ticket:created", onCreated);
       s.off("ticket:updated", onUpdated);
+      s.off("ticket:deleted", onDeleted);
     };
   }, [socket, load, addToast]);
 
