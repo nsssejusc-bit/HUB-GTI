@@ -236,3 +236,136 @@ export async function otherReclassified(req, res) {
   });
   res.json(tickets);
 }
+
+// ── OS Analytics ──────────────────────────────────────────────────────────────
+
+function parseOsRange(q) {
+  const where = {};
+  if (q.from || q.to) {
+    where.createdAt = {};
+    if (q.from) where.createdAt.gte = new Date(q.from);
+    if (q.to)   where.createdAt.lte = new Date(q.to);
+  }
+  return where;
+}
+
+const OS_TIPO_LABELS = {
+  VISITA_TECNICA:           "Visita Técnica",
+  TROCA_EQUIPAMENTO:        "Troca de Equipamento",
+  ENTREGA:                  "Entrega",
+  MANUTENCAO_REDE:          "Manutenção de Rede",
+  MANUTENCAO_CAMERA:        "Manutenção de Câmera",
+  RECOLHIMENTO_EQUIPAMENTO: "Recolhimento de Equipamento",
+  ACAO:                     "Ação",
+  OUTRO:                    "Outro",
+};
+
+const OS_STATUS_LABELS = {
+  ABERTA:       "Aberta",
+  EM_ANDAMENTO: "Em Andamento",
+  CONCLUIDA:    "Concluída",
+  CANCELADA:    "Cancelada",
+};
+
+export async function osByStatus(req, res) {
+  const where = parseOsRange(req.query);
+  const data = await prisma.workOrder.groupBy({
+    by: ["status"],
+    where,
+    _count: { _all: true },
+  });
+  res.json(data.map((d) => ({
+    status: d.status,
+    label:  OS_STATUS_LABELS[d.status] || d.status,
+    total:  d._count._all,
+  })));
+}
+
+export async function osByTipo(req, res) {
+  const where = parseOsRange(req.query);
+  const data = await prisma.workOrder.groupBy({
+    by: ["tipo"],
+    where,
+    _count: { _all: true },
+    orderBy: { _count: { tipo: "desc" } },
+  });
+  res.json(data.map((d) => ({
+    tipo:  d.tipo,
+    label: OS_TIPO_LABELS[d.tipo] || d.tipo,
+    total: d._count._all,
+  })));
+}
+
+export async function osByUnit(req, res) {
+  const where = parseOsRange(req.query);
+  const data = await prisma.workOrder.groupBy({
+    by: ["unitId"],
+    where,
+    _count: { _all: true },
+  });
+  const units = await prisma.unit.findMany();
+  const map = new Map(units.map((u) => [u.id, u.name]));
+  res.json(data.map((d) => ({
+    unitId: d.unitId,
+    unit:   d.unitId ? (map.get(d.unitId) || "Desconhecido") : "Sem núcleo",
+    total:  d._count._all,
+  })));
+}
+
+export async function osByTecnico(req, res) {
+  const start = req.query.from ? new Date(req.query.from) : new Date(Date.now() - 365 * 86400000);
+  const end   = req.query.to   ? new Date(req.query.to)   : new Date();
+  start.setHours(0, 0, 0, 0);
+  end.setHours(23, 59, 59, 999);
+
+  const rows = await prisma.$queryRaw`
+    SELECT ot.userId, COUNT(*) AS total
+    FROM OsTecnico ot
+    JOIN WorkOrder wo ON wo.id = ot.osId
+    WHERE wo.createdAt >= ${start} AND wo.createdAt <= ${end}
+    GROUP BY ot.userId
+    ORDER BY total DESC
+  `;
+
+  const ids = rows.map((r) => Number(r.userId));
+  const users = ids.length > 0
+    ? await prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } })
+    : [];
+  const map = new Map(users.map((u) => [u.id, u.name]));
+
+  res.json(rows.map((r) => ({
+    userId:  Number(r.userId),
+    tecnico: map.get(Number(r.userId)) || "-",
+    total:   Number(r.total),
+  })));
+}
+
+export async function osByMonth(req, res) {
+  const start = req.query.from ? new Date(req.query.from) : new Date(Date.now() - 365 * 86400000);
+  const end   = req.query.to   ? new Date(req.query.to)   : new Date();
+  start.setHours(0, 0, 0, 0);
+  end.setHours(23, 59, 59, 999);
+
+  const rows = await prisma.$queryRaw`
+    SELECT
+      DATE_FORMAT(createdAt, '%Y-%m') AS month,
+      COUNT(*) AS total,
+      SUM(status = 'CONCLUIDA')    AS concluida,
+      SUM(status = 'ABERTA')       AS aberta,
+      SUM(status = 'EM_ANDAMENTO') AS em_andamento,
+      SUM(status = 'CANCELADA')    AS cancelada
+    FROM WorkOrder
+    WHERE createdAt >= ${start} AND createdAt <= ${end}
+    GROUP BY DATE_FORMAT(createdAt, '%Y-%m')
+    ORDER BY month ASC
+  `;
+
+  res.json(rows.map((r) => ({
+    month:       r.month,
+    total:       Number(r.total),
+    concluida:   Number(r.concluida),
+    aberta:      Number(r.aberta),
+    emAndamento: Number(r.em_andamento),
+    cancelada:   Number(r.cancelada),
+  })));
+}

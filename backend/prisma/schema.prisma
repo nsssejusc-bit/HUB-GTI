@@ -21,6 +21,24 @@ enum TicketStatus {
   COMPLETED
 }
 
+enum OsStatus {
+  ABERTA
+  EM_ANDAMENTO
+  CONCLUIDA
+  CANCELADA
+}
+
+enum OsTipo {
+  VISITA_TECNICA
+  TROCA_EQUIPAMENTO
+  ENTREGA
+  MANUTENCAO_REDE
+  MANUTENCAO_CAMERA
+  RECOLHIMENTO_EQUIPAMENTO
+  ACAO
+  OUTRO
+}
+
 model Department {
   id        Int      @id @default(autoincrement())
   name      String   @unique
@@ -31,12 +49,13 @@ model Department {
 }
 
 model Unit {
-  id          Int        @id @default(autoincrement())
-  name        String     @unique
+  id          Int         @id @default(autoincrement())
+  name        String      @unique
   description String?
-  createdAt   DateTime   @default(now())
+  createdAt   DateTime    @default(now())
   technicians User[]
   tickets     Ticket[]
+  workOrders  WorkOrder[]
 }
 
 model User {
@@ -56,6 +75,9 @@ model User {
   openedTickets      Ticket[]   @relation("TicketOpener")
   history            TicketHistory[]
   resolvedRequests   PasswordResetRequest[] @relation("ResolvedRequests")
+  createdWorkOrders  WorkOrder[] @relation("OsCreator")
+  osTecnico          OsTecnico[]
+  osHistory          OsHistory[]
 
   @@index([departmentId])
   @@index([role, active])
@@ -125,6 +147,7 @@ model Ticket {
   completedAt         DateTime?
   history             TicketHistory[]
   feedback            Feedback?
+  workOrders          TicketWorkOrder[]
 
   @@index([status])
   @@index([unitId])
@@ -162,4 +185,63 @@ model ConfigFlag {
   key       String   @id
   value     String
   updatedAt DateTime @updatedAt
+}
+
+model WorkOrder {
+  id          Int               @id @default(autoincrement())
+  osNumber    String            @unique
+  tipo        OsTipo
+  status      OsStatus          @default(ABERTA)
+  local       String
+  problema    String?           @db.Text
+  materiais   String?           @db.Text
+  prazo       DateTime?
+  relatorio   String?           @db.Text
+  unitId      Int?
+  unit        Unit?             @relation(fields: [unitId], references: [id])
+  createdById Int?
+  createdBy   User?             @relation("OsCreator", fields: [createdById], references: [id])
+  tecnicos    OsTecnico[]
+  tickets     TicketWorkOrder[]
+  history     OsHistory[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  startedAt   DateTime?
+  concludedAt DateTime?
+  cancelledAt DateTime?
+
+  @@index([status])
+  @@index([unitId])
+}
+
+model OsTecnico {
+  osId    Int
+  userId  Int
+  os      WorkOrder @relation(fields: [osId], references: [id], onDelete: Cascade)
+  user    User      @relation(fields: [userId], references: [id])
+
+  @@id([osId, userId])
+}
+
+model TicketWorkOrder {
+  ticketId    Int
+  workOrderId Int
+  ticket      Ticket    @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+
+  @@id([ticketId, workOrderId])
+}
+
+model OsHistory {
+  id         Int       @id @default(autoincrement())
+  osId       Int
+  os         WorkOrder @relation(fields: [osId], references: [id], onDelete: Cascade)
+  actorId    Int?
+  actor      User?     @relation(fields: [actorId], references: [id])
+  fromStatus OsStatus?
+  toStatus   OsStatus
+  note       String?   @db.Text
+  createdAt  DateTime  @default(now())
+
+  @@index([osId])
 }

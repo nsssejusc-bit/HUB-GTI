@@ -196,9 +196,10 @@ export default function DashboardPage() {
                 )}
               </button>
             ))}
+            <span className="ml-auto text-xs text-slate-400 dark:text-gray-500">{visible.length} chamado{visible.length !== 1 ? "s" : ""}</span>
             {isAdmin && (
               <button
-                onClick={() => setFilter("history")}
+                onClick={() => setFilter(filter === "history" ? "active" : "history")}
                 className={`relative pb-2 text-sm font-medium transition flex items-center gap-1 ${
                   filter === "history"
                     ? "text-brand-600 dark:text-brand-400"
@@ -212,7 +213,6 @@ export default function DashboardPage() {
                 )}
               </button>
             )}
-            <span className="ml-auto text-xs text-slate-400 dark:text-gray-500">{visible.length} chamado{visible.length !== 1 ? "s" : ""}</span>
           </div>
 
           {/* Filtros avançados */}

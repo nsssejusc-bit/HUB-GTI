@@ -18,4 +18,4 @@ RUN npx prisma generate
 EXPOSE 3333
 
 # Na inicialização: gera client, aplica migrations e sobe o servidor
-CMD ["sh", "-c", "npx prisma migrate deploy && npm run dev"]
+CMD ["sh", "-c", "npx prisma generate && npx prisma migrate deploy && npm run dev"]

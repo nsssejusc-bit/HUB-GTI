@@ -5,7 +5,7 @@ import { useTheme } from "../context/ThemeContext";
 import { api } from "../lib/api";
 import {
   LayoutDashboard, BarChart2, LogOut, Users,
-  Crown, Sun, Moon, Building2, ChevronDown, UserCircle, Ticket, KeyRound,
+  Crown, Sun, Moon, Building2, ChevronDown, UserCircle, Ticket, KeyRound, ClipboardList,
 } from "lucide-react";
 
 const ROLE_LABEL = {
@@ -23,6 +23,7 @@ export default function AppHeader() {
   const nav = useNavigate();
   const [pendingCount, setPendingCount] = useState(0);
   const [resetCount,   setResetCount]   = useState(0);
+  const [osOpenCount,  setOsOpenCount]  = useState(0);
   const [userOpen, setUserOpen] = useState(false);
   const userRef = useRef(null);
 
@@ -47,6 +48,16 @@ export default function AppHeader() {
     const t = setInterval(fetchCounts, 30000);
     return () => clearInterval(t);
   }, [isAdmin]);
+
+  useEffect(() => {
+    if (!isStaff) return;
+    function fetchOsCount() {
+      api.get("/work-orders?status=ABERTA").then((r) => setOsOpenCount(r.data.length)).catch(() => {});
+    }
+    fetchOsCount();
+    const t = setInterval(fetchOsCount, 30000);
+    return () => clearInterval(t);
+  }, [isStaff]);
 
   const isActive = (path) => loc.pathname === path;
   const isActiveSearch = (path, search) => loc.pathname === path && loc.search.includes(search);
@@ -95,6 +106,18 @@ export default function AppHeader() {
             <Link to="/painel/relatorios" className={navCls(isActive("/painel/relatorios"))}>
               <BarChart2 size={15} />
               <span className="hidden sm:inline">Relatórios</span>
+            </Link>
+          )}
+
+          {isStaff && (
+            <Link to="/painel/os" className={navCls(loc.pathname.startsWith("/painel/os"))}>
+              {osOpenCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-white text-[10px] font-bold">
+                  {osOpenCount > 9 ? "9+" : osOpenCount}
+                </span>
+              )}
+              <ClipboardList size={15} />
+              <span className="hidden sm:inline">OS</span>
             </Link>
           )}
 

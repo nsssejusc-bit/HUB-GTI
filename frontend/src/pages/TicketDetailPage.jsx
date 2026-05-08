@@ -5,7 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { StatusBadge, InfoItem, Alert, Spinner } from "../components/ui";
 import AppHeader from "../components/AppHeader";
 import { formatElapsed, STATUS_LABEL } from "../lib/statuses";
-import { ArrowLeft, Clock, CheckCircle2, ChevronRight, Trash2, AlertTriangle, MonitorSmartphone, Copy, Check as CheckIcon } from "lucide-react";
+import { ArrowLeft, Clock, CheckCircle2, ChevronRight, Trash2, AlertTriangle, MonitorSmartphone, Copy, Check as CheckIcon, ClipboardList, Plus, ExternalLink } from "lucide-react";
 
 const TRANSITION_LABEL = {
   VIEWED:     "Marcar como Visualizado",
@@ -38,18 +38,40 @@ export default function TicketDetailPage() {
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [linkedOs, setLinkedOs] = useState([]);
+  const [allOs, setAllOs] = useState([]);
+  const [showOsLink, setShowOsLink] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     load();
     api.get("/units").then((r) => setUnits(r.data));
     api.get("/technicians").then((r) => setTechs(r.data));
+    api.get("/work-orders").then((r) => {
+      const all = r.data;
+      setAllOs(all);
+      setLinkedOs(all.filter((os) => os.tickets.some((t) => t.id === Number(id))));
+    });
   }, [id]);
 
   async function load() {
     const { data } = await api.get(`/tickets/${id}`);
     setTicket(data);
     setForm((f) => ({ ...f, unitId: data.unit?.id || "", assignedTechId: data.technician?.id || "" }));
+  }
+
+  async function linkToOs(osId) {
+    try {
+      await api.post(`/work-orders/${osId}/tickets`, { ticketId: Number(id) });
+      const res = await api.get("/work-orders");
+      setAllOs(res.data);
+      setLinkedOs(res.data.filter((os) => os.tickets.some((t) => t.id === Number(id))));
+      setShowOsLink(false);
+    } catch (e) { setErr(e.response?.data?.error || "Erro ao vincular OS"); }
+  }
+
+  async function createAndLinkOs() {
+    window.location.href = `/painel/os?new=1&ticketId=${id}`;
   }
 
   async function doTransition(toStatus) {
@@ -224,6 +246,74 @@ export default function TicketDetailPage() {
               <div className="mt-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700 px-4 py-3">
                 <div className="text-xs font-medium text-emerald-700 dark:text-emerald-400 mb-1">Solução aplicada</div>
                 <p className="text-sm text-emerald-900 dark:text-emerald-200">{ticket.solution}</p>
+              </div>
+            )}
+          </div>
+
+          {/* Ordens de Serviço vinculadas */}
+          <div className="card p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-gray-100 flex items-center gap-2">
+                <ClipboardList size={14} className="text-brand-600" />
+                Ordens de Serviço
+              </h3>
+              {canTransition && (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowOsLink((v) => !v)}
+                    className="text-xs text-brand-600 dark:text-brand-400 hover:underline flex items-center gap-1"
+                  >
+                    <Plus size={12} /> Vincular OS
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {showOsLink && (
+              <div className="mb-3 rounded-xl border border-slate-200 dark:border-gray-700 divide-y divide-slate-100 dark:divide-gray-700/60 max-h-48 overflow-y-auto">
+                {allOs.filter((os) => !linkedOs.some((l) => l.id === os.id) && os.status !== "CONCLUIDA" && os.status !== "CANCELADA").length === 0 ? (
+                  <div className="px-3 py-3 text-sm text-slate-400 dark:text-gray-500">
+                    Nenhuma OS disponível.{" "}
+                    <Link to="/painel/os" className="text-brand-600 dark:text-brand-400 hover:underline">Criar nova OS</Link>
+                  </div>
+                ) : (
+                  allOs
+                    .filter((os) => !linkedOs.some((l) => l.id === os.id) && os.status !== "CONCLUIDA" && os.status !== "CANCELADA")
+                    .map((os) => (
+                      <button
+                        key={os.id}
+                        onClick={() => linkToOs(os.id)}
+                        className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-gray-800 transition text-sm"
+                      >
+                        <span className="font-mono text-xs text-slate-400 mr-2">{os.osNumber}</span>
+                        <span className="text-slate-700 dark:text-gray-300">{os.tipoLabel}</span>
+                        <span className="text-slate-400 ml-1">— {os.local}</span>
+                      </button>
+                    ))
+                )}
+              </div>
+            )}
+
+            {linkedOs.length === 0 ? (
+              <p className="text-sm text-slate-400 dark:text-gray-500">Nenhuma OS vinculada.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {linkedOs.map((os) => (
+                  <Link
+                    key={os.id}
+                    to={`/painel/os/${os.id}`}
+                    className="flex items-center gap-2 rounded-lg px-3 py-2 bg-slate-50 dark:bg-gray-800/60 hover:bg-slate-100 dark:hover:bg-gray-800 transition"
+                  >
+                    <span className="font-mono text-xs text-slate-400">{os.osNumber}</span>
+                    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                      os.status === "ABERTA" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" :
+                      os.status === "EM_ANDAMENTO" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" :
+                      "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                    }`}>{os.status === "ABERTA" ? "Aberta" : os.status === "EM_ANDAMENTO" ? "Em Andamento" : "Concluída"}</span>
+                    <span className="text-sm text-slate-600 dark:text-gray-400 truncate">{os.tipoLabel} — {os.local}</span>
+                    <ExternalLink size={12} className="ml-auto text-slate-400 shrink-0" />
+                  </Link>
+                ))}
               </div>
             )}
           </div>

@@ -14,6 +14,8 @@ import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import DashboardPage from "./pages/DashboardPage";
 import TicketDetailPage from "./pages/TicketDetailPage";
 import AnalyticsPage from "./pages/AnalyticsPage";
+import WorkOrdersPage from "./pages/WorkOrdersPage";
+import WorkOrderDetailPage from "./pages/WorkOrderDetailPage";
 import UsersPage from "./pages/UsersPage";
 import DepartmentsPage from "./pages/DepartmentsPage";
 import ProfilePage from "./pages/ProfilePage";
@@ -71,6 +73,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(
                 <Route path="/painel" element={<Protected staffOnly><DashboardPage /></Protected>} />
                 <Route path="/painel/chamado/:id" element={<Protected staffOnly><TicketDetailPage /></Protected>} />
                 <Route path="/painel/relatorios" element={<Protected staffOnly><AnalyticsPage /></Protected>} />
+                <Route path="/painel/os" element={<Protected staffOnly><WorkOrdersPage /></Protected>} />
+                <Route path="/painel/os/:id" element={<Protected staffOnly><WorkOrderDetailPage /></Protected>} />
 
                 {/* Admin only */}
                 <Route path="/painel/usuarios" element={<Protected adminOnly><UsersPage /></Protected>} />

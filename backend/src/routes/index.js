@@ -20,7 +20,13 @@ import {
   ticketsByUnit, ticketsByTechnician, ticketsByDepartment,
   ticketsByCategory, avgResolutionByCategory, avgResolutionByUnit, otherReclassified,
   topRequesters, ticketsByDay, ticketsByMonth,
+  osByStatus, osByTipo, osByUnit, osByTecnico, osByMonth,
 } from "../controllers/analyticsController.js";
+import {
+  createWorkOrder, listWorkOrders, getWorkOrder, updateWorkOrder,
+  transitionWorkOrder, addTecnico, removeTecnico, linkTicket, unlinkTicket,
+  deleteWorkOrder,
+} from "../controllers/workOrderController.js";
 import { authRequired, optionalAuth, requireRole } from "../middleware/auth.js";
 
 // 10 tentativas por IP a cada 15 minutos nos endpoints de autenticação
@@ -86,6 +92,20 @@ router.get("/tickets/:id", authRequired, getTicket);
 router.post("/tickets/:id/transition", authRequired, requireRole("TECHNICIAN", "ADMIN"), transitionTicket);
 router.delete("/tickets/:id", authRequired, requireRole("ADMIN"), deleteTicket);
 
+// ── Ordens de Serviço ──────────────────────────────────────────────────────────
+const staffAccess = [authRequired, requireRole("TECHNICIAN", "ADMIN")];
+const adminOnly   = [authRequired, requireRole("ADMIN")];
+router.get("/work-orders",                          ...staffAccess, listWorkOrders);
+router.post("/work-orders",                         ...staffAccess, createWorkOrder);
+router.get("/work-orders/:id",                      ...staffAccess, getWorkOrder);
+router.patch("/work-orders/:id",                    ...staffAccess, updateWorkOrder);
+router.delete("/work-orders/:id",                   ...adminOnly,   deleteWorkOrder);
+router.post("/work-orders/:id/transition",          ...staffAccess, transitionWorkOrder);
+router.post("/work-orders/:id/tecnicos",            ...staffAccess, addTecnico);
+router.delete("/work-orders/:id/tecnicos/:userId",  ...staffAccess, removeTecnico);
+router.post("/work-orders/:id/tickets",             ...staffAccess, linkTicket);
+router.delete("/work-orders/:id/tickets/:ticketId", ...staffAccess, unlinkTicket);
+
 // ── Analytics ──────────────────────────────────────────────────────────────────
 const analyticsAccess = [authRequired, requireRole("TECHNICIAN", "ADMIN")];
 router.get("/analytics/by-unit",        ...analyticsAccess, ticketsByUnit);
@@ -98,5 +118,11 @@ router.get("/analytics/other",          ...analyticsAccess, otherReclassified);
 router.get("/analytics/top-requesters", ...analyticsAccess, topRequesters);
 router.get("/analytics/by-day",         ...analyticsAccess, ticketsByDay);
 router.get("/analytics/by-month",       ...analyticsAccess, ticketsByMonth);
+// OS analytics
+router.get("/analytics/os/by-status",  ...analyticsAccess, osByStatus);
+router.get("/analytics/os/by-tipo",    ...analyticsAccess, osByTipo);
+router.get("/analytics/os/by-unit",    ...analyticsAccess, osByUnit);
+router.get("/analytics/os/by-tecnico", ...analyticsAccess, osByTecnico);
+router.get("/analytics/os/by-month",   ...analyticsAccess, osByMonth);
 
 export default router;
