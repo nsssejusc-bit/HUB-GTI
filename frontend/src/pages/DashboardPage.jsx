@@ -3,12 +3,13 @@ import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { useSocket } from "../context/SocketContext";
 import { useToast } from "../context/ToastContext";
+import { useAuth } from "../context/AuthContext";
 import { StatusBadge, KpiCard, Spinner } from "../components/ui";
 import AppHeader from "../components/AppHeader";
 import { formatElapsed } from "../lib/statuses";
 import {
   Ticket, AlertCircle, Activity, CheckCircle2,
-  ChevronRight, Clock, RefreshCw, Filter,
+  ChevronRight, Clock, RefreshCw, Filter, History,
 } from "lucide-react";
 
 const ACTIVE_STATUSES = ["OPEN", "VIEWED", "EN_ROUTE", "IN_SERVICE"];
@@ -22,9 +23,13 @@ const FILTER_TABS = [
 export default function DashboardPage() {
   const socket  = useSocket();
   const addToast = useToast();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "ADMIN";
 
   const [tickets, setTickets]         = useState([]);
+  const [history, setHistory]         = useState([]);
   const [loading, setLoading]         = useState(true);
+  const [histLoading, setHistLoading] = useState(false);
   const [filter, setFilter]           = useState("active");
   const [lastUpdated, setLastUpdated] = useState(new Date());
 
@@ -63,11 +68,26 @@ export default function DashboardPage() {
     }
   }, [categoryFilter]);
 
+  const loadHistory = useCallback(async () => {
+    setHistLoading(true);
+    try {
+      const res = await api.get("/tickets", { params: { status: "COMPLETED", limit: 500 } });
+      setHistory(res.data.tickets);
+    } finally {
+      setHistLoading(false);
+    }
+  }, []);
+
   // Carrega filtros disponíveis
   useEffect(() => {
     api.get("/departments").then((r) => setDepartments(r.data));
     api.get("/categories").then((r) => setCategories(r.data));
   }, []);
+
+  // Carrega histórico ao trocar para essa aba
+  useEffect(() => {
+    if (filter === "history") loadHistory();
+  }, [filter, loadHistory]);
 
   // Carrega tickets e escuta socket (sem polling)
   useEffect(() => {
@@ -104,8 +124,11 @@ export default function DashboardPage() {
   const todayTotal = tickets.filter((t) => new Date(t.openedAt) >= todayStart);
 
   // Filtro de exibição
-  let visible = filter === "active" ? active : filter === "completed" ? completed : tickets;
-  if (deptFilter) visible = visible.filter((t) => t.department === deptFilter);
+  let visible = filter === "active"    ? active
+              : filter === "completed" ? completed
+              : filter === "history"   ? history
+              : tickets;
+  if (deptFilter && filter !== "history") visible = visible.filter((t) => t.department === deptFilter);
 
   // Agrupar por unidade
   const byUnit = visible.reduce((acc, t) => {
@@ -173,6 +196,22 @@ export default function DashboardPage() {
                 )}
               </button>
             ))}
+            {isAdmin && (
+              <button
+                onClick={() => setFilter("history")}
+                className={`relative pb-2 text-sm font-medium transition flex items-center gap-1 ${
+                  filter === "history"
+                    ? "text-brand-600 dark:text-brand-400"
+                    : "text-slate-500 dark:text-gray-400 hover:text-slate-700 dark:hover:text-gray-200"
+                }`}
+              >
+                <History size={13} />
+                Histórico
+                {filter === "history" && (
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-brand-600 dark:bg-brand-400" />
+                )}
+              </button>
+            )}
             <span className="ml-auto text-xs text-slate-400 dark:text-gray-500">{visible.length} chamado{visible.length !== 1 ? "s" : ""}</span>
           </div>
 
@@ -211,14 +250,14 @@ export default function DashboardPage() {
         </div>
 
         {/* Loading */}
-        {loading && (
+        {(loading || (filter === "history" && histLoading)) && (
           <div className="flex items-center justify-center py-16">
             <Spinner className="h-8 w-8" />
           </div>
         )}
 
         {/* Empty state */}
-        {!loading && visible.length === 0 && (
+        {!(loading || (filter === "history" && histLoading)) && visible.length === 0 && (
           <div className="card p-14 text-center">
             <div className="text-4xl mb-3">
               {filter === "completed" ? "✅" : filter === "active" ? "🎉" : "📭"}
@@ -226,6 +265,7 @@ export default function DashboardPage() {
             <div className="font-semibold text-slate-700 dark:text-gray-300">
               {filter === "completed" ? "Nenhum chamado concluído ainda" :
                filter === "active"    ? "Nenhum chamado ativo no momento" :
+               filter === "history"   ? "Nenhum chamado no histórico" :
                "Nenhum chamado hoje"}
             </div>
             <p className="text-sm text-slate-400 dark:text-gray-500 mt-1">
@@ -235,7 +275,7 @@ export default function DashboardPage() {
         )}
 
         {/* Tickets por unidade */}
-        {!loading && sortedUnits.map(([unit, list]) => {
+        {!(loading || (filter === "history" && histLoading)) && sortedUnits.map(([unit, list]) => {
           const noUnitSection   = unit === "__sem_unidade__";
           const activeInSection = list.filter((t) => ACTIVE_STATUSES.includes(t.status)).length;
           const doneInSection   = list.filter((t) => t.status === "COMPLETED").length;
