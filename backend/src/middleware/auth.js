@@ -6,11 +6,19 @@ function extractToken(req) {
   return token || null;
 }
 
+// Rotas acessíveis mesmo quando mustChangePassword === true
+const ALLOWED_WHILE_FORCED = ["/auth/change-password", "/auth/me", "/auth/logout"];
+
 export function authRequired(req, res, next) {
   const token = extractToken(req);
   if (!token) return res.status(401).json({ error: "Token ausente" });
   try {
     req.user = jwt.verify(token, process.env.JWT_SECRET);
+
+    if (req.user.mustChangePassword && !ALLOWED_WHILE_FORCED.some((p) => req.path.endsWith(p))) {
+      return res.status(403).json({ error: "Troque sua senha antes de continuar", code: "MUST_CHANGE_PASSWORD" });
+    }
+
     next();
   } catch {
     return res.status(401).json({ error: "Token inválido ou expirado" });

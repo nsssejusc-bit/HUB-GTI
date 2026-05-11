@@ -47,7 +47,17 @@ const forgotLimiter = rateLimit({
   message: { error: "Muitas solicitações. Tente novamente em 1 hora." },
 });
 
+// 300 requisições por IP por minuto — proteção geral contra abuso/DoS
+const generalLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Muitas requisições. Tente novamente em breve." },
+});
+
 const router = Router();
+router.use(generalLimiter);
 
 // ── Público ──────────────────────────────────────────────────────────────────
 router.get("/config",          getPublicConfig);

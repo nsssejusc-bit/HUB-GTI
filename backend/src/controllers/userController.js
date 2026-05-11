@@ -1,4 +1,5 @@
 import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
 import { z } from "zod";
 import { prisma } from "../config/prisma.js";
 import { stripCpf, isValidCpf, maskCpf } from "../utils/cpf.js";
@@ -183,9 +184,23 @@ export async function changePassword(req, res) {
   }
 
   const passwordHash = await bcrypt.hash(newPassword, 10);
-  await prisma.user.update({
+  const updated = await prisma.user.update({
     where: { id: req.user.id },
     data: { passwordHash, mustChangePassword: false },
+  });
+
+  // Re-emite o token com mustChangePassword: false para evitar re-login obrigatório
+  const expiresIn = process.env.JWT_EXPIRES_IN || "8h";
+  const newToken = jwt.sign(
+    { id: updated.id, role: updated.role, name: updated.name, unitId: updated.unitId, mustChangePassword: false },
+    process.env.JWT_SECRET,
+    { expiresIn }
+  );
+  res.cookie("hd_token", newToken, {
+    httpOnly: true,
+    secure: process.env.COOKIE_SECURE === "true",
+    sameSite: "strict",
+    maxAge: 8 * 60 * 60 * 1000,
   });
 
   res.json({ ok: true });

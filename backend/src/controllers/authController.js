@@ -2,6 +2,7 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { prisma } from "../config/prisma.js";
 import { stripCpf, isValidCpf, maskCpf } from "../utils/cpf.js";
+import { RESET_STATUS } from "../constants/index.js";
 
 const normalize = (s) => s.trim().toLowerCase().replace(/\s+/g, " ");
 
@@ -30,7 +31,7 @@ export async function login(req, res) {
 
   const expiresIn = process.env.JWT_EXPIRES_IN || "8h";
   const token = jwt.sign(
-    { id: user.id, role: user.role, name: user.name, unitId: user.unitId },
+    { id: user.id, role: user.role, name: user.name, unitId: user.unitId, mustChangePassword: user.mustChangePassword },
     process.env.JWT_SECRET,
     { expiresIn }
   );
@@ -82,7 +83,7 @@ export async function forgotPassword(req, res) {
 
   // Cancela solicitações pendentes anteriores do mesmo CPF
   await prisma.passwordResetRequest.updateMany({
-    where: { cpf: cleanCpf, status: "PENDING" },
+    where: { cpf: cleanCpf, status: RESET_STATUS.PENDING },
     data: { status: "CANCELLED" },
   });
 
@@ -95,7 +96,7 @@ export async function forgotPassword(req, res) {
 
 export async function listResetRequests(req, res) {
   const requests = await prisma.passwordResetRequest.findMany({
-    where: { status: "PENDING" },
+    where: { status: RESET_STATUS.PENDING },
     orderBy: { createdAt: "asc" },
   });
   res.json(requests.map((r) => ({
@@ -110,7 +111,7 @@ export async function listResetRequests(req, res) {
 export async function resolveResetRequest(req, res) {
   const id = Number(req.params.id);
   const request = await prisma.passwordResetRequest.findUnique({ where: { id } });
-  if (!request || request.status !== "PENDING") {
+  if (!request || request.status !== RESET_STATUS.PENDING) {
     return res.status(404).json({ error: "Solicitação não encontrada ou já resolvida" });
   }
 
@@ -132,7 +133,7 @@ export async function resolveResetRequest(req, res) {
 
   await prisma.passwordResetRequest.update({
     where: { id },
-    data: { status: "RESOLVED", resolvedAt: new Date(), resolvedById: req.user.id },
+    data: { status: RESET_STATUS.RESOLVED, resolvedAt: new Date(), resolvedById: req.user.id },
   });
 
   res.setHeader("Cache-Control", "no-store");

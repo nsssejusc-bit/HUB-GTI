@@ -38,6 +38,7 @@ export default function TicketDetailPage() {
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteErr, setDeleteErr] = useState("");
   const [linkedOs, setLinkedOs] = useState([]);
   const [allOs, setAllOs] = useState([]);
   const [showOsLink, setShowOsLink] = useState(false);
@@ -101,8 +102,7 @@ export default function TicketDetailPage() {
       await api.delete(`/tickets/${id}`);
       nav("/painel");
     } catch (e) {
-      setErr(e.response?.data?.error || "Erro ao excluir chamado");
-      setShowDeleteModal(false);
+      setDeleteErr(e.response?.data?.error || "Erro ao excluir chamado");
     } finally {
       setDeleting(false);
     }
@@ -128,7 +128,7 @@ export default function TicketDetailPage() {
       {showDeleteModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-          onClick={(e) => { if (e.target === e.currentTarget) setShowDeleteModal(false); }}
+          onClick={(e) => { if (e.target === e.currentTarget) { setShowDeleteModal(false); setDeleteErr(""); } }}
         >
           <div className="card w-full max-w-sm p-6 space-y-4">
             <div className="flex items-center gap-3">
@@ -145,9 +145,14 @@ export default function TicketDetailPage() {
               <span className="font-mono font-semibold">{ticket.ticketNumber}</span>?
               Todo o histórico será perdido permanentemente.
             </p>
+            {deleteErr && (
+              <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl px-3 py-2">
+                {deleteErr}
+              </p>
+            )}
             <div className="flex gap-2 justify-end pt-1">
               <button
-                onClick={() => setShowDeleteModal(false)}
+                onClick={() => { setShowDeleteModal(false); setDeleteErr(""); }}
                 className="btn-secondary text-sm py-2 px-4"
               >
                 Cancelar
@@ -178,7 +183,7 @@ export default function TicketDetailPage() {
             <StatusBadge status={ticket.status} />
             {isAdmin && (
               <button
-                onClick={() => setShowDeleteModal(true)}
+                onClick={() => { setShowDeleteModal(true); setDeleteErr(""); }}
                 className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 transition px-2 py-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20"
                 title="Excluir chamado"
               >

@@ -8,12 +8,21 @@ import jwt from "jsonwebtoken";
 import { Server as SocketServer } from "socket.io";
 import routes from "./routes/index.js";
 
+if (!process.env.JWT_SECRET) {
+  console.error("FATAL: JWT_SECRET não está definido. Encerrando.");
+  process.exit(1);
+}
+if (process.env.JWT_SECRET.length < 32) {
+  console.warn("AVISO: JWT_SECRET muito curto — recomendado mínimo de 32 caracteres.");
+}
+
 const allowedOrigin = process.env.CORS_ORIGIN;
 if (!allowedOrigin) {
   console.warn("AVISO: CORS_ORIGIN não definido — aceitando qualquer origem (somente dev)");
 }
 
 const app = express();
+app.set("trust proxy", 1); // necessário para rate limiting correto atrás do nginx
 const server = http.createServer(app);
 const io = new SocketServer(server, {
   cors: { origin: allowedOrigin || "*", credentials: true, methods: ["GET", "POST"] },

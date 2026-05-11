@@ -171,7 +171,7 @@ function CategoryCard({ cat, onSaved }) {
           {tipCount > 0 ? (
             <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400">
               <CheckCircle2 size={10} />
-              {tipCount} instrução{tipCount !== 1 ? "ões" : ""}
+              {tipCount} {tipCount !== 1 ? "instruções" : "instrução"}
             </span>
           ) : (
             <span className="text-xs text-slate-400 dark:text-gray-500">Sem instruções</span>
@@ -254,7 +254,7 @@ function CategoryCard({ cat, onSaved }) {
             <p className="text-xs text-slate-400 dark:text-gray-500">
               {tips.length === 0
                 ? "Sem instruções — nenhum card será exibido para esta categoria."
-                : `${tips.length} instrução${tips.length !== 1 ? "ões" : ""} configurada${tips.length !== 1 ? "s" : ""}.`}
+                : `${tips.length} ${tips.length !== 1 ? "instruções" : "instrução"} configurada${tips.length !== 1 ? "s" : ""}.`}
             </p>
             <button
               onClick={save}

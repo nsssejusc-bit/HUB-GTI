@@ -242,6 +242,11 @@ export async function transitionTicket(req, res) {
     return res.status(403).json({ error: "Apenas técnicos e administradores podem alterar o status" });
   }
 
+  // Técnico só pode transicionar chamados atribuídos a ele
+  if (req.user.role === "TECHNICIAN" && ticket.assignedTechId !== null && ticket.assignedTechId !== req.user.id) {
+    return res.status(403).json({ error: "Este chamado está atribuído a outro técnico" });
+  }
+
   const updateData = { status: toStatus };
   const now = new Date();
 

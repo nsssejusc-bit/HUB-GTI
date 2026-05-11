@@ -18,12 +18,15 @@ export async function ticketsByUnit(req, res) {
     where,
     _count: { _all: true },
   });
-  const units = await prisma.unit.findMany();
+  const unitIds = data.map((d) => d.unitId).filter(Boolean);
+  const units = unitIds.length > 0
+    ? await prisma.unit.findMany({ where: { id: { in: unitIds } }, select: { id: true, name: true } })
+    : [];
   const map = new Map(units.map((u) => [u.id, u.name]));
   res.json(
     data.map((d) => ({
       unitId: d.unitId,
-      unit: d.unitId ? map.get(d.unitId) : "Sem unidade",
+      unit: d.unitId ? (map.get(d.unitId) || "Unidade removida") : "Sem unidade",
       total: d._count._all,
     }))
   );
@@ -36,12 +39,15 @@ export async function ticketsByTechnician(req, res) {
     where,
     _count: { _all: true },
   });
-  const techs = await prisma.user.findMany({ select: { id: true, name: true } });
+  const techIds = data.map((d) => d.assignedTechId).filter(Boolean);
+  const techs = techIds.length > 0
+    ? await prisma.user.findMany({ where: { id: { in: techIds } }, select: { id: true, name: true } })
+    : [];
   const map = new Map(techs.map((t) => [t.id, t.name]));
   res.json(
     data.map((d) => ({
       technicianId: d.assignedTechId,
-      technician: d.assignedTechId ? map.get(d.assignedTechId) : "Não atribuído",
+      technician: d.assignedTechId ? (map.get(d.assignedTechId) || "Técnico removido") : "Não atribuído",
       total: d._count._all,
     }))
   );
@@ -66,7 +72,10 @@ export async function ticketsByCategory(req, res) {
     where,
     _count: { _all: true },
   });
-  const cats = await prisma.category.findMany();
+  const catIds = data.map((d) => d.categoryId).filter(Boolean);
+  const cats = catIds.length > 0
+    ? await prisma.category.findMany({ where: { id: { in: catIds } }, select: { id: true, name: true } })
+    : [];
   const map = new Map(cats.map((c) => [c.id, c.name]));
   res.json(
     data.map((d) => ({
@@ -83,7 +92,10 @@ export async function avgResolutionByCategory(req, res) {
     where,
     select: { categoryId: true, openedAt: true, completedAt: true },
   });
-  const cats = await prisma.category.findMany();
+  const catIds = [...new Set(tickets.map((t) => t.categoryId).filter(Boolean))];
+  const cats = catIds.length > 0
+    ? await prisma.category.findMany({ where: { id: { in: catIds } }, select: { id: true, name: true } })
+    : [];
   const map = new Map(cats.map((c) => [c.id, c.name]));
   const buckets = {};
   for (const t of tickets) {
@@ -199,7 +211,10 @@ export async function avgResolutionByUnit(req, res) {
     where,
     select: { unitId: true, openedAt: true, completedAt: true },
   });
-  const units = await prisma.unit.findMany();
+  const unitIds = [...new Set(tickets.map((t) => t.unitId).filter(Boolean))];
+  const units = unitIds.length > 0
+    ? await prisma.unit.findMany({ where: { id: { in: unitIds } }, select: { id: true, name: true } })
+    : [];
   const map = new Map(units.map((u) => [u.id, u.name]));
   const buckets = {};
   for (const t of tickets) {
@@ -303,7 +318,10 @@ export async function osByUnit(req, res) {
     where,
     _count: { _all: true },
   });
-  const units = await prisma.unit.findMany();
+  const unitIds = data.map((d) => d.unitId).filter(Boolean);
+  const units = unitIds.length > 0
+    ? await prisma.unit.findMany({ where: { id: { in: unitIds } }, select: { id: true, name: true } })
+    : [];
   const map = new Map(units.map((u) => [u.id, u.name]));
   res.json(data.map((d) => ({
     unitId: d.unitId,

@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { prisma } from "../config/prisma.js";
+import { allowedOsNext, canOsTransition } from "../utils/osStateMachine.js";
+import { nextOsSeq } from "../utils/nextSequence.js";
 
 const TIPO_LABELS = {
   VISITA_TECNICA:           "Visita Técnica",
@@ -11,15 +13,6 @@ const TIPO_LABELS = {
   ACAO:                     "Ação",
   OUTRO:                    "Outro",
 };
-
-const VALID_TRANSITIONS = {
-  ABERTA:       ["EM_ANDAMENTO", "CANCELADA"],
-  EM_ANDAMENTO: ["CONCLUIDA", "CANCELADA"],
-  CONCLUIDA:    [],
-  CANCELADA:    [],
-};
-
-import { nextOsSeq } from "../utils/nextSequence.js";
 
 function buildOsNumber(seq) {
   const d = new Date();
@@ -56,7 +49,7 @@ function formatOs(os) {
     startedAt:   os.startedAt,
     concludedAt: os.concludedAt,
     cancelledAt: os.cancelledAt,
-    allowedNext: VALID_TRANSITIONS[os.status] ?? [],
+    allowedNext: allowedOsNext(os.status),
   };
 }
 
@@ -105,16 +98,21 @@ export async function createWorkOrder(req, res) {
 }
 
 export async function listWorkOrders(req, res) {
-  const { status, unitId, tipo } = req.query;
+  const { status, unitId, tipo, limit, offset } = req.query;
   const where = {};
   if (status) where.status = status;
   if (unitId) where.unitId = Number(unitId);
   if (tipo)   where.tipo   = tipo;
 
+  const take = Math.min(Number(limit)  || 100, 500);
+  const skip = Math.max(Number(offset) || 0,   0);
+
   const rows = await prisma.workOrder.findMany({
     where,
     include: osInclude,
     orderBy: { createdAt: "desc" },
+    take,
+    skip,
   });
 
   res.json(rows.map(formatOs));
@@ -181,7 +179,7 @@ export async function transitionWorkOrder(req, res) {
   const os = await prisma.workOrder.findUnique({ where: { id } });
   if (!os) return res.status(404).json({ error: "OS não encontrada" });
 
-  if (!VALID_TRANSITIONS[os.status]?.includes(toStatus)) {
+  if (!canOsTransition(os.status, toStatus)) {
     return res.status(400).json({ error: `Transição inválida: ${os.status} → ${toStatus}` });
   }
 
