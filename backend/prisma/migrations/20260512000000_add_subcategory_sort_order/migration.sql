@@ -1,0 +1,1 @@
+ALTER TABLE `Subcategory` ADD COLUMN `sortOrder` INT NOT NULL DEFAULT 0;

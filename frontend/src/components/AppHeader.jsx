@@ -5,7 +5,7 @@ import { useTheme } from "../context/ThemeContext";
 import { api } from "../lib/api";
 import {
   LayoutDashboard, BarChart2, LogOut, Users,
-  Crown, Sun, Moon, Building2, ChevronDown, UserCircle, Ticket, KeyRound, ClipboardList, Lightbulb, Settings,
+  Crown, Sun, Moon, Building2, ChevronDown, UserCircle, Ticket, KeyRound, ClipboardList, Lightbulb, Settings, Tag,
 } from "lucide-react";
 
 const ROLE_LABEL = {
@@ -64,7 +64,7 @@ export default function AppHeader() {
 
   const isActive = (path) => loc.pathname === path;
   const isActiveSearch = (path, search) => loc.pathname === path && loc.search.includes(search);
-  const configActive = isActive("/painel/setores") || isActive("/painel/n1") || isActiveSearch("/painel/usuarios", "tab=resets");
+  const configActive = isActive("/painel/setores") || isActive("/painel/n1") || isActive("/painel/categorias") || isActiveSearch("/painel/usuarios", "tab=resets");
 
   const navCls = (active) =>
     `relative flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg transition whitespace-nowrap ${
@@ -177,6 +177,18 @@ export default function AppHeader() {
                   >
                     <Lightbulb size={15} />
                     Suporte N1
+                  </Link>
+                  <Link
+                    to="/painel/categorias"
+                    onClick={() => setConfigOpen(false)}
+                    className={`flex items-center gap-2.5 px-3.5 py-2.5 text-sm transition ${
+                      isActive("/painel/categorias")
+                        ? "bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-400 font-medium"
+                        : "text-slate-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-800"
+                    }`}
+                  >
+                    <Tag size={15} />
+                    Categorias
                   </Link>
                   <div className="h-px bg-slate-100 dark:bg-gray-700/60" />
                   <Link

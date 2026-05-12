@@ -10,7 +10,9 @@ import {
   transitionTicket, deleteTicket, submitFeedback,
 } from "../controllers/ticketController.js";
 import {
-  listCategories, listUnits, listTechnicians, getPublicConfig, updateCategory,
+  listCategories, listUnits, listTechnicians, getPublicConfig,
+  updateCategory, createCategory, deleteCategory, reorderCategories,
+  createSubcategory, updateSubcategory, deleteSubcategory, reorderSubcategories,
 } from "../controllers/metaController.js";
 import {
   listDepartments, listAllDepartments, createDepartment,
@@ -61,8 +63,16 @@ router.use(generalLimiter);
 
 // ── Público ──────────────────────────────────────────────────────────────────
 router.get("/config",          getPublicConfig);
-router.get("/categories",      listCategories);
-router.patch("/categories/:id", authRequired, requireRole("ADMIN"), updateCategory);
+router.get("/categories",                    listCategories);
+router.post("/categories",                   authRequired, requireRole("ADMIN"), createCategory);
+router.patch("/categories/reorder",          authRequired, requireRole("ADMIN"), reorderCategories);
+router.patch("/categories/:id",              authRequired, requireRole("ADMIN"), updateCategory);
+router.delete("/categories/:id",             authRequired, requireRole("ADMIN"), deleteCategory);
+
+router.post("/categories/:catId/subcategories",              authRequired, requireRole("ADMIN"), createSubcategory);
+router.patch("/categories/:catId/subcategories/reorder",     authRequired, requireRole("ADMIN"), reorderSubcategories);
+router.patch("/categories/:catId/subcategories/:subId",      authRequired, requireRole("ADMIN"), updateSubcategory);
+router.delete("/categories/:catId/subcategories/:subId",     authRequired, requireRole("ADMIN"), deleteSubcategory);
 router.get("/units",           listUnits);
 router.get("/departments", listDepartments);
 router.post("/tickets",  authRequired, createTicket);

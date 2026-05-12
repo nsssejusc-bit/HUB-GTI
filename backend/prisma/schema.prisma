@@ -113,6 +113,7 @@ model Category {
 model Subcategory {
   id         Int      @id @default(autoincrement())
   name       String
+  sortOrder  Int      @default(0)
   categoryId Int
   category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   tickets    Ticket[]
