@@ -102,17 +102,17 @@ export default function UsersPage() {
     setTimeout(() => setCopied(false), 2000);
   }
 
-  const servidores = users.filter((u) => u.role === "USER");
-  const tecnicos   = users.filter((u) => u.active && u.role === "TECHNICIAN");
-  const admins     = users.filter((u) => u.role === "ADMIN");
+  const usuarios  = users.filter((u) => u.role === "USER");
+  const tecnicos  = users.filter((u) => u.active && u.role === "TECHNICIAN");
+  const admins    = users.filter((u) => u.role === "ADMIN");
 
-  const tabData = { all: users, servidores, tecnicos, admins };
+  const tabData = { all: users, usuarios, tecnicos, admins };
 
   const tabs = [
-    { key: "all",        label: "Todos",     count: users.length,       highlight: false },
-    { key: "servidores", label: "Servidores", count: servidores.length,  highlight: false },
-    { key: "tecnicos",   label: "Técnicos",  count: tecnicos.length,    highlight: false },
-    { key: "admins",     label: "Admins",    count: admins.length,      highlight: false },
+    { key: "all",      label: "Todos",    count: users.length,      highlight: false },
+    { key: "usuarios", label: "Usuários", count: usuarios.length,   highlight: false },
+    { key: "tecnicos", label: "Técnicos", count: tecnicos.length,   highlight: false },
+    { key: "admins",   label: "Admins",   count: admins.length,     highlight: false },
   ];
 
   return (

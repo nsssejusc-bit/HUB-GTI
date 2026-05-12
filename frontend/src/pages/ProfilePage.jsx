@@ -84,7 +84,7 @@ export default function ProfilePage() {
               <div className="flex items-center gap-3 rounded-xl bg-slate-50 dark:bg-gray-800/60 px-4 py-3">
                 <Shield size={15} className="text-slate-400 dark:text-gray-500 shrink-0" />
                 <div className="min-w-0">
-                  <div className="text-xs text-slate-400 dark:text-gray-500 mb-0.5">Unidade GTI</div>
+                  <div className="text-xs text-slate-400 dark:text-gray-500 mb-0.5">Núcleo</div>
                   <div className="text-sm font-medium text-slate-800 dark:text-gray-100 truncate">
                     {user.unit.name}
                   </div>
@@ -107,15 +107,20 @@ export default function ProfilePage() {
 
         {/* Chamados abertos */}
         <div>
-          <h2 className="text-sm font-semibold text-slate-700 dark:text-gray-300 mb-3 flex items-center gap-2">
-            <Ticket size={15} />
-            Meus chamados
-            {tickets.length > 0 && (
-              <span className="rounded-full bg-slate-100 dark:bg-gray-800 text-slate-600 dark:text-gray-400 px-2 py-0.5 text-xs font-medium">
-                {tickets.length}
-              </span>
-            )}
-          </h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold text-slate-700 dark:text-gray-300 flex items-center gap-2">
+              <Ticket size={15} />
+              Meus chamados
+              {tickets.length > 0 && (
+                <span className="rounded-full bg-slate-100 dark:bg-gray-800 text-slate-600 dark:text-gray-400 px-2 py-0.5 text-xs font-medium">
+                  {tickets.length}
+                </span>
+              )}
+            </h2>
+            <Link to="/novo-chamado" className="btn-primary text-sm py-1.5 px-3">
+              + Abrir chamado
+            </Link>
+          </div>
 
           {loading ? (
             <div className="flex items-center justify-center py-12">
@@ -128,9 +133,6 @@ export default function ProfilePage() {
               <p className="text-sm text-slate-400 dark:text-gray-500 mt-1">
                 Seus chamados aparecerão aqui quando você abrir um
               </p>
-              <Link to="/novo-chamado" className="btn-primary mt-4 inline-flex">
-                Abrir chamado
-              </Link>
             </div>
           ) : (
             <div className="card divide-y divide-slate-100 dark:divide-gray-700/60">
