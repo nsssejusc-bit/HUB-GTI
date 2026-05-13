@@ -275,7 +275,7 @@ export default function RegisterPage() {
                     name="prefixo"
                     value={p.value}
                     checked={prefixo === p.value}
-                    onChange={() => setPrefixo(p.value)}
+                    onChange={() => { setPrefixo(p.value); if (p.value !== "GOVERNO") setIsChefe(false); }}
                     className="sr-only"
                   />
                   <span className={`h-4 w-4 rounded-full border-2 flex items-center justify-center shrink-0
@@ -332,8 +332,8 @@ export default function RegisterPage() {
             />
           </div>
 
-          {/* Chefe de Setor */}
-          <div>
+          {/* Chefe de Setor — visível apenas para Servidor do Governo */}
+          {prefixo === "GOVERNO" && <div>
             <label className="flex items-start gap-3 cursor-pointer select-none">
               <div className="mt-0.5 shrink-0">
                 <div
@@ -367,7 +367,7 @@ export default function RegisterPage() {
                 )}
               </div>
             </label>
-          </div>
+          </div>}
 
           {/* Senha */}
           <div className="border-t border-gray-100 dark:border-gray-800 pt-4 space-y-4">

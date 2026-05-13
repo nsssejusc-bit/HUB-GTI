@@ -147,7 +147,7 @@ export default function UsersPage() {
   }
 
   // ── Agrupamentos de tabs ─────────────────────────────────────────────────
-  const chefes   = users.filter((u) => u.role === "CHEFE_SETOR");
+  const chefes   = users.filter((u) => u.role === "CHEFE_SETOR" || u.isChefe);
   const usuarios  = users.filter((u) => u.role === "USER");
   const tecnicos  = users.filter((u) => u.role === "TECHNICIAN");
   const admins    = users.filter((u) => u.role === "ADMIN");
