@@ -34,6 +34,10 @@ async function main() {
   }
 
   // ── Categorias e subcategorias ───────────────────────────────────────────
+  // requiresPresential:    true  → exibe etapa "Técnico a caminho"
+  // requiresApproval:     true  → requer aprovação do Chefe de Setor antes de atender
+  // dualApproval:         true  → requer aprovação dos chefes de DOIS setores
+  // requiresCauseSolution: false → dispensa campos Causa/Solução ao concluir (pedidos de serviço)
   const categories = [
     {
       code: "HARDWARE",
@@ -42,11 +46,11 @@ async function main() {
       sortOrder: 1,
       allowsFreeText: false,
       subcategories: [
-        "Computador não liga",
-        "Computador travado",
-        "Monitor sem imagem",
-        "Mouse/Teclado não funciona",
-        "Outro",
+        { name: "Computador não liga",        code: "HARDWARE_WONT_TURN_ON", requiresPresential: true  },
+        { name: "Computador travado",          code: "HARDWARE_FROZEN",       requiresPresential: true  },
+        { name: "Monitor sem imagem",          code: "HARDWARE_NO_IMAGE",     requiresPresential: true  },
+        { name: "Mouse/Teclado não funciona",  code: "HARDWARE_INPUT",        requiresPresential: true  },
+        { name: "Outro",                       code: "HARDWARE_OTHER",        requiresPresential: true  },
       ],
     },
     {
@@ -56,55 +60,70 @@ async function main() {
       sortOrder: 2,
       allowsFreeText: false,
       subcategories: [
-        "Sem internet",
-        "Internet lenta",
-        "Falha de confiança",
-        "Wi-Fi não conecta",
-        "Outro",
+        { name: "Queda de internet",  code: "INTERNET_QUEDA",         requiresPresential: true },
+        { name: "Lentidão",           code: "INTERNET_LENTIDAO",      requiresPresential: true },
+        { name: "Intermitência",      code: "INTERNET_INTERMITENCIA", requiresPresential: true },
       ],
     },
     {
-      code: "ACCESS",
-      name: "Senhas e Sistemas",
-      icon: "key",
+      code: "NETSERVER",
+      name: "Rede/Servidor",
+      icon: "server",
       sortOrder: 3,
       allowsFreeText: false,
       subcategories: [
-        "Esqueci a senha (SIGED)",
-        "Usuário bloqueado",
-        "Criação de usuário (Novo Servidor)",
-        "Problema no SIGED",
-        "Problema no site da SEJUSC",
+        { name: "Criação de usuário",    code: "NETSERVER_USER_CREATE",    requiresApproval: true,  requiresPresential: false, requiresCauseSolution: false },
+        { name: "Exclusão de usuário",   code: "NETSERVER_USER_DELETE",    requiresPresential: false, requiresCauseSolution: false },
+        { name: "Atualização de usuário",code: "NETSERVER_USER_UPDATE",    requiresPresential: false, requiresCauseSolution: false },
+        { name: "Reset de senha",        code: "NETSERVER_PASSWORD_RESET", requiresPresential: false, requiresCauseSolution: false },
+        { name: "Criação de pasta",      code: "NETSERVER_FOLDER_CREATE",  requiresPresential: false, requiresCauseSolution: false },
+        { name: "Mapeamento de pasta",   code: "NETSERVER_FOLDER_MAP",     requiresPresential: false, requiresCauseSolution: false },
+        { name: "Falha de confiança",    code: "NETSERVER_TRUST_FAIL",     requiresPresential: true  },
+        { name: "VPN",                   code: "NETSERVER_VPN",            requiresPresential: false, requiresCauseSolution: false },
+      ],
+    },
+    {
+      code: "SIGED",
+      name: "SIGED",
+      icon: "file-text",
+      sortOrder: 4,
+      allowsFreeText: false,
+      subcategories: [
+        { name: "Cadastro de usuário",  code: "SIGED_USER_CREATE",    requiresPresential: false, requiresCauseSolution: false },
+        { name: "Realocação de setor",  code: "SIGED_SECTOR_MOVE",    requiresApproval: true, dualApproval: true, requiresPresential: false, requiresCauseSolution: false },
+        { name: "Excluir usuário",      code: "SIGED_USER_DELETE",    requiresPresential: false, requiresCauseSolution: false },
+        { name: "Reset de senha",       code: "SIGED_PASSWORD_RESET", requiresPresential: false, requiresCauseSolution: false },
+        { name: "Cadastrar Setor",      code: "SIGED_SECTOR_CREATE",  requiresPresential: false, requiresCauseSolution: false },
       ],
     },
     {
       code: "PRINTER",
       name: "Impressora",
       icon: "printer",
-      sortOrder: 4,
+      sortOrder: 5,
       allowsFreeText: false,
       subcategories: [
-        "Impressora não aparece",
-        "Impressora offline",
-        "Impressão não sai",
-        "Papel enroscado",
-        "Sem papel",
-        "Troca de toner",
+        { name: "Impressora não aparece", code: "PRINTER_NOT_VISIBLE", requiresPresential: true },
+        { name: "Impressora offline",     code: "PRINTER_OFFLINE",     requiresPresential: true },
+        { name: "Impressão não sai",      code: "PRINTER_NO_PRINT",    requiresPresential: true },
+        { name: "Papel enroscado",        code: "PRINTER_PAPER_JAM",   requiresPresential: true },
+        { name: "Sem papel",              code: "PRINTER_NO_PAPER",    requiresPresential: true },
+        { name: "Troca de toner",         code: "PRINTER_TONER",       requiresPresential: true },
       ],
     },
     {
       code: "REMOTE",
       name: "Suporte Remoto",
       icon: "monitor-smartphone",
-      sortOrder: 5,
+      sortOrder: 6,
       allowsFreeText: false,
       subcategories: [],
     },
   ];
 
-  // Remove categoria OTHER obsoleta (se não tiver chamados vinculados)
+  // Remove categorias obsoletas sem chamados vinculados
   await prisma.category.deleteMany({
-    where: { code: "OTHER", tickets: { none: {} } },
+    where: { code: { in: ["OTHER", "ACCESS"] }, tickets: { none: {} } },
   });
 
   for (const cat of categories) {
@@ -125,38 +144,47 @@ async function main() {
       },
     });
 
+    const subNames = cat.subcategories.map((s) => s.name);
+
     // Remove subcategorias obsoletas (sem chamados vinculados)
     await prisma.subcategory.deleteMany({
       where: {
         categoryId: created.id,
-        name: { notIn: cat.subcategories },
+        name: { notIn: subNames },
         tickets: { none: {} },
       },
     });
 
-    for (const subName of cat.subcategories) {
+    for (const sub of cat.subcategories) {
       const existing = await prisma.subcategory.findFirst({
-        where: { categoryId: created.id, name: subName },
+        where: { categoryId: created.id, name: sub.name },
       });
+      const subData = {
+        code:                  sub.code                  ?? null,
+        requiresApproval:      sub.requiresApproval      ?? false,
+        dualApproval:          sub.dualApproval           ?? false,
+        requiresPresential:    sub.requiresPresential     ?? true,
+        requiresCauseSolution: sub.requiresCauseSolution  ?? true,
+      };
       if (!existing) {
         await prisma.subcategory.create({
-          data: { name: subName, categoryId: created.id },
+          data: { name: sub.name, categoryId: created.id, ...subData },
+        });
+      } else {
+        await prisma.subcategory.update({
+          where: { id: existing.id },
+          data: subData,
         });
       }
     }
   }
 
   // ── Usuário ADMIN (único usuário pré-criado) ─────────────────────────────
-  // CPF do administrador do sistema
-  const adminCpf = "48215374867";
+  const adminCpf  = "48215374867";
   const adminHash = await bcrypt.hash("admin@2025", 10);
 
-  const gti = await prisma.unit.findUnique({
-    where: { name: "GTI" },
-  });
-  const nssDept = await prisma.department.findFirst({
-    where: { name: { contains: "NSS" } },
-  });
+  const gti     = await prisma.unit.findUnique({ where: { name: "GTI" } });
+  const nssDept = await prisma.department.findFirst({ where: { name: { contains: "NSS" } } });
 
   await prisma.user.upsert({
     where: { cpf: adminCpf },
@@ -166,14 +194,14 @@ async function main() {
       passwordHash: adminHash,
       role: "ADMIN",
       active: true,
-      unitId: gti?.id || null,
+      unitId:       gti?.id     || null,
       departmentId: nssDept?.id || null,
     },
     update: {
       name: "Guilherme Oliveira",
       role: "ADMIN",
       active: true,
-      unitId: gti?.id || null,
+      unitId:       gti?.id     || null,
       departmentId: nssDept?.id || null,
     },
   });

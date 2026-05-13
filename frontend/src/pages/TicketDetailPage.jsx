@@ -6,7 +6,7 @@ import { useToast } from "../context/ToastContext";
 import { StatusBadge, InfoItem, Alert, Spinner } from "../components/ui";
 import AppHeader from "../components/AppHeader";
 import { formatElapsed, STATUS_LABEL } from "../lib/statuses";
-import { ArrowLeft, Clock, CheckCircle2, ChevronRight, Trash2, AlertTriangle, MonitorSmartphone, Copy, Check as CheckIcon, ClipboardList, Plus, ExternalLink } from "lucide-react";
+import { ArrowLeft, Clock, CheckCircle2, ChevronRight, Trash2, AlertTriangle, MonitorSmartphone, Copy, Check as CheckIcon, ClipboardList, Plus, ExternalLink, ShieldCheck, ThumbsUp, ThumbsDown } from "lucide-react";
 
 const TRANSITION_LABEL = {
   VIEWED:     "Marcar como Visualizado",
@@ -223,6 +223,11 @@ export default function TicketDetailPage() {
             </div>
           </div>
 
+          {/* Painel de aprovação */}
+          {ticket.approvalStatus && ticket.approvalStatus !== "NOT_REQUIRED" && (
+            <ApprovalPanel approvalStatus={ticket.approvalStatus} approvals={ticket.approvals || []} />
+          )}
+
           {/* Painel AnyDesk — visível para técnico/monitor quando é remoto */}
           {ticket.isRemote && ticket.anyDeskCode && (
             <AnyDeskPanel code={ticket.anyDeskCode} status={ticket.status} />
@@ -418,7 +423,7 @@ export default function TicketDetailPage() {
                   </>
                 )}
 
-                {ticket.allowedNext.includes("COMPLETED") && (
+                {ticket.allowedNext.includes("COMPLETED") && ticket.requiresCauseSolution !== false && (
                   <>
                     <div>
                       <label className="field-label">Causa do problema *</label>
@@ -458,13 +463,17 @@ export default function TicketDetailPage() {
 
                 <div className="space-y-2 pt-1">
                   {ticket.allowedNext
-                    .filter((next) => !(ticket.isRemote && next === "EN_ROUTE"))
+                    .filter((next) => {
+                      // Oculta "Técnico a caminho" se chamado não é presencial ou é remoto
+                      if (next === "EN_ROUTE" && (ticket.isRemote || ticket.presential === false)) return false;
+                      return true;
+                    })
                     .map((next) => {
                       const labels = ticket.isRemote ? TRANSITION_LABEL_REMOTE : TRANSITION_LABEL;
                       return (
                         <button
                           key={next}
-                          disabled={loading || (next === "COMPLETED" && (!form.cause.trim() || !form.solution.trim()))}
+                          disabled={loading || (next === "COMPLETED" && ticket.requiresCauseSolution !== false && (!form.cause.trim() || !form.solution.trim()))}
                           onClick={() => doTransition(next)}
                           className={`w-full justify-center ${TRANSITION_COLOR[next] || "btn-primary"} disabled:opacity-50 disabled:cursor-not-allowed`}
                         >
@@ -479,6 +488,54 @@ export default function TicketDetailPage() {
           </div>
         </aside>
       </main>
+    </div>
+  );
+}
+
+// ── Painel de aprovação ───────────────────────────────────────────────────────
+function ApprovalPanel({ approvalStatus, approvals }) {
+  const colors = {
+    PENDING:  "border-amber-200  dark:border-amber-700  bg-amber-50  dark:bg-amber-900/15  text-amber-800  dark:text-amber-300",
+    APPROVED: "border-emerald-200 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/15 text-emerald-800 dark:text-emerald-300",
+    REJECTED: "border-red-200    dark:border-red-700    bg-red-50    dark:bg-red-900/15    text-red-800    dark:text-red-300",
+  };
+  const icons = {
+    PENDING:  <ShieldCheck size={16} />,
+    APPROVED: <ThumbsUp   size={16} />,
+    REJECTED: <ThumbsDown size={16} />,
+  };
+  const labels = {
+    PENDING:  "Aguardando aprovação do Chefe de Setor",
+    APPROVED: "Aprovado pelo Chefe de Setor",
+    REJECTED: "Reprovado pelo Chefe de Setor",
+  };
+
+  return (
+    <div className={`card px-5 py-4 border-2 ${colors[approvalStatus] || ""}`}>
+      <div className="flex items-center gap-2 font-semibold text-sm mb-2">
+        {icons[approvalStatus]}
+        {labels[approvalStatus] || approvalStatus}
+      </div>
+      {approvals.length > 0 && (
+        <div className="space-y-1.5 mt-2">
+          {approvals.map((a) => (
+            <div key={a.id} className="flex items-center gap-2 text-xs">
+              <span className={`rounded-full px-2 py-0.5 font-medium ${
+                a.status === "APPROVED" ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400"
+                : a.status === "REJECTED" ? "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400"
+                : "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400"
+              }`}>
+                {a.status === "APPROVED" ? "Aprovado" : a.status === "REJECTED" ? "Reprovado" : "Pendente"}
+              </span>
+              <span className="text-slate-600 dark:text-gray-400">
+                {a.chefDeptName}
+                {a.chefUserName && <span className="text-slate-400 dark:text-gray-500"> — {a.chefUserName}</span>}
+              </span>
+              {a.note && <span className="text-slate-500 dark:text-gray-500 italic">"{a.note}"</span>}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

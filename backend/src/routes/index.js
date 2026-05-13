@@ -7,7 +7,7 @@ import {
 } from "../controllers/userController.js";
 import {
   createTicket, getTicketPublic, listTickets, getTicket,
-  transitionTicket, deleteTicket, submitFeedback,
+  transitionTicket, approveTicket, deleteTicket, submitFeedback,
 } from "../controllers/ticketController.js";
 import {
   listCategories, listUnits, listTechnicians, getPublicConfig,
@@ -111,6 +111,7 @@ router.get("/technicians", authRequired, listTechnicians);
 router.get("/tickets",     authRequired, requireRole("TECHNICIAN", "ADMIN", "CHEFE_SETOR"), listTickets);
 router.get("/tickets/:id", authRequired, requireRole("TECHNICIAN", "ADMIN", "CHEFE_SETOR"), getTicket);
 router.post("/tickets/:id/transition", authRequired, requireRole("TECHNICIAN", "ADMIN"), transitionTicket);
+router.post("/tickets/:id/approve",    authRequired, requireRole("CHEFE_SETOR", "ADMIN"), approveTicket);
 router.delete("/tickets/:id", authRequired, requireRole("ADMIN"), deleteTicket);
 
 // ── Ordens de Serviço ──────────────────────────────────────────────────────────

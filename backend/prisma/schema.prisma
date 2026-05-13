@@ -28,6 +28,13 @@ enum TicketStatus {
   COMPLETED
 }
 
+enum ApprovalStatus {
+  NOT_REQUIRED
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum OsStatus {
   ABERTA
   EM_ANDAMENTO
@@ -47,12 +54,13 @@ enum OsTipo {
 }
 
 model Department {
-  id        Int      @id @default(autoincrement())
-  name      String   @unique
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  tickets   Ticket[]
-  users     User[]   @relation("UserDepartment")
+  id              Int              @id @default(autoincrement())
+  name            String           @unique
+  active          Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  tickets         Ticket[]
+  users           User[]           @relation("UserDepartment")
+  ticketApprovals TicketApproval[]
 }
 
 model Unit {
@@ -87,9 +95,10 @@ model User {
   openedTickets      Ticket[]   @relation("TicketOpener")
   history            TicketHistory[]
   resolvedRequests   PasswordResetRequest[] @relation("ResolvedRequests")
-  createdWorkOrders  WorkOrder[] @relation("OsCreator")
+  createdWorkOrders  WorkOrder[]      @relation("OsCreator")
   osTecnico          OsTecnico[]
   osHistory          OsHistory[]
+  ticketApprovals    TicketApproval[] @relation("ApprovalChef")
 
   @@index([departmentId])
   @@index([role, active])
@@ -123,12 +132,17 @@ model Category {
 }
 
 model Subcategory {
-  id         Int      @id @default(autoincrement())
-  name       String
-  sortOrder  Int      @default(0)
-  categoryId Int
-  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  tickets    Ticket[]
+  id                 Int      @id @default(autoincrement())
+  name               String
+  code               String?  @unique
+  sortOrder          Int      @default(0)
+  requiresApproval      Boolean  @default(false)
+  dualApproval          Boolean  @default(false)
+  requiresPresential    Boolean  @default(true)
+  requiresCauseSolution Boolean  @default(true)
+  categoryId            Int
+  category           Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  tickets            Ticket[]
 }
 
 model Ticket {
@@ -152,6 +166,11 @@ model Ticket {
   openedById          Int?
   openedBy            User?        @relation("TicketOpener", fields: [openedById], references: [id])
   anyDeskCode         String?
+  extraData           Json?
+  approvalStatus      ApprovalStatus @default(NOT_REQUIRED)
+  approvalNote        String?      @db.Text
+  presential            Boolean      @default(true)
+  requiresCauseSolution Boolean      @default(true)
   cause               String?      @db.Text
   solution            String?      @db.Text
   openedAt            DateTime     @default(now())
@@ -162,14 +181,33 @@ model Ticket {
   history             TicketHistory[]
   feedback            Feedback?
   workOrders          TicketWorkOrder[]
+  approvals           TicketApproval[]
 
   @@index([status])
+  @@index([approvalStatus])
   @@index([unitId])
   @@index([assignedTechId])
   @@index([openedById])
   @@index([openedAt])
   @@index([categoryId])
   @@index([departmentId])
+}
+
+model TicketApproval {
+  id         Int        @id @default(autoincrement())
+  ticketId   Int
+  ticket     Ticket     @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  chefDeptId Int
+  chefDept   Department @relation(fields: [chefDeptId], references: [id])
+  chefUserId Int?
+  chefUser   User?      @relation("ApprovalChef", fields: [chefUserId], references: [id])
+  status     String     @default("PENDING")
+  note       String?    @db.Text
+  decidedAt  DateTime?
+  createdAt  DateTime   @default(now())
+
+  @@index([ticketId])
+  @@index([chefDeptId, status])
 }
 
 model TicketHistory {

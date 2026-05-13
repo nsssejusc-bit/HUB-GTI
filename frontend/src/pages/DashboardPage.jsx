@@ -10,6 +10,7 @@ import { formatElapsed } from "../lib/statuses";
 import {
   Ticket, AlertCircle, Activity, CheckCircle2,
   ChevronRight, Clock, RefreshCw, Filter, History,
+  ShieldCheck, ThumbsUp, ThumbsDown, X,
 } from "lucide-react";
 
 const ACTIVE_STATUSES = ["OPEN", "VIEWED", "EN_ROUTE", "IN_SERVICE"];
@@ -30,33 +31,198 @@ const HIST_RANGES = [
 // ── View simplificada para Chefe de Setor ────────────────────────────────────
 function ChefeDashboard() {
   const { user } = useAuth();
+  const [tickets,    setTickets]    = useState([]);
+  const [loading,    setLoading]    = useState(true);
+  const [rejectId,   setRejectId]   = useState(null); // id do ticket em rejeição
+  const [rejectNote, setRejectNote] = useState("");
+  const [acting,     setActing]     = useState(false);
+  const [err,        setErr]        = useState("");
+
+  async function load() {
+    setLoading(true);
+    try {
+      const { data } = await api.get("/tickets");
+      setTickets(data.tickets ?? data);
+    } catch {}
+    finally { setLoading(false); }
+  }
+
+  useEffect(() => { load(); }, []);
+
+  async function decide(ticketId, status, note) {
+    setActing(true);
+    setErr("");
+    try {
+      await api.post(`/tickets/${ticketId}/approve`, { status, note: note || undefined });
+      setRejectId(null);
+      setRejectNote("");
+      load();
+    } catch (e) {
+      setErr(e.response?.data?.error || "Erro ao processar aprovação");
+    } finally {
+      setActing(false);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-gray-950">
       <AppHeader />
-      <main className="max-w-2xl mx-auto p-6 space-y-6">
-        <div>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-gray-100">
-            Olá, {user?.name?.split(" ")[0]}
-          </h1>
-          <p className="text-sm text-slate-500 dark:text-gray-400 mt-1">
-            Painel de aprovações — Chefe de Setor
-          </p>
+
+      {/* Modal de rejeição */}
+      {rejectId !== null && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setRejectId(null); }}
+        >
+          <div className="card w-full max-w-sm p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400">
+                <ThumbsDown size={18} />
+              </span>
+              <div>
+                <h3 className="font-semibold text-slate-900 dark:text-gray-100">Reprovar solicitação</h3>
+                <p className="text-xs text-slate-500 dark:text-gray-400 mt-0.5">Informe o motivo (opcional)</p>
+              </div>
+            </div>
+            <textarea
+              rows={3}
+              className="field-input resize-none w-full"
+              placeholder="Motivo da reprovação..."
+              value={rejectNote}
+              onChange={(e) => setRejectNote(e.target.value)}
+              autoFocus
+            />
+            {err && <p className="text-sm text-red-600 dark:text-red-400">{err}</p>}
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => { setRejectId(null); setErr(""); }} className="btn-secondary text-sm py-2 px-4">Cancelar</button>
+              <button
+                onClick={() => decide(rejectId, "REJECTED", rejectNote)}
+                disabled={acting}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white px-4 py-2 text-sm font-semibold transition disabled:opacity-50"
+              >
+                {acting ? <Spinner className="h-4 w-4" /> : <ThumbsDown size={14} />}
+                Reprovar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <main className="max-w-3xl mx-auto p-4 md:p-6 space-y-5">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-slate-900 dark:text-gray-100">
+              Olá, {user?.name?.split(" ")[0]}
+            </h1>
+            <p className="text-sm text-slate-500 dark:text-gray-400 mt-0.5">
+              Painel de aprovações — Chefe de Setor
+            </p>
+          </div>
+          <button onClick={load} className="flex items-center gap-1.5 text-sm text-slate-500 dark:text-gray-400 hover:text-slate-700 dark:hover:text-gray-200 transition">
+            <RefreshCw size={14} /> Atualizar
+          </button>
         </div>
 
-        <div className="card p-10 text-center space-y-3">
-          <div className="flex items-center justify-center">
-            <span className="flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 dark:bg-gray-800">
-              <CheckCircle2 className="h-8 w-8 text-slate-400 dark:text-gray-500" />
-            </span>
+        {loading ? (
+          <div className="flex justify-center py-16"><Spinner className="h-8 w-8" /></div>
+        ) : tickets.length === 0 ? (
+          <div className="card p-10 text-center space-y-3">
+            <div className="flex items-center justify-center">
+              <span className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 dark:bg-emerald-900/20">
+                <CheckCircle2 className="h-8 w-8 text-emerald-500" />
+              </span>
+            </div>
+            <p className="font-medium text-slate-700 dark:text-gray-300">
+              Nenhum chamado aguardando sua aprovação
+            </p>
+            <p className="text-sm text-slate-400 dark:text-gray-500">
+              Quando um chamado do seu setor precisar de autorização, ele aparecerá aqui.
+            </p>
           </div>
-          <p className="font-medium text-slate-700 dark:text-gray-300">
-            Nenhum chamado aguardando sua aprovação
-          </p>
-          <p className="text-sm text-slate-400 dark:text-gray-500">
-            Quando um chamado do seu setor precisar de autorização, ele aparecerá aqui.
-          </p>
-        </div>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-sm text-slate-500 dark:text-gray-400">
+              {tickets.length} solicitaç{tickets.length === 1 ? "ão" : "ões"} aguardando sua aprovação
+            </p>
+            {tickets.map((t) => (
+              <ApprovalCard
+                key={t.id}
+                ticket={t}
+                onApprove={() => decide(t.id, "APPROVED")}
+                onReject={() => { setRejectId(t.id); setRejectNote(""); setErr(""); }}
+                acting={acting}
+              />
+            ))}
+          </div>
+        )}
       </main>
+    </div>
+  );
+}
+
+// ── Card de aprovação ──────────────────────────────────────────────────────
+function ApprovalCard({ ticket, onApprove, onReject, acting }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div className="card overflow-hidden">
+      <div className="px-5 py-4 flex flex-col sm:flex-row sm:items-start gap-4">
+        {/* Ícone + info principal */}
+        <div className="flex items-start gap-3 flex-1 min-w-0">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400">
+            <ShieldCheck size={18} />
+          </span>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-mono text-xs text-slate-400 dark:text-gray-500">{ticket.ticketNumber}</span>
+              <span className="rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 text-xs font-medium">Aguardando aprovação</span>
+            </div>
+            <p className="font-semibold text-slate-900 dark:text-gray-100 text-sm mt-0.5">{ticket.requesterName}</p>
+            <p className="text-xs text-slate-500 dark:text-gray-400">{ticket.department} · {ticket.category?.name} → {ticket.subcategory?.name}</p>
+            <p className="text-xs text-slate-400 dark:text-gray-500 mt-0.5">
+              <Clock size={10} className="inline mr-1" />
+              {new Date(ticket.openedAt).toLocaleString("pt-BR")}
+            </p>
+          </div>
+        </div>
+
+        {/* Ações */}
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={onApprove}
+            disabled={acting}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 text-xs font-semibold transition disabled:opacity-50"
+          >
+            <ThumbsUp size={13} /> Aprovar
+          </button>
+          <button
+            onClick={onReject}
+            disabled={acting}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-700 dark:text-red-400 ring-1 ring-red-200 dark:ring-red-800 px-3 py-2 text-xs font-semibold transition disabled:opacity-50"
+          >
+            <ThumbsDown size={13} /> Reprovar
+          </button>
+        </div>
+      </div>
+
+      {/* Detalhes expandíveis */}
+      {ticket.freeTextDescription && (
+        <>
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            className="w-full px-5 py-2 text-xs text-brand-600 dark:text-brand-400 hover:underline text-left border-t border-slate-100 dark:border-gray-700"
+          >
+            {expanded ? "Ocultar detalhes ▲" : "Ver detalhes da solicitação ▼"}
+          </button>
+          {expanded && (
+            <div className="px-5 pb-4">
+              <div className="rounded-xl bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 px-4 py-3">
+                <p className="text-xs font-medium text-slate-500 dark:text-gray-400 mb-1">Dados informados pelo solicitante</p>
+                <p className="text-sm text-slate-700 dark:text-gray-200 whitespace-pre-wrap">{ticket.freeTextDescription}</p>
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

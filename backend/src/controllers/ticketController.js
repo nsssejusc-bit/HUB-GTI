@@ -4,12 +4,14 @@ import { maskCpf } from "../utils/cpf.js";
 import { buildTicketNumber } from "../utils/ticketNumber.js";
 import { nextTicketSeq } from "../utils/nextSequence.js";
 import { STATUS, canTransition, allowedNext } from "../utils/ticketStateMachine.js";
+
 const createTicketSchema = z.object({
-  departmentId: z.number().int().positive().optional().nullable(),
-  categoryId: z.number().int().positive(),
-  subcategoryId: z.number().int().positive().optional().nullable(),
+  departmentId:        z.number().int().positive().optional().nullable(),
+  categoryId:          z.number().int().positive(),
+  subcategoryId:       z.number().int().positive().optional().nullable(),
   freeTextDescription: z.string().max(2000).optional().nullable(),
-  anyDeskCode: z.string().max(20).optional().nullable(),
+  anyDeskCode:         z.string().max(20).optional().nullable(),
+  extraData:           z.record(z.unknown()).optional().nullable(),
 });
 
 export async function createTicket(req, res) {
@@ -19,13 +21,11 @@ export async function createTicket(req, res) {
   }
   const data = parsed.data;
 
-  // Identidade sempre vem do usuário autenticado
   const requester = await prisma.user.findUnique({ where: { id: req.user.id } });
   if (!requester || !requester.active) {
     return res.status(401).json({ error: "Usuário não encontrado" });
   }
 
-  // Usa o setor enviado ou o setor do perfil do usuário
   const deptId = data.departmentId || requester.departmentId;
   if (!deptId) return res.status(400).json({ error: "Selecione um setor" });
 
@@ -40,7 +40,7 @@ export async function createTicket(req, res) {
   });
   if (!category) return res.status(400).json({ error: "Categoria inexistente" });
 
-  const isRemote = category.code === "REMOTE";
+  const isRemote    = category.code === "REMOTE";
   const selectedSub = (!isRemote && data.subcategoryId)
     ? category.subcategories.find((s) => s.id === data.subcategoryId)
     : null;
@@ -64,167 +64,288 @@ export async function createTicket(req, res) {
     }
   }
 
+  // ── Flags da subcategoria ────────────────────────────────────────────────
+  const requiresApproval      = selectedSub?.requiresApproval      ?? false;
+  const dualApproval          = selectedSub?.dualApproval           ?? false;
+  const requiresPresential    = isRemote ? false : (selectedSub?.requiresPresential    ?? true);
+  const requiresCauseSolution = isRemote ? true  : (selectedSub?.requiresCauseSolution ?? true);
+
+  // Para aprovação dupla (SIGED_SECTOR_MOVE), o targetDeptId vem em extraData
+  const extraData   = data.extraData ?? null;
+  const targetDeptId = dualApproval && extraData?.targetDeptId
+    ? Number(extraData.targetDeptId)
+    : null;
+
+  // Valida setor alvo para aprovação dupla
+  if (dualApproval && !targetDeptId) {
+    return res.status(400).json({ error: "Selecione o setor de destino para a realocação" });
+  }
+
+  // ── Monta registros de aprovação ────────────────────────────────────────
+  const approvalRecords = requiresApproval
+    ? [
+        { chefDeptId: deptId },
+        ...(targetDeptId ? [{ chefDeptId: targetDeptId }] : []),
+      ]
+    : [];
+
   const ticketPayload = {
-    requesterName: requester.name,
-    requesterCpf: requester.cpf,
-    department: dept.name,
-    departmentId: dept.id,
-    categoryId: data.categoryId,
-    subcategoryId: (!isRemote && !category.allowsFreeText) ? data.subcategoryId : null,
+    requesterName:       requester.name,
+    requesterCpf:        requester.cpf,
+    department:          dept.name,
+    departmentId:        dept.id,
+    categoryId:          data.categoryId,
+    subcategoryId:       (!isRemote && !category.allowsFreeText) ? data.subcategoryId : null,
     freeTextDescription: isRemote
       ? (data.freeTextDescription?.trim() || null)
-      : (!isRemote && (category.allowsFreeText || isOutro)) ? data.freeTextDescription.trim() : null,
-    anyDeskCode: isRemote ? data.anyDeskCode.trim() : null,
-    openedById: req.user?.id ?? null,
-    status: STATUS.OPEN,
+      : (!isRemote && (category.allowsFreeText || isOutro))
+        ? data.freeTextDescription.trim()
+        : (data.freeTextDescription?.trim() || null),
+    anyDeskCode:    isRemote ? data.anyDeskCode.trim() : null,
+    extraData,
+    presential:            requiresPresential,
+    requiresCauseSolution: requiresCauseSolution,
+    approvalStatus: requiresApproval ? "PENDING" : "NOT_REQUIRED",
+    openedById:     req.user?.id ?? null,
+    status:         STATUS.OPEN,
     history: { create: { toStatus: STATUS.OPEN } },
+    ...(approvalRecords.length > 0 && {
+      approvals: { create: approvalRecords },
+    }),
   };
 
-  const seq = await nextTicketSeq();
+  const seq          = await nextTicketSeq();
   const ticketNumber = buildTicketNumber(seq);
-  const ticket = await prisma.ticket.create({ data: { ticketNumber, ...ticketPayload } });
+  const ticket       = await prisma.ticket.create({ data: { ticketNumber, ...ticketPayload } });
 
   req.app.get("io")?.emit("ticket:created", { ticketNumber: ticket.ticketNumber });
 
   res.status(201).json({
     ticketNumber: ticket.ticketNumber,
-    openedAt: ticket.openedAt,
+    openedAt:     ticket.openedAt,
+    approvalStatus: ticket.approvalStatus,
   });
 }
 
+// ── GET público ──────────────────────────────────────────────────────────────
 export async function getTicketPublic(req, res) {
   const { ticketNumber } = req.params;
   const ticket = await prisma.ticket.findUnique({
     where: { ticketNumber },
     include: {
-      category: true,
+      category:   true,
       subcategory: true,
-      unit: true,
+      unit:        true,
       assignedTech: { select: { name: true } },
-      feedback: true,
+      feedback:    true,
     },
   });
   if (!ticket) return res.status(404).json({ error: "Chamado não encontrado" });
 
   res.json({
-    ticketNumber: ticket.ticketNumber,
-    status: ticket.status,
-    requesterName: ticket.requesterName,
-    requesterCpf: maskCpf(ticket.requesterCpf),
-    department: ticket.department,
-    category: ticket.category?.name,
-    subcategory: ticket.subcategory?.name,
+    ticketNumber:        ticket.ticketNumber,
+    status:              ticket.status,
+    approvalStatus:      ticket.approvalStatus,
+    requesterName:       ticket.requesterName,
+    requesterCpf:        maskCpf(ticket.requesterCpf),
+    department:          ticket.department,
+    category:            ticket.category?.name,
+    subcategory:         ticket.subcategory?.name,
     freeTextDescription: ticket.freeTextDescription,
-    anyDeskCode: ticket.anyDeskCode || null,
-    isRemote: !!(ticket.anyDeskCode),
-    unit: ticket.unit?.name || null,
-    technician: ticket.assignedTech?.name || null,
-    openedAt: ticket.openedAt,
-    viewedAt: ticket.viewedAt,
-    enRouteAt: ticket.enRouteAt,
-    inServiceAt: ticket.inServiceAt,
-    completedAt: ticket.completedAt,
-    hasFeedback: !!ticket.feedback,
+    anyDeskCode:         ticket.anyDeskCode || null,
+    isRemote:            !!(ticket.anyDeskCode),
+    unit:                ticket.unit?.name || null,
+    technician:          ticket.assignedTech?.name || null,
+    openedAt:            ticket.openedAt,
+    viewedAt:            ticket.viewedAt,
+    enRouteAt:           ticket.enRouteAt,
+    inServiceAt:         ticket.inServiceAt,
+    completedAt:         ticket.completedAt,
+    hasFeedback:         !!ticket.feedback,
   });
 }
 
+// ── LIST ─────────────────────────────────────────────────────────────────────
 export async function listTickets(req, res) {
   const { status, unitId, technicianId, from, to, categoryId, cursor, limit } = req.query;
   const where = {};
-  if (status) where.status = status;
-  if (unitId) where.unitId = Number(unitId);
+
+  if (status)       where.status      = status;
+  if (unitId)       where.unitId      = Number(unitId);
   if (technicianId) where.assignedTechId = Number(technicianId);
-  if (categoryId) where.categoryId = Number(categoryId);
+  if (categoryId)   where.categoryId  = Number(categoryId);
   if (from || to) {
     where.openedAt = {};
     if (from) where.openedAt.gte = new Date(from);
-    if (to) where.openedAt.lte = new Date(to);
+    if (to)   where.openedAt.lte = new Date(to);
   }
 
-  // Technicians see only their unit + their assigned tickets (unitId from DB, not JWT)
-  if (req.user.role === "TECHNICIAN") {
+  // ── Filtros por role ────────────────────────────────────────────────────
+  if (req.user.role === "CHEFE_SETOR") {
+    // Chefe vê apenas chamados PENDENTES da aprovação do seu setor
+    const chefeUser = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { departmentId: true },
+    });
+    if (!chefeUser?.departmentId) return res.json({ tickets: [], nextCursor: null });
+
+    where.approvalStatus = "PENDING";
+    where.approvals = {
+      some: { chefDeptId: chefeUser.departmentId, status: "PENDING" },
+    };
+  } else if (req.user.role === "TECHNICIAN") {
+    // Técnico não vê chamados aguardando aprovação
+    where.approvalStatus = { not: "PENDING" };
     const techUser = await prisma.user.findUnique({ where: { id: req.user.id }, select: { unitId: true } });
     where.OR = [
       { assignedTechId: req.user.id },
       { unitId: techUser?.unitId || -1 },
     ];
   }
+  // ADMIN vê tudo (sem filtro adicional)
 
-  const take = Math.min(Number(limit) || 200, 500);
+  const take        = Math.min(Number(limit) || 200, 500);
   const cursorClause = cursor ? { cursor: { id: Number(cursor) }, skip: 1 } : {};
 
   const rows = await prisma.ticket.findMany({
     where,
     include: {
-      category: true,
+      category:    true,
       subcategory: true,
-      unit: true,
+      unit:        true,
       assignedTech: { select: { id: true, name: true } },
+      approvals: {
+        include: {
+          chefDept: { select: { name: true } },
+          chefUser: { select: { name: true } },
+        },
+      },
     },
     orderBy: { openedAt: "asc" },
-    take: take + 1,
+    take:    take + 1,
     ...cursorClause,
   });
 
-  const hasMore = rows.length > take;
-  const tickets = hasMore ? rows.slice(0, take) : rows;
+  const hasMore   = rows.length > take;
+  const tickets   = hasMore ? rows.slice(0, take) : rows;
   const nextCursor = hasMore ? tickets[tickets.length - 1].id : null;
 
   res.json({ tickets: tickets.map(formatTicket), nextCursor });
 }
 
+// ── DETAIL ────────────────────────────────────────────────────────────────────
 export async function getTicket(req, res) {
   const id = Number(req.params.id);
   const ticket = await prisma.ticket.findUnique({
     where: { id },
     include: {
-      category: true,
+      category:    true,
       subcategory: true,
-      unit: true,
+      unit:        true,
       assignedTech: { select: { id: true, name: true } },
       history: {
         include: { actor: { select: { id: true, name: true } } },
         orderBy: { createdAt: "asc" },
       },
       feedback: true,
+      approvals: {
+        include: {
+          chefDept: { select: { id: true, name: true } },
+          chefUser: { select: { name: true } },
+        },
+      },
     },
   });
   if (!ticket) return res.status(404).json({ error: "Chamado não encontrado" });
   res.json({
     ...formatTicket(ticket),
-    anyDeskCode: ticket.anyDeskCode || null,
-    isRemote: !!(ticket.anyDeskCode),
-    cause: ticket.cause,
-    solution: ticket.solution,
-    history: ticket.history,
-    allowedNext: allowedNext(ticket.status),
-    feedback: ticket.feedback,
+    anyDeskCode:  ticket.anyDeskCode || null,
+    isRemote:     !!(ticket.anyDeskCode),
+    cause:        ticket.cause,
+    solution:     ticket.solution,
+    history:      ticket.history,
+    allowedNext:  allowedNext(ticket.status),
+    feedback:     ticket.feedback,
   });
 }
 
-function formatTicket(t) {
-  return {
-    id: t.id,
-    ticketNumber: t.ticketNumber,
-    requesterName: t.requesterName,
-    requesterCpf: maskCpf(t.requesterCpf),
-    department: t.department,
-    category: t.category ? { id: t.category.id, name: t.category.name } : null,
-    subcategory: t.subcategory ? { id: t.subcategory.id, name: t.subcategory.name } : null,
-    freeTextDescription: t.freeTextDescription,
-    anyDeskCode: t.anyDeskCode || null,
-    isRemote: !!(t.anyDeskCode),
-    status: t.status,
-    unit: t.unit ? { id: t.unit.id, name: t.unit.name } : null,
-    technician: t.assignedTech || null,
-    openedAt: t.openedAt,
-    viewedAt: t.viewedAt,
-    enRouteAt: t.enRouteAt,
-    inServiceAt: t.inServiceAt,
-    completedAt: t.completedAt,
-  };
+// ── APPROVE / REJECT (Chefe de Setor ou Admin) ────────────────────────────────
+export async function approveTicket(req, res) {
+  const id = Number(req.params.id);
+  const { status, note } = req.body || {};
+
+  if (!["APPROVED", "REJECTED"].includes(status)) {
+    return res.status(400).json({ error: "Status inválido. Use APPROVED ou REJECTED." });
+  }
+
+  const ticket = await prisma.ticket.findUnique({
+    where: { id },
+    include: { approvals: true },
+  });
+  if (!ticket) return res.status(404).json({ error: "Chamado não encontrado" });
+  if (ticket.approvalStatus !== "PENDING") {
+    return res.status(400).json({ error: "Este chamado não está aguardando aprovação." });
+  }
+
+  // Determina qual registro de aprovação atualizar
+  let targetApproval = null;
+
+  if (req.user.role === "ADMIN") {
+    // Admin pode aprovar qualquer pendência
+    targetApproval = ticket.approvals.find((a) => a.status === "PENDING");
+  } else {
+    // Chefe de Setor: busca o registro do seu departamento
+    const chefeUser = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { departmentId: true },
+    });
+    if (!chefeUser?.departmentId) {
+      return res.status(403).json({ error: "Você não está associado a nenhum setor." });
+    }
+    targetApproval = ticket.approvals.find(
+      (a) => a.chefDeptId === chefeUser.departmentId && a.status === "PENDING"
+    );
+  }
+
+  if (!targetApproval) {
+    return res.status(403).json({ error: "Você não tem uma aprovação pendente neste chamado." });
+  }
+
+  await prisma.ticketApproval.update({
+    where: { id: targetApproval.id },
+    data: {
+      status,
+      note:      note || null,
+      decidedAt: new Date(),
+      chefUserId: req.user.id,
+    },
+  });
+
+  // Recalcula o status geral de aprovação
+  const allApprovals = await prisma.ticketApproval.findMany({ where: { ticketId: id } });
+  let newApprovalStatus;
+  if (allApprovals.some((a) => a.status === "REJECTED")) {
+    newApprovalStatus = "REJECTED";
+  } else if (allApprovals.every((a) => a.status === "APPROVED")) {
+    newApprovalStatus = "APPROVED";
+  } else {
+    newApprovalStatus = "PENDING"; // ainda há pendências (dual approval)
+  }
+
+  await prisma.ticket.update({
+    where: { id },
+    data: { approvalStatus: newApprovalStatus },
+  });
+
+  req.app.get("io")?.emit("ticket:approval", {
+    ticketId:       id,
+    approvalStatus: newApprovalStatus,
+  });
+
+  res.json({ ok: true, approvalStatus: newApprovalStatus });
 }
 
+// ── TRANSITION ────────────────────────────────────────────────────────────────
 export async function transitionTicket(req, res) {
   const id = Number(req.params.id);
   const { toStatus, unitId, assignedTechId, internalNote, cause, solution } = req.body || {};
@@ -242,9 +363,18 @@ export async function transitionTicket(req, res) {
     return res.status(403).json({ error: "Apenas técnicos e administradores podem alterar o status" });
   }
 
-  // Técnico só pode transicionar chamados atribuídos a ele
   if (req.user.role === "TECHNICIAN" && ticket.assignedTechId !== null && ticket.assignedTechId !== req.user.id) {
     return res.status(403).json({ error: "Este chamado está atribuído a outro técnico" });
+  }
+
+  // Bloqueia transição se aprovação ainda pendente ou rejeitada
+  if (toStatus === STATUS.VIEWED) {
+    if (ticket.approvalStatus === "PENDING") {
+      return res.status(400).json({ error: "Este chamado aguarda aprovação do Chefe de Setor antes de ser atendido." });
+    }
+    if (ticket.approvalStatus === "REJECTED") {
+      return res.status(400).json({ error: "Este chamado foi reprovado pelo Chefe de Setor e não pode ser atendido." });
+    }
   }
 
   const updateData = { status: toStatus };
@@ -255,18 +385,18 @@ export async function transitionTicket(req, res) {
     if (!unitId || !assignedTechId) {
       return res.status(400).json({ error: "Unidade e técnico são obrigatórios ao visualizar" });
     }
-    updateData.unitId = Number(unitId);
-    updateData.assignedTechId = Number(assignedTechId);
+    updateData.unitId          = Number(unitId);
+    updateData.assignedTechId  = Number(assignedTechId);
   }
-  if (toStatus === STATUS.EN_ROUTE) updateData.enRouteAt = now;
+  if (toStatus === STATUS.EN_ROUTE)   updateData.enRouteAt   = now;
   if (toStatus === STATUS.IN_SERVICE) updateData.inServiceAt = now;
   if (toStatus === STATUS.COMPLETED) {
-    if (!cause || !solution) {
+    if (ticket.requiresCauseSolution && (!cause || !solution)) {
       return res.status(400).json({ error: "Causa e solução são obrigatórias para concluir" });
     }
     updateData.completedAt = now;
-    updateData.cause = cause;
-    updateData.solution = solution;
+    updateData.cause       = cause   || null;
+    updateData.solution    = solution || null;
   }
 
   const updated = await prisma.ticket.update({
@@ -275,9 +405,9 @@ export async function transitionTicket(req, res) {
       ...updateData,
       history: {
         create: {
-          fromStatus: ticket.status,
+          fromStatus:   ticket.status,
           toStatus,
-          actorId: req.user.id,
+          actorId:      req.user.id,
           internalNote: internalNote || null,
         },
       },
@@ -286,13 +416,13 @@ export async function transitionTicket(req, res) {
 
   req.app.get("io")?.emit("ticket:updated", {
     ticketNumber: updated.ticketNumber,
-    status: updated.status,
+    status:       updated.status,
   });
 
   res.json({ ok: true, status: updated.status });
 }
 
-// DELETE /api/tickets/:id — apenas ADMIN
+// ── DELETE ────────────────────────────────────────────────────────────────────
 export async function deleteTicket(req, res) {
   const id = Number(req.params.id);
   const ticket = await prisma.ticket.findUnique({ where: { id } });
@@ -302,6 +432,7 @@ export async function deleteTicket(req, res) {
   res.json({ ok: true });
 }
 
+// ── FEEDBACK ─────────────────────────────────────────────────────────────────
 export async function submitFeedback(req, res) {
   if (process.env.FEEDBACK_ENABLED !== "true") {
     return res.status(404).json({ error: "Módulo de avaliação desativado" });
@@ -324,4 +455,41 @@ export async function submitFeedback(req, res) {
     data: { ticketId: ticket.id, rating: r, comment: comment || null },
   });
   res.status(201).json({ ok: true, id: fb.id });
+}
+
+// ── Formato base de ticket para listagens ─────────────────────────────────────
+function formatTicket(t) {
+  return {
+    id:                  t.id,
+    ticketNumber:        t.ticketNumber,
+    requesterName:       t.requesterName,
+    requesterCpf:        maskCpf(t.requesterCpf),
+    department:          t.department,
+    category:            t.category     ? { id: t.category.id,     name: t.category.name }     : null,
+    subcategory:         t.subcategory  ? { id: t.subcategory.id,  name: t.subcategory.name, code: t.subcategory.code } : null,
+    freeTextDescription: t.freeTextDescription,
+    extraData:           t.extraData,
+    anyDeskCode:         t.anyDeskCode || null,
+    isRemote:             !!(t.anyDeskCode),
+    presential:           t.presential,
+    requiresCauseSolution: t.requiresCauseSolution,
+    approvalStatus:       t.approvalStatus,
+    approvals:           t.approvals?.map((a) => ({
+      id:           a.id,
+      chefDeptId:   a.chefDeptId,
+      chefDeptName: a.chefDept?.name,
+      chefUserName: a.chefUser?.name,
+      status:       a.status,
+      note:         a.note,
+      decidedAt:    a.decidedAt,
+    })) ?? [],
+    status:        t.status,
+    unit:          t.unit        ? { id: t.unit.id,        name: t.unit.name }        : null,
+    technician:    t.assignedTech || null,
+    openedAt:      t.openedAt,
+    viewedAt:      t.viewedAt,
+    enRouteAt:     t.enRouteAt,
+    inServiceAt:   t.inServiceAt,
+    completedAt:   t.completedAt,
+  };
 }

@@ -4,72 +4,412 @@ import { api } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { Alert, Spinner } from "../components/ui";
 import {
-  ArrowLeft, ArrowRight, Monitor, Wifi, KeyRound, HelpCircle,
+  ArrowLeft, ArrowRight, Monitor, Wifi, Server, FileText,
   CheckCircle2, MonitorSmartphone, Copy, Check as CheckIcon, Printer, LogOut,
-  Lightbulb,
+  Lightbulb, AlertTriangle, ShieldCheck, ChevronDown,
 } from "lucide-react";
 
+// ── Ícones e cores por código de categoria ───────────────────────────────────
 const CATEGORY_ICONS = {
-  HARDWARE: Monitor,
-  NETWORK:  Wifi,
-  ACCESS:   KeyRound,
-  OTHER:    HelpCircle,
-  REMOTE:   MonitorSmartphone,
-  PRINTER:  Printer,
+  HARDWARE:  Monitor,
+  NETWORK:   Wifi,
+  NETSERVER: Server,
+  SIGED:     FileText,
+  REMOTE:    MonitorSmartphone,
+  PRINTER:   Printer,
 };
 
 const CATEGORY_COLORS = {
-  HARDWARE: "bg-orange-50  dark:bg-orange-900/30  text-orange-600  dark:text-orange-400  border-orange-200  dark:border-orange-700",
-  NETWORK:  "bg-blue-50    dark:bg-blue-900/30    text-blue-600    dark:text-blue-400    border-blue-200    dark:border-blue-700",
-  ACCESS:   "bg-violet-50  dark:bg-violet-900/30  text-violet-600  dark:text-violet-400  border-violet-200  dark:border-violet-700",
-  OTHER:    "bg-slate-50   dark:bg-gray-800       text-slate-600   dark:text-gray-400    border-slate-200   dark:border-gray-700",
-  REMOTE:   "bg-cyan-50    dark:bg-cyan-900/30    text-cyan-600    dark:text-cyan-400    border-cyan-200    dark:border-cyan-700",
-  PRINTER:  "bg-green-50   dark:bg-green-900/30   text-green-600   dark:text-green-400   border-green-200   dark:border-green-700",
+  HARDWARE:  "bg-orange-50  dark:bg-orange-900/30  text-orange-600  dark:text-orange-400  border-orange-200  dark:border-orange-700",
+  NETWORK:   "bg-blue-50    dark:bg-blue-900/30    text-blue-600    dark:text-blue-400    border-blue-200    dark:border-blue-700",
+  NETSERVER: "bg-indigo-50  dark:bg-indigo-900/30  text-indigo-600  dark:text-indigo-400  border-indigo-200  dark:border-indigo-700",
+  SIGED:     "bg-teal-50    dark:bg-teal-900/30    text-teal-600    dark:text-teal-400    border-teal-200    dark:border-teal-700",
+  REMOTE:    "bg-cyan-50    dark:bg-cyan-900/30    text-cyan-600    dark:text-cyan-400    border-cyan-200    dark:border-cyan-700",
+  PRINTER:   "bg-green-50   dark:bg-green-900/30   text-green-600   dark:text-green-400   border-green-200   dark:border-green-700",
 };
 
+// Subcategorias que têm campos extras (valor = tipo de formulário)
+const EXTRA_FORM_TYPE = {
+  // Impressoras: nome da impressora + bloco
+  PRINTER_NOT_VISIBLE: "printer",
+  PRINTER_OFFLINE:     "printer",
+  PRINTER_NO_PRINT:    "printer",
+  PRINTER_PAPER_JAM:   "printer",
+  PRINTER_NO_PAPER:    "printer",
+  PRINTER_TONER:       "printer",
+  // Rede/Servidor
+  NETSERVER_USER_CREATE:    "net_user_create",
+  NETSERVER_USER_DELETE:    "net_user_delete",
+  NETSERVER_PASSWORD_RESET: "net_password_reset",
+  NETSERVER_USER_UPDATE:    "freetext",
+  NETSERVER_FOLDER_CREATE:  "freetext",
+  NETSERVER_FOLDER_MAP:     "freetext",
+  NETSERVER_VPN:            "freetext",
+  NETSERVER_TRUST_FAIL:     "none",
+  // SIGED
+  SIGED_USER_CREATE:    "freetext",
+  SIGED_SECTOR_MOVE:    "siged_sector_move",
+  SIGED_USER_DELETE:    "siged_user_delete",
+  SIGED_PASSWORD_RESET: "freetext",
+  SIGED_SECTOR_CREATE:  "freetext",
+  // Computador / Internet (descri livre só para "Outro")
+  HARDWARE_OTHER: "freetext",
+};
+
+// ── Componente select de departamento com busca ──────────────────────────────
+function DeptSelect({ value, onChange, departments, placeholder = "Selecione o setor..." }) {
+  const [open,  setOpen]  = useState(false);
+  const [query, setQuery] = useState("");
+
+  const filtered = departments.filter((d) =>
+    d.name.toLowerCase().includes(query.toLowerCase())
+  );
+  const selected = departments.find((d) => d.id === value);
+
+  useEffect(() => {
+    function handle(e) {
+      if (!e.target.closest("[data-dept-select]")) setOpen(false);
+    }
+    document.addEventListener("mousedown", handle);
+    return () => document.removeEventListener("mousedown", handle);
+  }, []);
+
+  return (
+    <div className="relative" data-dept-select>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="field-input w-full flex items-center justify-between text-left"
+      >
+        <span className={selected ? "text-slate-900 dark:text-gray-100" : "text-slate-400 dark:text-gray-500"}>
+          {selected ? selected.name : placeholder}
+        </span>
+        <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="absolute z-50 mt-1 w-full bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl shadow-lg overflow-hidden">
+          <div className="p-2 border-b border-slate-100 dark:border-gray-700">
+            <input
+              autoFocus
+              type="text"
+              placeholder="Filtrar..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="w-full px-3 py-1.5 text-sm rounded-lg bg-slate-50 dark:bg-gray-900 border border-slate-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+          </div>
+          <ul className="max-h-44 overflow-y-auto">
+            {filtered.length === 0 && (
+              <li className="px-4 py-3 text-sm text-slate-400">Nenhum setor encontrado</li>
+            )}
+            {filtered.map((d) => (
+              <li key={d.id}>
+                <button
+                  type="button"
+                  onClick={() => { onChange(d.id); setOpen(false); setQuery(""); }}
+                  className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
+                    value === d.id
+                      ? "bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400 font-medium"
+                      : "text-slate-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-700"
+                  }`}
+                >
+                  {d.name}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Formulários extras por tipo ──────────────────────────────────────────────
+function ExtraFields({ formType, fields, setFields, departments }) {
+  const set = (key, val) => setFields((prev) => ({ ...prev, [key]: val }));
+
+  if (formType === "printer") return (
+    <div className="space-y-3 pt-1">
+      <div>
+        <label className="field-label">Identificação da impressora *</label>
+        <input
+          className="field-input"
+          placeholder="Ex: HP LaserJet Pro M404n — sala 203"
+          value={fields.printerName || ""}
+          onChange={(e) => set("printerName", e.target.value)}
+        />
+      </div>
+      <div>
+        <label className="field-label">Bloco / localização *</label>
+        <input
+          className="field-input"
+          placeholder="Ex: Bloco A, 2º andar"
+          value={fields.block || ""}
+          onChange={(e) => set("block", e.target.value)}
+        />
+      </div>
+    </div>
+  );
+
+  if (formType === "net_user_create") return (
+    <div className="space-y-3 pt-1">
+      <div className="rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 px-4 py-3 flex items-start gap-2 text-xs text-amber-800 dark:text-amber-300">
+        <ShieldCheck size={14} className="shrink-0 mt-0.5" />
+        <span>Este chamado será enviado para <strong>aprovação do seu Chefe de Setor</strong> antes de ser processado pela GTI.</span>
+      </div>
+      <div>
+        <label className="field-label">Nome completo do novo usuário *</label>
+        <input className="field-input" placeholder="Nome completo" value={fields.nome || ""} onChange={(e) => set("nome", e.target.value)} />
+      </div>
+      <div>
+        <label className="field-label">CPF do novo usuário *</label>
+        <input className="field-input" placeholder="000.000.000-00" value={fields.cpf || ""} onChange={(e) => set("cpf", e.target.value)} />
+      </div>
+      <div>
+        <label className="field-label">E-mail institucional</label>
+        <input className="field-input" type="email" placeholder="usuario@sejusc.am.gov.br" value={fields.email || ""} onChange={(e) => set("email", e.target.value)} />
+      </div>
+      <div>
+        <label className="field-label">Setor *</label>
+        <input className="field-input" placeholder="Setor do novo usuário" value={fields.setor || ""} onChange={(e) => set("setor", e.target.value)} />
+      </div>
+      <div>
+        <label className="field-label">Cargo / Função *</label>
+        <input className="field-input" placeholder="Ex: Analista, Assistente..." value={fields.cargo || ""} onChange={(e) => set("cargo", e.target.value)} />
+      </div>
+      <div>
+        <label className="field-label mb-2">Sistemas necessários *</label>
+        <div className="flex flex-wrap gap-3">
+          {["SIGED", "SAM", "AD"].map((sys) => {
+            const checked = (fields.systems || []).includes(sys);
+            return (
+              <label key={sys} className={`flex items-center gap-2 px-4 py-2 rounded-xl border cursor-pointer transition text-sm font-medium ${
+                checked
+                  ? "border-brand-500 bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400"
+                  : "border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-slate-700 dark:text-gray-300 hover:border-brand-300"
+              }`}>
+                <input
+                  type="checkbox"
+                  className="sr-only"
+                  checked={checked}
+                  onChange={() => {
+                    const cur = fields.systems || [];
+                    set("systems", checked ? cur.filter((s) => s !== sys) : [...cur, sys]);
+                  }}
+                />
+                <div className={`h-4 w-4 rounded border-2 flex items-center justify-center ${checked ? "border-brand-500 bg-brand-500" : "border-slate-300 dark:border-gray-600"}`}>
+                  {checked && <CheckIcon size={10} className="text-white" />}
+                </div>
+                {sys}
+              </label>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+
+  if (formType === "net_user_delete") return (
+    <div className="space-y-3 pt-1">
+      <div>
+        <label className="field-label">CPF do usuário a ser excluído *</label>
+        <input className="field-input" placeholder="000.000.000-00" value={fields.cpf || ""} onChange={(e) => set("cpf", e.target.value)} />
+      </div>
+      <div>
+        <label className="field-label">Setor do usuário *</label>
+        <input className="field-input" placeholder="Setor atual do usuário" value={fields.setor || ""} onChange={(e) => set("setor", e.target.value)} />
+      </div>
+      <div>
+        <label className="field-label">Observações</label>
+        <textarea rows={2} className="field-input resize-none" placeholder="Informações adicionais..." value={fields.obs || ""} onChange={(e) => set("obs", e.target.value)} />
+      </div>
+    </div>
+  );
+
+  if (formType === "net_password_reset") return (
+    <div className="space-y-3 pt-1">
+      <div>
+        <label className="field-label">Nome do usuário *</label>
+        <input className="field-input" placeholder="Nome completo" value={fields.nome || ""} onChange={(e) => set("nome", e.target.value)} />
+      </div>
+      <div>
+        <label className="field-label">CPF *</label>
+        <input className="field-input" placeholder="000.000.000-00" value={fields.cpf || ""} onChange={(e) => set("cpf", e.target.value)} />
+      </div>
+      <div>
+        <label className="field-label">Setor *</label>
+        <input className="field-input" placeholder="Setor do usuário" value={fields.setor || ""} onChange={(e) => set("setor", e.target.value)} />
+      </div>
+    </div>
+  );
+
+  if (formType === "siged_sector_move") return (
+    <div className="space-y-3 pt-1">
+      <div className="rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 px-4 py-3 flex items-start gap-2 text-xs text-amber-800 dark:text-amber-300">
+        <ShieldCheck size={14} className="shrink-0 mt-0.5" />
+        <span>Esta solicitação requer aprovação dos <strong>Chefes dos dois setores envolvidos</strong> antes de ser processada.</span>
+      </div>
+      <div>
+        <label className="field-label">CPF do usuário *</label>
+        <input className="field-input" placeholder="000.000.000-00" value={fields.cpf || ""} onChange={(e) => set("cpf", e.target.value)} />
+      </div>
+      <div>
+        <label className="field-label">Setor de destino *</label>
+        <DeptSelect
+          value={fields.targetDeptId || null}
+          onChange={(id) => {
+            const dept = departments.find((d) => d.id === id);
+            setFields((prev) => ({ ...prev, targetDeptId: id, targetDeptName: dept?.name || "" }));
+          }}
+          departments={departments}
+          placeholder="Selecione o novo setor..."
+        />
+      </div>
+      <div>
+        <label className="field-label">Observações</label>
+        <textarea rows={2} className="field-input resize-none" placeholder="Informações adicionais..." value={fields.obs || ""} onChange={(e) => set("obs", e.target.value)} />
+      </div>
+    </div>
+  );
+
+  if (formType === "siged_user_delete") return (
+    <div className="space-y-3 pt-1">
+      <div>
+        <label className="field-label">CPF do usuário a ser excluído *</label>
+        <input className="field-input" placeholder="000.000.000-00" value={fields.cpf || ""} onChange={(e) => set("cpf", e.target.value)} />
+      </div>
+      <div>
+        <label className="field-label">Observações</label>
+        <textarea rows={2} className="field-input resize-none" placeholder="Informações adicionais..." value={fields.obs || ""} onChange={(e) => set("obs", e.target.value)} />
+      </div>
+    </div>
+  );
+
+  if (formType === "freetext") return (
+    <div className="pt-1">
+      <label className="field-label">Descreva a solicitação *</label>
+      <textarea
+        rows={4}
+        className="field-input resize-none"
+        placeholder="Descreva com o máximo de detalhes..."
+        value={fields.freetext || ""}
+        onChange={(e) => set("freetext", e.target.value)}
+        autoFocus
+      />
+      <p className={`mt-1 text-xs ${(fields.freetext?.length || 0) < 5 ? "text-amber-600 dark:text-amber-400" : "text-slate-400 dark:text-gray-500"}`}>
+        {(fields.freetext?.length || 0)} / mínimo 5 caracteres
+      </p>
+    </div>
+  );
+
+  return null; // formType === "none" ou não mapeado
+}
+
+// ── Valida se os campos extras estão preenchidos ─────────────────────────────
+function isExtraValid(formType, fields) {
+  if (!formType || formType === "none") return true;
+  if (formType === "printer")          return !!(fields.printerName?.trim() && fields.block?.trim());
+  if (formType === "net_user_create")  return !!(fields.nome?.trim() && fields.cpf?.trim() && fields.setor?.trim() && fields.cargo?.trim() && (fields.systems || []).length > 0);
+  if (formType === "net_user_delete")  return !!(fields.cpf?.trim() && fields.setor?.trim());
+  if (formType === "net_password_reset") return !!(fields.nome?.trim() && fields.cpf?.trim() && fields.setor?.trim());
+  if (formType === "siged_sector_move")  return !!(fields.cpf?.trim() && fields.targetDeptId);
+  if (formType === "siged_user_delete")  return !!(fields.cpf?.trim());
+  if (formType === "freetext")           return (fields.freetext?.trim().length || 0) >= 5;
+  return true;
+}
+
+// ── Constrói freeTextDescription e extraData a partir dos campos ──────────────
+function buildPayload(formType, fields) {
+  let freeTextDescription = null;
+  let extraData           = null;
+
+  if (formType === "printer") {
+    freeTextDescription = `Impressora: ${fields.printerName}\nBloco: ${fields.block}`;
+    extraData = { printerName: fields.printerName, block: fields.block };
+  } else if (formType === "net_user_create") {
+    const systems = (fields.systems || []).join(", ");
+    freeTextDescription = `Nome: ${fields.nome}\nCPF: ${fields.cpf}\nE-mail: ${fields.email || "—"}\nSetor: ${fields.setor}\nCargo: ${fields.cargo}\nSistemas: ${systems}`;
+    extraData = { systems: fields.systems || [] };
+  } else if (formType === "net_user_delete") {
+    freeTextDescription = `CPF: ${fields.cpf}\nSetor: ${fields.setor}${fields.obs ? `\nObservações: ${fields.obs}` : ""}`;
+  } else if (formType === "net_password_reset") {
+    freeTextDescription = `Nome: ${fields.nome}\nCPF: ${fields.cpf}\nSetor: ${fields.setor}`;
+  } else if (formType === "siged_sector_move") {
+    freeTextDescription = `CPF: ${fields.cpf}\nSetor de destino: ${fields.targetDeptName}${fields.obs ? `\nObservações: ${fields.obs}` : ""}`;
+    extraData = { targetDeptId: fields.targetDeptId, targetDeptName: fields.targetDeptName };
+  } else if (formType === "siged_user_delete") {
+    freeTextDescription = `CPF: ${fields.cpf}${fields.obs ? `\nObservações: ${fields.obs}` : ""}`;
+  } else if (formType === "freetext") {
+    freeTextDescription = fields.freetext?.trim() || null;
+  }
+
+  return { freeTextDescription, extraData };
+}
+
+// ── Página principal ─────────────────────────────────────────────────────────
 export default function NewTicketPage() {
-  const nav = useNavigate();
+  const nav          = useNavigate();
   const { user, logout } = useAuth();
-  const [categories, setCategories] = useState([]);
-  const [screen, setScreen] = useState("category");
-  const [form, setForm] = useState({
-    categoryId: null,
-    subcategoryId: null,
-    freeTextDescription: "",
-    anyDeskCode: "",
-  });
-  const [error, setError] = useState("");
-  const [submitting, setSubmitting] = useState(false);
+  const [categories,   setCategories]   = useState([]);
+  const [departments,  setDepartments]  = useState([]);
+  const [screen,       setScreen]       = useState("category");
+  const [form,         setForm]         = useState({ categoryId: null, subcategoryId: null, anyDeskCode: "", freeTextDescription: "" });
+  const [extraFields,  setExtraFields]  = useState({});
+  const [error,        setError]        = useState("");
+  const [submitting,   setSubmitting]   = useState(false);
   const [createdTicket, setCreatedTicket] = useState(null);
 
   useEffect(() => {
-    api.get("/categories").then((r) => setCategories(r.data));
+    api.get("/categories").then((r)   => setCategories(r.data));
+    api.get("/departments").then((r)  => setDepartments(r.data)).catch(() => {});
   }, []);
 
-  const selectedCategory = categories.find((c) => c.id === form.categoryId);
-  const isRemote   = selectedCategory?.code === "REMOTE";
-  const n1Tips     = selectedCategory?.n1Tips ? JSON.parse(selectedCategory.n1Tips) : [];
-
+  const selectedCategory   = categories.find((c) => c.id === form.categoryId);
+  const isRemote           = selectedCategory?.code === "REMOTE";
+  const n1Tips             = selectedCategory?.n1Tips ? JSON.parse(selectedCategory.n1Tips) : [];
   const selectedSubcategory = selectedCategory?.subcategories?.find((s) => s.id === form.subcategoryId);
-  const isOutro = selectedSubcategory?.name === "Outro";
+  const subCode            = selectedSubcategory?.code;
+  const formType           = subCode ? (EXTRA_FORM_TYPE[subCode] ?? "none") : null;
+  const requiresApproval   = selectedSubcategory?.requiresApproval ?? false;
 
-  const steps = ["Tipo do problema", "Detalhes"];
+  const steps      = ["Tipo do problema", "Detalhes"];
   const currentStep = screen === "category" ? 1 : 2;
+
+  // Reset de campos extras ao trocar subcategoria
+  function selectSub(subId) {
+    setForm((f) => ({ ...f, subcategoryId: subId, freeTextDescription: "" }));
+    setExtraFields({});
+  }
+
+  function canSubmit() {
+    if (isRemote) return form.anyDeskCode.trim().length >= 3;
+    if (selectedCategory?.allowsFreeText) return form.freeTextDescription.trim().length >= 5;
+    if (!form.subcategoryId) return false;
+    return isExtraValid(formType, extraFields);
+  }
 
   async function submit() {
     setError("");
     setSubmitting(true);
     try {
-      const payload = {
-        categoryId:          form.categoryId,
-        subcategoryId:       selectedCategory?.allowsFreeText || isRemote ? null : form.subcategoryId,
-        freeTextDescription: isRemote
-          ? (form.freeTextDescription?.trim() || null)
-          : (selectedCategory?.allowsFreeText ? form.freeTextDescription : null),
-        anyDeskCode: isRemote ? form.anyDeskCode.trim() : null,
+      let payload = {
+        categoryId:    form.categoryId,
+        subcategoryId: (selectedCategory?.allowsFreeText || isRemote) ? null : form.subcategoryId,
+        anyDeskCode:   isRemote ? form.anyDeskCode.trim() : null,
       };
+
+      if (isRemote) {
+        payload.freeTextDescription = form.freeTextDescription?.trim() || null;
+      } else if (selectedCategory?.allowsFreeText) {
+        payload.freeTextDescription = form.freeTextDescription?.trim() || null;
+      } else if (formType) {
+        const built = buildPayload(formType, extraFields);
+        payload.freeTextDescription = built.freeTextDescription;
+        payload.extraData           = built.extraData;
+      }
+
       const { data } = await api.post("/tickets", payload);
-      setCreatedTicket({ ticketNumber: data.ticketNumber, isRemote });
+      setCreatedTicket({ ticketNumber: data.ticketNumber, isRemote, approvalStatus: data.approvalStatus });
     } catch (e) {
       setError(e.response?.data?.error || "Falha ao abrir chamado");
     } finally {
@@ -80,6 +420,7 @@ export default function NewTicketPage() {
   // ── Tela de sucesso ──────────────────────────────────────────────────────
   if (createdTicket) {
     if (createdTicket.isRemote) return <RemoteSuccessScreen ticketNumber={createdTicket.ticketNumber} />;
+    if (createdTicket.approvalStatus === "PENDING") return <ApprovalPendingScreen ticketNumber={createdTicket.ticketNumber} />;
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-gray-950 flex items-center justify-center p-4">
         <div className="card p-8 text-center max-w-sm w-full space-y-4">
@@ -115,8 +456,7 @@ export default function NewTicketPage() {
           }}
           className="flex items-center gap-1.5 text-sm text-slate-500 dark:text-gray-400 hover:text-slate-700 dark:hover:text-gray-200 transition"
         >
-          <ArrowLeft size={16} />
-          Voltar
+          <ArrowLeft size={16} /> Voltar
         </button>
         <div className="h-4 w-px bg-slate-200 dark:bg-gray-700" />
         <h1 className="text-sm font-semibold text-slate-800 dark:text-gray-100">Abrir chamado</h1>
@@ -184,8 +524,8 @@ export default function NewTicketPage() {
 
               <div className="space-y-2">
                 {categories.filter((c) => c.code !== "REMOTE").map((c) => {
-                  const Icon       = CATEGORY_ICONS[c.code] || HelpCircle;
-                  const colorClass = CATEGORY_COLORS[c.code] || CATEGORY_COLORS.OTHER;
+                  const Icon       = CATEGORY_ICONS[c.code] || FileText;
+                  const colorClass = CATEGORY_COLORS[c.code] || "";
                   const selected   = form.categoryId === c.id;
                   return (
                     <button
@@ -272,7 +612,7 @@ export default function NewTicketPage() {
           {screen === "details" && selectedCategory && (
             <div className="space-y-4">
 
-              {/* Card N1 — só aparece se houver dicas, não bloqueia nada */}
+              {/* Dicas N1 */}
               {n1Tips.length > 0 && !isRemote && (
                 <div className="rounded-xl border border-amber-200 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/15 px-4 py-3.5 space-y-2">
                   <div className="flex items-center gap-2 text-sm font-semibold text-amber-800 dark:text-amber-300">
@@ -303,6 +643,7 @@ export default function NewTicketPage() {
                 </p>
               </div>
 
+              {/* AnyDesk */}
               {isRemote && (
                 <AnyDeskStep
                   value={form.anyDeskCode}
@@ -312,6 +653,7 @@ export default function NewTicketPage() {
                 />
               )}
 
+              {/* Texto livre (categoria) */}
               {!isRemote && selectedCategory.allowsFreeText && (
                 <div>
                   <label className="field-label">Descrição do problema</label>
@@ -333,6 +675,7 @@ export default function NewTicketPage() {
                 </div>
               )}
 
+              {/* Subcategorias */}
               {!isRemote && !selectedCategory.allowsFreeText && (
                 <div className="space-y-2">
                   {selectedCategory.subcategories.map((s) => {
@@ -352,26 +695,28 @@ export default function NewTicketPage() {
                           {selected && <div className="h-1.5 w-1.5 rounded-full bg-white" />}
                         </div>
                         <input type="radio" name="sub" className="sr-only" checked={selected}
-                          onChange={() => setForm({ ...form, subcategoryId: s.id, freeTextDescription: "" })} />
-                        <span className="text-sm text-slate-700 dark:text-gray-200">{s.name}</span>
+                          onChange={() => selectSub(s.id)} />
+                        <div className="flex-1 min-w-0">
+                          <span className="text-sm text-slate-700 dark:text-gray-200">{s.name}</span>
+                          {s.requiresApproval && (
+                            <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 text-xs text-amber-700 dark:text-amber-400 ring-1 ring-amber-200 dark:ring-amber-700">
+                              <ShieldCheck size={9} /> Requer aprovação
+                            </span>
+                          )}
+                        </div>
                       </label>
                     );
                   })}
 
-                  {isOutro && (
-                    <div className="pt-1">
-                      <label className="field-label">Descreva o problema</label>
-                      <textarea
-                        rows={4}
-                        className="field-input resize-none"
-                        placeholder="Descreva o problema com detalhes..."
-                        value={form.freeTextDescription}
-                        onChange={(e) => setForm({ ...form, freeTextDescription: e.target.value })}
-                        autoFocus
+                  {/* Campos extras da subcategoria selecionada */}
+                  {form.subcategoryId && formType && formType !== "none" && (
+                    <div className="rounded-xl border border-slate-200 dark:border-gray-700 p-4 space-y-1 mt-1">
+                      <ExtraFields
+                        formType={formType}
+                        fields={extraFields}
+                        setFields={setExtraFields}
+                        departments={departments}
                       />
-                      <p className="mt-1 text-xs text-slate-400 dark:text-gray-500">
-                        {form.freeTextDescription.length} / mínimo 5 caracteres
-                      </p>
                     </div>
                   )}
                 </div>
@@ -380,27 +725,17 @@ export default function NewTicketPage() {
               <Alert message={error} />
 
               <div className="flex gap-2 pt-1">
-                <button
-                  onClick={() => setScreen("category")}
-                  className="btn-secondary flex-1"
-                >
+                <button onClick={() => setScreen("category")} className="btn-secondary flex-1">
                   <ArrowLeft size={16} /> Voltar
                 </button>
                 <button
-                  disabled={
-                    submitting ||
-                    (isRemote
-                      ? form.anyDeskCode.trim().length < 3
-                      : selectedCategory.allowsFreeText
-                      ? form.freeTextDescription.trim().length < 5
-                      : !form.subcategoryId || (isOutro && form.freeTextDescription.trim().length < 5))
-                  }
+                  disabled={submitting || !canSubmit()}
                   onClick={submit}
                   className="btn-primary flex-1"
                 >
                   {submitting
                     ? <><Spinner className="h-4 w-4" /> Enviando...</>
-                    : <>Abrir chamado <CheckCircle2 size={16} /></>}
+                    : <>{requiresApproval ? <><ShieldCheck size={16} /> Enviar para aprovação</> : <><CheckCircle2 size={16} /> Abrir chamado</>}</>}
                 </button>
               </div>
             </div>
@@ -411,7 +746,36 @@ export default function NewTicketPage() {
   );
 }
 
-// ── AnyDesk step ──────────────────────────────────────────────────────────────
+// ── Tela: aguardando aprovação do chefe ──────────────────────────────────────
+function ApprovalPendingScreen({ ticketNumber }) {
+  return (
+    <div className="min-h-screen bg-slate-50 dark:bg-gray-950 flex items-center justify-center p-4">
+      <div className="card p-8 text-center max-w-sm w-full space-y-4">
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 mx-auto">
+          <ShieldCheck size={28} />
+        </div>
+        <div>
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-gray-100">Solicitação enviada!</h2>
+          <p className="font-mono text-sm text-brand-600 dark:text-brand-400 mt-1">{ticketNumber}</p>
+          <p className="text-sm text-slate-500 dark:text-gray-400 mt-2">
+            Aguardando aprovação do Chefe de Setor. Após a aprovação, a GTI irá processar sua solicitação.
+          </p>
+        </div>
+        <div className="rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 px-4 py-3 text-xs text-amber-800 dark:text-amber-300 text-left">
+          ⚠️ Você receberá atualização sobre o andamento da sua solicitação.
+        </div>
+        <Link to={`/acompanhar/${ticketNumber}`} className="btn-primary w-full justify-center">
+          Acompanhar solicitação
+        </Link>
+        <Link to="/" className="block text-sm text-slate-500 dark:text-gray-400 hover:text-slate-700 dark:hover:text-gray-200 transition">
+          Voltar ao início
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+// ── AnyDesk step ─────────────────────────────────────────────────────────────
 function AnyDeskStep({ value, onChange, description, onDescriptionChange }) {
   return (
     <div className="space-y-4">
@@ -451,7 +815,7 @@ function AnyDeskStep({ value, onChange, description, onDescriptionChange }) {
   );
 }
 
-// ── Remote success ─────────────────────────────────────────────────────────────
+// ── Remote success ────────────────────────────────────────────────────────────
 function RemoteSuccessScreen({ ticketNumber }) {
   const [copied, setCopied] = useState(false);
   function copyProtocol() {
