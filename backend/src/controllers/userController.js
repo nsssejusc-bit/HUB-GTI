@@ -5,11 +5,18 @@ import { prisma } from "../config/prisma.js";
 import { stripCpf, isValidCpf, maskCpf } from "../utils/cpf.js";
 import { toTitleCase } from "../utils/name.js";
 
+const VALID_PREFIXOS = ["GOVERNO", "TERCEIRIZADO", "ESTAGIARIO"];
+
 const registerSchema = z.object({
-  name:        z.string().min(3, "Nome muito curto"),
-  cpf:         z.string(),
-  password:    z.string().min(6, "Senha mínima de 6 caracteres"),
+  name:         z.string().min(3, "Nome muito curto"),
+  cpf:          z.string(),
+  password:     z.string().min(6, "Senha mínima de 6 caracteres"),
   departmentId: z.number().int().positive("Selecione um setor"),
+  matricula:    z.string().optional().nullable(),
+  prefixo:      z.enum(["GOVERNO", "TERCEIRIZADO", "ESTAGIARIO"]).optional().nullable(),
+  email:        z.string().email("E-mail inválido").optional().or(z.literal("")).nullable(),
+  telefone:     z.string().optional().nullable(),
+  isChefe:      z.boolean().optional().default(false),
 });
 
 // POST /api/auth/register — público, cria conta de usuário ativa imediatamente
@@ -18,7 +25,7 @@ export async function register(req, res) {
   if (!parsed.success) {
     return res.status(400).json({ error: "Dados inválidos", details: parsed.error.issues });
   }
-  const { name, password, departmentId } = parsed.data;
+  const { name, password, departmentId, matricula, prefixo, email, telefone, isChefe } = parsed.data;
   const cleanCpf = stripCpf(parsed.data.cpf);
   if (!isValidCpf(cleanCpf)) {
     return res.status(400).json({ error: "CPF inválido" });
@@ -42,6 +49,11 @@ export async function register(req, res) {
       role: "USER",
       active: true,
       departmentId,
+      matricula: matricula || null,
+      prefixo: prefixo || null,
+      email: email || null,
+      telefone: telefone || null,
+      isChefe: isChefe ?? false,
     },
   });
   res.status(201).json({ ok: true });
@@ -62,6 +74,11 @@ export async function listUsers(req, res) {
       cpf: true,
       role: true,
       active: true,
+      isChefe: true,
+      matricula: true,
+      prefixo: true,
+      email: true,
+      telefone: true,
       createdAt: true,
       unit: { select: { id: true, name: true } },
       department: { select: { id: true, name: true } },
@@ -74,7 +91,7 @@ export async function listUsers(req, res) {
 // PATCH /api/users/:id — atualiza usuário (ADMIN only)
 export async function updateUser(req, res) {
   const id = Number(req.params.id);
-  const { active, unitId, role, name } = req.body || {};
+  const { active, unitId, role, name, isChefe, email, telefone, matricula, prefixo } = req.body || {};
 
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) return res.status(404).json({ error: "Usuário não encontrado" });
@@ -86,6 +103,17 @@ export async function updateUser(req, res) {
   const data = {};
   if (active !== undefined) data.active = active;
   if (unitId !== undefined) data.unitId = unitId ? Number(unitId) : null;
+  if (isChefe !== undefined) data.isChefe = Boolean(isChefe);
+  if (email !== undefined) data.email = email || null;
+  if (telefone !== undefined) data.telefone = telefone || null;
+  if (matricula !== undefined) data.matricula = matricula || null;
+  if (prefixo !== undefined) {
+    if (prefixo && !VALID_PREFIXOS.includes(prefixo)) {
+      return res.status(400).json({ error: "Prefixo inválido" });
+    }
+    data.prefixo = prefixo || null;
+  }
+
   if (name !== undefined) {
     const trimmed = name.trim();
     if (trimmed.length < 3) return res.status(400).json({ error: "Nome muito curto (mínimo 3 caracteres)" });
@@ -93,7 +121,7 @@ export async function updateUser(req, res) {
   }
 
   if (role !== undefined) {
-    const validRoles = ["USER", "TECHNICIAN", "ADMIN"];
+    const validRoles = ["USER", "TECHNICIAN", "CHEFE_SETOR", "ADMIN"];
     if (!validRoles.includes(role)) {
       return res.status(400).json({ error: "Papel inválido" });
     }
@@ -120,6 +148,11 @@ export async function updateUser(req, res) {
     name: updated.name,
     role: updated.role,
     active: updated.active,
+    isChefe: updated.isChefe,
+    matricula: updated.matricula,
+    prefixo: updated.prefixo,
+    email: updated.email,
+    telefone: updated.telefone,
     unit: updated.unit,
     department: updated.department,
   });

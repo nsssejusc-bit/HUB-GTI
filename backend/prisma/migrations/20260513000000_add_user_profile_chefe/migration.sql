@@ -1,0 +1,11 @@
+-- Adiciona novos campos de perfil no User e o role CHEFE_SETOR
+ALTER TABLE `User`
+  ADD COLUMN `matricula` VARCHAR(191) NULL,
+  ADD COLUMN `prefixo`   ENUM('GOVERNO','TERCEIRIZADO','ESTAGIARIO') NULL,
+  ADD COLUMN `email`     VARCHAR(191) NULL,
+  ADD COLUMN `telefone`  VARCHAR(191) NULL,
+  ADD COLUMN `isChefe`   TINYINT(1) NOT NULL DEFAULT 0;
+
+-- Atualiza o enum Role para incluir CHEFE_SETOR
+ALTER TABLE `User` MODIFY COLUMN `role`
+  ENUM('ADMIN','TECHNICIAN','CHEFE_SETOR','USER') NOT NULL DEFAULT 'USER';

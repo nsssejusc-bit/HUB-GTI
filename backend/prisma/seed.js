@@ -20,6 +20,7 @@ async function main() {
 
   // ── Unidades ────────────────────────────────────────────────────────────
   const units = [
+    { name: "GTI", description: "Gerência de Tecnologia da Informação" },
     { name: "NSS", description: "Tecnologia da Informação" },
     { name: "NIR", description: "Infraestrutura e Redes" },
     { name: "NMT", description: "Manutenção Técnica" },
@@ -150,8 +151,8 @@ async function main() {
   const adminCpf = "48215374867";
   const adminHash = await bcrypt.hash("admin@2025", 10);
 
-  const nss = await prisma.unit.findUnique({
-    where: { name: "NSS" },
+  const gti = await prisma.unit.findUnique({
+    where: { name: "GTI" },
   });
   const nssDept = await prisma.department.findFirst({
     where: { name: { contains: "NSS" } },
@@ -165,14 +166,14 @@ async function main() {
       passwordHash: adminHash,
       role: "ADMIN",
       active: true,
-      unitId: nss?.id || null,
+      unitId: gti?.id || null,
       departmentId: nssDept?.id || null,
     },
     update: {
       name: "Guilherme Oliveira",
       role: "ADMIN",
       active: true,
-      unitId: nss?.id || null,
+      unitId: gti?.id || null,
       departmentId: nssDept?.id || null,
     },
   });

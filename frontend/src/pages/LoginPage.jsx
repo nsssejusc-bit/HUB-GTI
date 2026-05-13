@@ -25,7 +25,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const user = await login(cpf, password);
-      const isStaff = ["TECHNICIAN", "ADMIN"].includes(user.role);
+      const isStaff = ["TECHNICIAN", "ADMIN", "CHEFE_SETOR"].includes(user.role);
       const dest = isStaff
         ? (next?.startsWith("/painel") ? next : "/painel")
         : "/";

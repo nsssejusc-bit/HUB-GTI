@@ -10,7 +10,14 @@ datasource db {
 enum Role {
   ADMIN
   TECHNICIAN
+  CHEFE_SETOR
   USER
+}
+
+enum Prefixo {
+  GOVERNO
+  TERCEIRIZADO
+  ESTAGIARIO
 }
 
 enum TicketStatus {
@@ -69,6 +76,11 @@ model User {
   unit               Unit?      @relation(fields: [unitId], references: [id])
   departmentId       Int?
   department         Department? @relation("UserDepartment", fields: [departmentId], references: [id])
+  matricula          String?
+  prefixo            Prefixo?
+  email              String?
+  telefone           String?
+  isChefe            Boolean    @default(false)
   mustChangePassword Boolean    @default(false)
   createdAt          DateTime   @default(now())
   assignedTickets    Ticket[]   @relation("AssignedTechnician")

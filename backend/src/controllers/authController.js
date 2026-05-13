@@ -152,6 +152,11 @@ export async function me(req, res) {
     cpf: maskCpf(user.cpf),
     role: user.role,
     mustChangePassword: user.mustChangePassword,
+    matricula: user.matricula,
+    prefixo: user.prefixo,
+    email: user.email,
+    telefone: user.telefone,
+    isChefe: user.isChefe,
     unit: user.unit ? { id: user.unit.id, name: user.unit.name } : null,
     department: user.department ? { id: user.department.id, name: user.department.name } : null,
   });

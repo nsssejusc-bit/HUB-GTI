@@ -108,8 +108,8 @@ router.post("/users/:id/reset-password", authRequired, requireRole("ADMIN"), res
 
 // ── Área técnica ───────────────────────────────────────────────────────────────
 router.get("/technicians", authRequired, listTechnicians);
-router.get("/tickets",     authRequired, listTickets);
-router.get("/tickets/:id", authRequired, getTicket);
+router.get("/tickets",     authRequired, requireRole("TECHNICIAN", "ADMIN", "CHEFE_SETOR"), listTickets);
+router.get("/tickets/:id", authRequired, requireRole("TECHNICIAN", "ADMIN", "CHEFE_SETOR"), getTicket);
 router.post("/tickets/:id/transition", authRequired, requireRole("TECHNICIAN", "ADMIN"), transitionTicket);
 router.delete("/tickets/:id", authRequired, requireRole("ADMIN"), deleteTicket);
 

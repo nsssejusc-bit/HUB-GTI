@@ -27,10 +27,48 @@ const HIST_RANGES = [
   { key: "0",  label: "Tudo"   },
 ];
 
+// ── View simplificada para Chefe de Setor ────────────────────────────────────
+function ChefeDashboard() {
+  const { user } = useAuth();
+  return (
+    <div className="min-h-screen bg-slate-50 dark:bg-gray-950">
+      <AppHeader />
+      <main className="max-w-2xl mx-auto p-6 space-y-6">
+        <div>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-gray-100">
+            Olá, {user?.name?.split(" ")[0]}
+          </h1>
+          <p className="text-sm text-slate-500 dark:text-gray-400 mt-1">
+            Painel de aprovações — Chefe de Setor
+          </p>
+        </div>
+
+        <div className="card p-10 text-center space-y-3">
+          <div className="flex items-center justify-center">
+            <span className="flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 dark:bg-gray-800">
+              <CheckCircle2 className="h-8 w-8 text-slate-400 dark:text-gray-500" />
+            </span>
+          </div>
+          <p className="font-medium text-slate-700 dark:text-gray-300">
+            Nenhum chamado aguardando sua aprovação
+          </p>
+          <p className="text-sm text-slate-400 dark:text-gray-500">
+            Quando um chamado do seu setor precisar de autorização, ele aparecerá aqui.
+          </p>
+        </div>
+      </main>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const socket  = useSocket();
   const addToast = useToast();
   const { user } = useAuth();
+
+  // CHEFE_SETOR vê view simplificada
+  if (user?.role === "CHEFE_SETOR") return <ChefeDashboard />;
+
   const isAdmin = user?.role === "ADMIN";
 
   const [tickets, setTickets]         = useState([]);

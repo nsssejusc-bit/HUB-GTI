@@ -9,12 +9,14 @@ import {
 } from "lucide-react";
 
 const ROLE_LABEL = {
-  ADMIN:      "Administrador",
-  TECHNICIAN: "Técnico",
-  USER:       "Usuário",
+  ADMIN:       "Administrador",
+  TECHNICIAN:  "Técnico",
+  CHEFE_SETOR: "Chefe de Setor",
+  USER:        "Usuário",
 };
 
-const STAFF_ROLES = ["TECHNICIAN", "ADMIN"];
+const STAFF_ROLES      = ["TECHNICIAN", "ADMIN", "CHEFE_SETOR"];
+const FULL_STAFF_ROLES = ["TECHNICIAN", "ADMIN"];
 
 export default function AppHeader() {
   const { user, logout } = useAuth();
@@ -29,8 +31,10 @@ export default function AppHeader() {
   const userRef   = useRef(null);
   const configRef = useRef(null);
 
-  const isStaff = STAFF_ROLES.includes(user?.role);
-  const isAdmin = user?.role === "ADMIN";
+  const isStaff     = STAFF_ROLES.includes(user?.role);
+  const isFullStaff = FULL_STAFF_ROLES.includes(user?.role);
+  const isAdmin     = user?.role === "ADMIN";
+  const isChefe     = user?.role === "CHEFE_SETOR";
 
   useEffect(() => {
     function handle(e) {
@@ -53,14 +57,14 @@ export default function AppHeader() {
   }, [isAdmin]);
 
   useEffect(() => {
-    if (!isStaff) return;
+    if (!isFullStaff) return;
     function fetchOsCount() {
       api.get("/work-orders?status=ABERTA").then((r) => setOsOpenCount(r.data.length)).catch(() => {});
     }
     fetchOsCount();
     const t = setInterval(fetchOsCount, 30000);
     return () => clearInterval(t);
-  }, [isStaff]);
+  }, [isFullStaff]);
 
   const isActive = (path) => loc.pathname === path;
   const isActiveSearch = (path, search) => loc.pathname === path && loc.search.includes(search);
@@ -78,7 +82,7 @@ export default function AppHeader() {
       <div className="max-w-6xl mx-auto px-4 h-14 flex items-center gap-3">
 
         {/* ── Brand ── */}
-        <Link to={isStaff ? "/painel" : "/perfil"} className="flex items-center gap-2 shrink-0 mr-2">
+        <Link to={isStaff ? "/painel" : "/"} className="flex items-center gap-2 shrink-0 mr-2">
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-white text-sm font-bold shadow-sm">
             HD
           </span>
@@ -98,7 +102,7 @@ export default function AppHeader() {
             </Link>
           )}
 
-          {/* STAFF + ADMIN */}
+          {/* Painel — staff completo e chefe de setor */}
           {isStaff && (
             <Link to="/painel" className={navCls(isActive("/painel"))}>
               <LayoutDashboard size={15} />
@@ -106,14 +110,15 @@ export default function AppHeader() {
             </Link>
           )}
 
-          {isStaff && (
+          {/* Relatórios e OS — apenas TECHNICIAN e ADMIN */}
+          {isFullStaff && (
             <Link to="/painel/relatorios" className={navCls(isActive("/painel/relatorios"))}>
               <BarChart2 size={15} />
               <span className="hidden sm:inline">Relatórios</span>
             </Link>
           )}
 
-          {isStaff && (
+          {isFullStaff && (
             <Link to="/painel/os" className={navCls(loc.pathname.startsWith("/painel/os"))}>
               {osOpenCount > 0 && (
                 <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-white text-[10px] font-bold">
