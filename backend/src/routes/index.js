@@ -31,6 +31,14 @@ import {
   transitionWorkOrder, addTecnico, removeTecnico, linkTicket, unlinkTicket,
   deleteWorkOrder,
 } from "../controllers/workOrderController.js";
+import {
+  listInventory, getInventoryItem, createInventoryItem, updateInventoryItem,
+  deleteInventoryItem, addMovement, listInventoryCategories,
+} from "../controllers/inventoryController.js";
+import {
+  listChecklists, getChecklist, createChecklist, approveChecklist,
+  rejectChecklist, deleteChecklist, downloadChecklistDocx,
+} from "../controllers/checklistController.js";
 import { authRequired, optionalAuth, requireRole } from "../middleware/auth.js";
 
 // 10 tentativas por IP a cada 15 minutos nos endpoints de autenticação
@@ -134,6 +142,22 @@ router.post("/work-orders/:id/tecnicos",            ...staffAccess, addTecnico);
 router.delete("/work-orders/:id/tecnicos/:userId",  ...staffAccess, removeTecnico);
 router.post("/work-orders/:id/tickets",             ...staffAccess, linkTicket);
 router.delete("/work-orders/:id/tickets/:ticketId", ...staffAccess, unlinkTicket);
+
+// ── Inventário ─────────────────────────────────────────────────────────────────
+router.get("/inventory/categories",                       ...staffAccess, listInventoryCategories);
+router.get("/inventory/checklists",                       ...staffAccess, listChecklists);
+router.post("/inventory/checklists",                      ...staffAccess, createChecklist);
+router.get("/inventory/checklists/:id",                   ...staffAccess, getChecklist);
+router.get("/inventory/checklists/:id/docx",              ...staffAccess, downloadChecklistDocx);
+router.post("/inventory/checklists/:id/approve",          ...staffAccess, approveChecklist);
+router.post("/inventory/checklists/:id/reject",           ...staffAccess, rejectChecklist);
+router.delete("/inventory/checklists/:id",                ...adminOnly,   deleteChecklist);
+router.get("/inventory",                                  ...staffAccess, listInventory);
+router.post("/inventory",                                 ...staffAccess, createInventoryItem);
+router.get("/inventory/:id",                              ...staffAccess, getInventoryItem);
+router.patch("/inventory/:id",                            ...staffAccess, updateInventoryItem);
+router.delete("/inventory/:id",                           ...adminOnly,   deleteInventoryItem);
+router.post("/inventory/:id/movements",                   ...staffAccess, addMovement);
 
 // ── Auditoria ──────────────────────────────────────────────────────────────────
 router.get("/audit-logs", authRequired, requireRole("ADMIN"), listAuditLogs);

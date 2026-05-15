@@ -23,6 +23,9 @@ import CategoriesPage from "./pages/CategoriesPage";
 import AuditPage from "./pages/AuditPage";
 import ProfilePage from "./pages/ProfilePage";
 import ChangePasswordPage from "./pages/ChangePasswordPage";
+import InventoryPage from "./pages/InventoryPage";
+import InventoryItemDetailPage from "./pages/InventoryItemDetailPage";
+import ChecklistDetailPage from "./pages/ChecklistDetailPage";
 import "./index.css";
 
 // Hierarquia: ADMIN > TECHNICIAN > CHEFE_SETOR > USER
@@ -109,6 +112,11 @@ ReactDOM.createRoot(document.getElementById("root")).render(
                 <Route path="/painel/relatorios" element={<Protected fullStaffOnly><AnalyticsPage /></Protected>} />
                 <Route path="/painel/os" element={<Protected fullStaffOnly><WorkOrdersPage /></Protected>} />
                 <Route path="/painel/os/:id" element={<Protected fullStaffOnly><WorkOrderDetailPage /></Protected>} />
+
+                {/* Inventário — TECHNICIAN e ADMIN */}
+                <Route path="/painel/inventario" element={<Protected fullStaffOnly><InventoryPage /></Protected>} />
+                <Route path="/painel/inventario/:id" element={<Protected fullStaffOnly><InventoryItemDetailPage /></Protected>} />
+                <Route path="/painel/checklists/:id" element={<Protected fullStaffOnly><ChecklistDetailPage /></Protected>} />
 
                 {/* Admin only */}
                 <Route path="/painel/usuarios" element={<Protected adminOnly><UsersPage /></Protected>} />

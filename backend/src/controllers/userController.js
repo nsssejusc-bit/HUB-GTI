@@ -80,6 +80,7 @@ export async function listUsers(req, res) {
       prefixo: true,
       email: true,
       telefone: true,
+      nucleoResponsavel: true,
       createdAt: true,
       unit: { select: { id: true, name: true } },
       department: { select: { id: true, name: true } },
@@ -92,7 +93,7 @@ export async function listUsers(req, res) {
 // PATCH /api/users/:id — atualiza usuário (ADMIN only)
 export async function updateUser(req, res) {
   const id = Number(req.params.id);
-  const { active, unitId, role, name, isChefe, email, telefone, matricula, prefixo } = req.body || {};
+  const { active, unitId, role, name, isChefe, email, telefone, matricula, prefixo, nucleoResponsavel } = req.body || {};
 
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) return res.status(404).json({ error: "Usuário não encontrado" });
@@ -108,6 +109,13 @@ export async function updateUser(req, res) {
   if (email !== undefined) data.email = email || null;
   if (telefone !== undefined) data.telefone = telefone || null;
   if (matricula !== undefined) data.matricula = matricula || null;
+  if (nucleoResponsavel !== undefined) {
+    const validNucleos = ["NMT", "NIR"];
+    if (nucleoResponsavel && !validNucleos.includes(nucleoResponsavel)) {
+      return res.status(400).json({ error: "Núcleo inválido" });
+    }
+    data.nucleoResponsavel = nucleoResponsavel || null;
+  }
   if (prefixo !== undefined) {
     if (prefixo && !VALID_PREFIXOS.includes(prefixo)) {
       return res.status(400).json({ error: "Prefixo inválido" });
@@ -161,6 +169,7 @@ export async function updateUser(req, res) {
     prefixo: updated.prefixo,
     email: updated.email,
     telefone: updated.telefone,
+    nucleoResponsavel: updated.nucleoResponsavel,
     unit: updated.unit,
     department: updated.department,
   });
@@ -238,7 +247,7 @@ export async function changePassword(req, res) {
   // Re-emite o token com mustChangePassword: false para evitar re-login obrigatório
   const expiresIn = process.env.JWT_EXPIRES_IN || "8h";
   const newToken = jwt.sign(
-    { id: updated.id, role: updated.role, name: updated.name, unitId: updated.unitId, mustChangePassword: false },
+    { id: updated.id, role: updated.role, name: updated.name, unitId: updated.unitId, mustChangePassword: false, nucleoResponsavel: updated.nucleoResponsavel ?? req.user.nucleoResponsavel },
     process.env.JWT_SECRET,
     { expiresIn }
   );

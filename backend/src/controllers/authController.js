@@ -31,7 +31,7 @@ export async function login(req, res) {
 
   const expiresIn = process.env.JWT_EXPIRES_IN || "8h";
   const token = jwt.sign(
-    { id: user.id, role: user.role, name: user.name, unitId: user.unitId, mustChangePassword: user.mustChangePassword },
+    { id: user.id, role: user.role, name: user.name, unitId: user.unitId, mustChangePassword: user.mustChangePassword, nucleoResponsavel: user.nucleoResponsavel },
     process.env.JWT_SECRET,
     { expiresIn }
   );
@@ -52,6 +52,7 @@ export async function login(req, res) {
       cpf: maskCpf(user.cpf),
       role: user.role,
       mustChangePassword: user.mustChangePassword,
+      nucleoResponsavel: user.nucleoResponsavel,
       unit: user.unit ? { id: user.unit.id, name: user.unit.name } : null,
       department: user.department ? { id: user.department.id, name: user.department.name } : null,
     },
@@ -157,6 +158,7 @@ export async function me(req, res) {
     email: user.email,
     telefone: user.telefone,
     isChefe: user.isChefe,
+    nucleoResponsavel: user.nucleoResponsavel,
     unit: user.unit ? { id: user.unit.id, name: user.unit.name } : null,
     department: user.department ? { id: user.department.id, name: user.department.name } : null,
   });

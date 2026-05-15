@@ -6,7 +6,7 @@ import { useSocketConnected } from "../context/SocketContext";
 import { api } from "../lib/api";
 import {
   LayoutDashboard, BarChart2, LogOut, Users,
-  Crown, Sun, Moon, Building2, ChevronDown, UserCircle, Ticket, KeyRound, ClipboardList, Lightbulb, Settings, Tag, Shield,
+  Crown, Sun, Moon, Building2, ChevronDown, UserCircle, Ticket, KeyRound, ClipboardList, Lightbulb, Settings, Tag, Shield, Package,
 } from "lucide-react";
 
 const ROLE_LABEL = {
@@ -24,8 +24,9 @@ export default function AppHeader() {
   const { dark, toggle } = useTheme();
   const loc = useLocation();
   const nav = useNavigate();
-  const [resetCount,   setResetCount]   = useState(0);
-  const [osOpenCount,  setOsOpenCount]  = useState(0);
+  const [resetCount,      setResetCount]      = useState(0);
+  const [osOpenCount,     setOsOpenCount]     = useState(0);
+  const [pendingChecklists, setPendingChecklists] = useState(0);
   const [userOpen,   setUserOpen]   = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
   const userRef   = useRef(null);
@@ -66,6 +67,17 @@ export default function AppHeader() {
     const t = setInterval(fetchOsCount, 30000);
     return () => clearInterval(t);
   }, [isFullStaff]);
+
+  useEffect(() => {
+    if (!isFullStaff || !user?.nucleoResponsavel) return;
+    function fetchPending() {
+      api.get(`/inventory/checklists?status=PENDENTE&nucleo=${user.nucleoResponsavel}`)
+        .then((r) => setPendingChecklists(r.data.length)).catch(() => {});
+    }
+    fetchPending();
+    const t = setInterval(fetchPending, 30000);
+    return () => clearInterval(t);
+  }, [isFullStaff, user?.nucleoResponsavel]);
 
   const isActive = (path) => loc.pathname === path;
   const isActiveSearch = (path, search) => loc.pathname === path && loc.search.includes(search);
@@ -128,6 +140,18 @@ export default function AppHeader() {
               )}
               <ClipboardList size={15} />
               <span className="hidden sm:inline">OS</span>
+            </Link>
+          )}
+
+          {isFullStaff && (
+            <Link to="/painel/inventario" className={navCls(loc.pathname.startsWith("/painel/inventario") || loc.pathname.startsWith("/painel/checklists"))}>
+              {pendingChecklists > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-white text-[10px] font-bold">
+                  {pendingChecklists > 9 ? "9+" : pendingChecklists}
+                </span>
+              )}
+              <Package size={15} />
+              <span className="hidden sm:inline">Inventário</span>
             </Link>
           )}
 

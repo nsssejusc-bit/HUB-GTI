@@ -439,13 +439,14 @@ function UserDetailPanel({ user, units, me, onUpdate, onDelete, onGrantAdmin, on
   const [saving,  setSaving]  = useState(false);
 
   // Campos editáveis
-  const [name,      setName]      = useState(user.name);
-  const [matricula, setMatricula] = useState(user.matricula ?? "");
-  const [email,     setEmail]     = useState(user.email ?? "");
-  const [telefone,  setTelefone]  = useState(user.telefone ?? "");
-  const [prefixo,   setPrefixo]   = useState(user.prefixo ?? "");
-  const [unitId,    setUnitId]    = useState(user.unit?.id ?? "");
-  const [isChefe,   setIsChefe]   = useState(user.isChefe ?? false);
+  const [name,             setName]             = useState(user.name);
+  const [matricula,        setMatricula]        = useState(user.matricula ?? "");
+  const [email,            setEmail]            = useState(user.email ?? "");
+  const [telefone,         setTelefone]         = useState(user.telefone ?? "");
+  const [prefixo,          setPrefixo]          = useState(user.prefixo ?? "");
+  const [unitId,           setUnitId]           = useState(user.unit?.id ?? "");
+  const [isChefe,          setIsChefe]          = useState(user.isChefe ?? false);
+  const [nucleoResponsavel, setNucleoResponsavel] = useState(user.nucleoResponsavel ?? "");
 
   // Sincroniza quando o user muda (ex: refresh após update)
   useEffect(() => {
@@ -456,6 +457,7 @@ function UserDetailPanel({ user, units, me, onUpdate, onDelete, onGrantAdmin, on
     setPrefixo(user.prefixo ?? "");
     setUnitId(user.unit?.id ?? "");
     setIsChefe(user.isChefe ?? false);
+    setNucleoResponsavel(user.nucleoResponsavel ?? "");
     setEditing(false);
   }, [user.id]);
 
@@ -469,6 +471,7 @@ function UserDetailPanel({ user, units, me, onUpdate, onDelete, onGrantAdmin, on
       prefixo: prefixo || null,
       unitId: unitId || null,
       isChefe,
+      nucleoResponsavel: nucleoResponsavel || null,
     });
     setSaving(false);
     setEditing(false);
@@ -578,6 +581,20 @@ function UserDetailPanel({ user, units, me, onUpdate, onDelete, onGrantAdmin, on
               <label className="field-label text-xs">Telefone</label>
               <input className="field-input w-full text-sm" type="tel" placeholder="—" value={telefone} onChange={(e) => setTelefone(e.target.value)} />
             </div>
+            {/* Núcleo responsável (apenas técnicos/admin) */}
+            <div>
+              <label className="field-label text-xs">Responsável de Núcleo</label>
+              <select
+                className="field-input w-full text-sm"
+                value={nucleoResponsavel}
+                onChange={(e) => setNucleoResponsavel(e.target.value)}
+              >
+                <option value="">Nenhum</option>
+                <option value="NMT">NMT – Mídias e Tecnologia</option>
+                <option value="NIR">NIR – Infraestrutura e Redes</option>
+              </select>
+            </div>
+
             {/* Toggle isChefe */}
             <label className="flex items-center gap-2.5 cursor-pointer select-none mt-1">
               <div
