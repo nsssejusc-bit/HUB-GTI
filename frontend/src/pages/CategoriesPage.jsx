@@ -174,8 +174,10 @@ function DropLine({ show }) {
 }
 
 // ── Subcategory row ───────────────────────────────────────────────────────────
-function SubRow({ sub, catId, onRename, onDelete, onGripPointerDown, isDragging }) {
+function SubRow({ sub, catId, onRename, onDelete, onUpdateSla, onGripPointerDown, isDragging }) {
   const [deleteErr, setDeleteErr] = useState("");
+  const [slaEdit, setSlaEdit]     = useState(false);
+  const [slaDraft, setSlaDraft]   = useState(sub.slaHours != null ? String(sub.slaHours) : "");
 
   async function handleDelete() {
     setDeleteErr("");
@@ -185,6 +187,19 @@ function SubRow({ sub, catId, onRename, onDelete, onGripPointerDown, isDragging 
     } catch (e) {
       setDeleteErr(e.response?.data?.error || "Erro ao excluir");
     }
+  }
+
+  function saveSla() {
+    setSlaEdit(false);
+    const parsed = slaDraft ? parseInt(slaDraft, 10) : null;
+    if (slaDraft && (isNaN(parsed) || parsed < 1)) {
+      setSlaDraft(sub.slaHours != null ? String(sub.slaHours) : "");
+      return;
+    }
+    if (parsed === sub.slaHours) return;
+    api.patch(`/categories/${catId}/subcategories/${sub.id}`, { slaHours: parsed })
+      .then(() => onUpdateSla(sub.id, parsed))
+      .catch(() => setSlaDraft(sub.slaHours != null ? String(sub.slaHours) : ""));
   }
 
   return (
@@ -201,6 +216,32 @@ function SubRow({ sub, catId, onRename, onDelete, onGripPointerDown, isDragging 
           onSave={(name) => onRename(sub.id, name)}
           className="flex-1 text-sm text-slate-700 dark:text-gray-200 font-medium"
         />
+        {/* SLA por subcategoria */}
+        <div className="flex items-center gap-1 shrink-0" title="SLA desta subcategoria (horas)">
+          {slaEdit ? (
+            <>
+              <input
+                autoFocus
+                type="number" min="1" max="9999"
+                value={slaDraft}
+                onChange={(e) => setSlaDraft(e.target.value)}
+                onBlur={saveSla}
+                onKeyDown={(e) => { if (e.key === "Enter") saveSla(); if (e.key === "Escape") { setSlaEdit(false); setSlaDraft(sub.slaHours != null ? String(sub.slaHours) : ""); } }}
+                className="field-input py-0.5 text-xs w-16 text-center"
+                placeholder="h"
+              />
+              <span className="text-xs text-slate-400">h</span>
+            </>
+          ) : (
+            <button
+              onClick={() => setSlaEdit(true)}
+              className="text-xs px-1.5 py-0.5 rounded-lg text-slate-400 dark:text-gray-500 hover:bg-slate-200 dark:hover:bg-gray-700 transition opacity-0 group-hover:opacity-100"
+              title="Definir SLA desta subcategoria"
+            >
+              {sub.slaHours ? <span className="text-brand-600 dark:text-brand-400 font-medium">{sub.slaHours}h</span> : "SLA"}
+            </button>
+          )}
+        </div>
         <button
           onClick={handleDelete}
           className="flex h-6 w-6 items-center justify-center rounded-lg text-slate-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition opacity-0 group-hover:opacity-100"
@@ -304,6 +345,10 @@ function CategoryCard({ cat, onUpdate, onDelete, onGripPointerDown, isDragging }
     api.patch(`/categories/${cat.id}/subcategories/${subId}`, { name })
       .then(() => setSubcats((prev) => prev.map((s) => s.id === subId ? { ...s, name } : s)))
       .catch((e) => addToast({ message: e.response?.data?.error || "Erro ao renomear", type: "error" }));
+  }
+
+  function updateSubcategorySla(subId, slaHours) {
+    setSubcats((prev) => prev.map((s) => s.id === subId ? { ...s, slaHours } : s));
   }
 
   function deleteSubcategory(subId) {
@@ -430,6 +475,7 @@ function CategoryCard({ cat, onUpdate, onDelete, onGripPointerDown, isDragging }
                         catId={cat.id}
                         onRename={renameSubcategory}
                         onDelete={deleteSubcategory}
+                        onUpdateSla={updateSubcategorySla}
                         isDragging={subFromIdx === idx}
                         onGripPointerDown={(e) => { e.stopPropagation(); startSubDrag(e, idx); }}
                       />

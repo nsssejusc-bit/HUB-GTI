@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 
 const NUCLEO_FULL = {
-  NMT: "NMT – Núcleo de Mídias e Tecnologia",
+  NMT: "NMT – Núcleo de Manutenção Técnica",
   NIR: "NIR – Núcleo de Infraestrutura e Redes",
 };
 
@@ -254,31 +254,39 @@ export default function ChecklistDetailPage() {
             <thead>
               <tr className="border-b border-slate-100 dark:border-gray-700/60">
                 <th className="text-left px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">Item</th>
-                <th className="text-center px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden sm:table-cell">Código</th>
-                <th className="text-center px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">Qtd solicitada</th>
-                <th className="text-center px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden sm:table-cell">Estoque atual</th>
+                <th className="text-center px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden sm:table-cell">Tombo / SN</th>
+                <th className="text-center px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50 dark:divide-gray-700/40">
-              {checklist.items.map((ci) => (
+              {checklist.items.map((ci) => {
+                const itemName = ci.unit?.item?.name ?? "—";
+                const tombo    = ci.unit?.tombo ?? null;
+                const status   = ci.unit?.status ?? null;
+                const statusCls = status === "EM_USO"
+                  ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                  : status === "DISPONIVEL"
+                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                    : "bg-slate-100 text-slate-500 dark:bg-gray-800 dark:text-gray-400";
+                return (
                 <tr key={ci.id} className="hover:bg-slate-50 dark:hover:bg-gray-800/30">
-                  <td className="px-4 py-3 font-medium text-slate-800 dark:text-gray-100">{ci.item.name}</td>
+                  <td className="px-4 py-3 font-medium text-slate-800 dark:text-gray-100">{itemName}</td>
                   <td className="px-4 py-3 text-center hidden sm:table-cell">
-                    {ci.item.code
-                      ? <span className="font-mono text-xs bg-slate-100 dark:bg-gray-800 px-2 py-0.5 rounded">{ci.item.code}</span>
-                      : <span className="text-slate-300 dark:text-gray-600 text-xs">—</span>
+                    {tombo
+                      ? <span className="font-mono text-xs bg-slate-100 dark:bg-gray-800 px-2 py-0.5 rounded">{tombo}</span>
+                      : <span className="text-slate-300 dark:text-gray-600 text-xs italic">Sem tombo</span>
                     }
                   </td>
-                  <td className="px-4 py-3 text-center font-semibold text-brand-600 dark:text-brand-400">
-                    {ci.quantity} <span className="text-xs font-normal text-slate-400">{ci.item.unitMeasure}</span>
-                  </td>
-                  <td className="px-4 py-3 text-center hidden sm:table-cell">
-                    <span className={`text-sm font-medium ${ci.item.quantity === 0 ? "text-amber-600" : "text-slate-600 dark:text-gray-300"}`}>
-                      {ci.item.quantity} {ci.item.unitMeasure}
-                    </span>
+                  <td className="px-4 py-3 text-center">
+                    {status && (
+                      <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${statusCls}`}>
+                        {status === "EM_USO" ? "Em uso" : status === "DISPONIVEL" ? "Disponível" : "Inativo"}
+                      </span>
+                    )}
                   </td>
                 </tr>
-              ))}
+              );
+              })}
             </tbody>
           </table>
         </div>

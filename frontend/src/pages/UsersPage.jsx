@@ -590,7 +590,7 @@ function UserDetailPanel({ user, units, me, onUpdate, onDelete, onGrantAdmin, on
                 onChange={(e) => setNucleoResponsavel(e.target.value)}
               >
                 <option value="">Nenhum</option>
-                <option value="NMT">NMT – Mídias e Tecnologia</option>
+                <option value="NMT">NMT – Manutenção Técnica</option>
                 <option value="NIR">NIR – Infraestrutura e Redes</option>
               </select>
             </div>

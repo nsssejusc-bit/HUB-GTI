@@ -12,9 +12,10 @@ export function statusIndex(s) {
   return STATUS_ORDER.indexOf(s);
 }
 
-export function formatElapsed(fromIso, toIso = null) {
+export function formatElapsed(fromIso, toIso = null, nowMs = null) {
   const start = new Date(fromIso).getTime();
-  const end = toIso ? new Date(toIso).getTime() : Date.now();
+  // nowMs pode ser passado pelo chamador (usando serverNow()); fallback para Date.now()
+  const end = toIso ? new Date(toIso).getTime() : (nowMs ?? Date.now());
   const mins = Math.max(0, Math.floor((end - start) / 60000));
   if (mins < 60) return `${mins} min`;
   const h = Math.floor(mins / 60);

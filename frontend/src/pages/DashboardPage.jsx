@@ -7,6 +7,7 @@ import { useAuth } from "../context/AuthContext";
 import { StatusBadge, KpiCard, Spinner, TicketSkeletonRow } from "../components/ui";
 import AppHeader from "../components/AppHeader";
 import { formatElapsed } from "../lib/statuses";
+import { useServerTick, serverNow } from "../lib/serverTime";
 import {
   Ticket, AlertCircle, Activity, CheckCircle2,
   ChevronRight, Clock, RefreshCw, Filter, History,
@@ -52,6 +53,7 @@ const HIST_RANGES = [
 // ── View simplificada para Chefe de Setor ────────────────────────────────────
 function ChefeDashboard() {
   const { user } = useAuth();
+  useServerTick(60000);
   const [tickets,    setTickets]    = useState([]);
   const [loading,    setLoading]    = useState(true);
   const [rejectId,   setRejectId]   = useState(null); // id do ticket em rejeição
@@ -257,6 +259,40 @@ export default function DashboardPage() {
   if (user?.role === "CHEFE_SETOR") return <ChefeDashboard />;
 
   const isAdmin = user?.role === "ADMIN";
+  useServerTick(60000);
+
+  // ── Aprovações pendentes para admin que também é chefe de setor ──────────
+  const adminDeptId = user?.department?.id ?? null;
+  const [pendingApprovals, setPendingApprovals]   = useState([]);
+  const [approvalRejectId, setApprovalRejectId]   = useState(null);
+  const [approvalRejectNote, setApprovalRejectNote] = useState("");
+  const [approvalActing, setApprovalActing]       = useState(false);
+  const [approvalErr, setApprovalErr]             = useState("");
+
+  const loadPendingApprovals = useCallback(async () => {
+    if (!adminDeptId) return;
+    try {
+      const { data } = await api.get("/tickets", { params: { pendingForDept: adminDeptId, limit: 100 } });
+      setPendingApprovals(data.tickets ?? []);
+    } catch {}
+  }, [adminDeptId]);
+
+  useEffect(() => { loadPendingApprovals(); }, [loadPendingApprovals]);
+
+  async function decideApproval(ticketId, status, note) {
+    setApprovalActing(true);
+    setApprovalErr("");
+    try {
+      await api.post(`/tickets/${ticketId}/approve`, { status, note: note || undefined });
+      setApprovalRejectId(null);
+      setApprovalRejectNote("");
+      loadPendingApprovals();
+    } catch (e) {
+      setApprovalErr(e.response?.data?.error || "Erro ao processar aprovação");
+    } finally {
+      setApprovalActing(false);
+    }
+  }
 
   const [tickets, setTickets]         = useState([]);
   const [history, setHistory]         = useState([]);
@@ -274,6 +310,7 @@ export default function DashboardPage() {
   const [categories, setCategories]       = useState([]);
   const [deptFilter, setDeptFilter]       = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [dateFilter, setDateFilter]       = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -362,12 +399,22 @@ export default function DashboardPage() {
     };
   }, [socket, load, addToast]);
 
-  // KPI counts
-  const active    = tickets.filter((t) => ACTIVE_STATUSES.includes(t.status));
-  const completed = tickets.filter((t) => t.status === "COMPLETED");
-  const noUnit    = tickets.filter((t) => ACTIVE_STATUSES.includes(t.status) && !t.unit);
+  // KPI counts — respeitam deptFilter e dateFilter
+  const kpiBase = (() => {
+    let base = tickets;
+    if (deptFilter) base = base.filter((t) => t.department === deptFilter);
+    if (dateFilter) {
+      const from = new Date(dateFilter + "T00:00:00");
+      const to   = new Date(dateFilter + "T23:59:59");
+      base = base.filter((t) => { const d = new Date(t.openedAt); return d >= from && d <= to; });
+    }
+    return base;
+  })();
+  const active    = kpiBase.filter((t) => ACTIVE_STATUSES.includes(t.status));
+  const completed = kpiBase.filter((t) => t.status === "COMPLETED");
+  const noUnit    = kpiBase.filter((t) => ACTIVE_STATUSES.includes(t.status) && !t.unit);
   const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-  const todayTotal = tickets.filter((t) => new Date(t.openedAt) >= todayStart);
+  const todayTotal = kpiBase.filter((t) => new Date(t.openedAt) >= todayStart);
 
   // Filtro de exibição
   let visible = filter === "active"    ? active
@@ -375,6 +422,14 @@ export default function DashboardPage() {
               : filter === "history"   ? history
               : tickets;
   if (deptFilter && filter !== "history") visible = visible.filter((t) => t.department === deptFilter);
+  if (dateFilter) {
+    const from = new Date(dateFilter + "T00:00:00");
+    const to   = new Date(dateFilter + "T23:59:59");
+    visible = visible.filter((t) => {
+      const d = new Date(t.openedAt);
+      return d >= from && d <= to;
+    });
+  }
   if (searchQuery) {
     const q = searchQuery.toLowerCase();
     visible = visible.filter((t) =>
@@ -398,7 +453,7 @@ export default function DashboardPage() {
 
   const now = new Date();
   const dateLabel = now.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
-  const hasFilters = deptFilter || categoryFilter;
+  const hasFilters = deptFilter || categoryFilter || dateFilter;
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-gray-950">
@@ -431,6 +486,55 @@ export default function DashboardPage() {
           <KpiCard title="Concluídos"   value={completed.length}  icon={CheckCircle2} sub={todayTotal.length ? `${Math.round((completed.length / todayTotal.length) * 100)}% de hoje` : "—"} />
           <KpiCard title="Sem unidade"  value={noUnit.length}     icon={AlertCircle}  highlight={noUnit.length > 0} />
         </div>
+
+        {/* ── Aprovações pendentes (admin que é chefe de setor) ── */}
+        {adminDeptId && pendingApprovals.length > 0 && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <ShieldCheck size={15} className="text-amber-500" />
+              <h2 className="text-sm font-semibold text-slate-800 dark:text-gray-100">
+                Aprovações pendentes do seu setor ({pendingApprovals.length})
+              </h2>
+            </div>
+
+            {/* Modal rejeição */}
+            {approvalRejectId !== null && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+                onClick={(e) => { if (e.target === e.currentTarget) setApprovalRejectId(null); }}>
+                <div className="card w-full max-w-sm p-6 space-y-4">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400">
+                      <ThumbsDown size={18} />
+                    </span>
+                    <div>
+                      <h3 className="font-semibold text-slate-900 dark:text-gray-100">Reprovar solicitação</h3>
+                      <p className="text-xs text-slate-500 dark:text-gray-400 mt-0.5">Informe o motivo (opcional)</p>
+                    </div>
+                  </div>
+                  <textarea rows={3} className="field-input resize-none w-full"
+                    placeholder="Motivo da reprovação..." value={approvalRejectNote}
+                    onChange={(e) => setApprovalRejectNote(e.target.value)} autoFocus />
+                  {approvalErr && <p className="text-sm text-red-600 dark:text-red-400">{approvalErr}</p>}
+                  <div className="flex gap-2 justify-end">
+                    <button onClick={() => { setApprovalRejectId(null); setApprovalErr(""); }} className="btn-secondary text-sm py-2 px-4">Cancelar</button>
+                    <button onClick={() => decideApproval(approvalRejectId, "REJECTED", approvalRejectNote)}
+                      disabled={approvalActing}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white px-4 py-2 text-sm font-semibold transition disabled:opacity-50">
+                      {approvalActing ? <Spinner className="h-4 w-4" /> : <ThumbsDown size={14} />} Reprovar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {pendingApprovals.map((t) => (
+              <ApprovalCard key={t.id} ticket={t}
+                onApprove={() => decideApproval(t.id, "APPROVED")}
+                onReject={() => { setApprovalRejectId(t.id); setApprovalRejectNote(""); setApprovalErr(""); }}
+                acting={approvalActing} />
+            ))}
+          </div>
+        )}
 
         {/* Filtros */}
         <div className="space-y-2">
@@ -533,9 +637,16 @@ export default function DashboardPage() {
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
+            <input
+              type="date"
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value)}
+              className="field-input py-1.5 text-xs w-auto"
+              title="Filtrar por data de abertura"
+            />
             {(hasFilters || searchQuery) && (
               <button
-                onClick={() => { setDeptFilter(""); setCategoryFilter(""); setSearchQuery(""); }}
+                onClick={() => { setDeptFilter(""); setCategoryFilter(""); setDateFilter(""); setSearchQuery(""); }}
                 className="text-xs text-slate-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 transition"
               >
                 Limpar filtros
@@ -701,7 +812,7 @@ function TicketRow({ ticket: t }) {
         </div>
       </div>
       <div className="text-right shrink-0">
-        <div className="text-xs text-slate-500 dark:text-gray-400">{formatElapsed(t.openedAt, t.completedAt)}</div>
+        <div className="text-xs text-slate-500 dark:text-gray-400">{formatElapsed(t.openedAt, t.completedAt, t.completedAt ? null : serverNow())}</div>
         <div className="text-xs text-slate-400 dark:text-gray-500 mt-0.5 max-w-[120px] truncate text-right">
           {t.technician?.name || "—"}
         </div>

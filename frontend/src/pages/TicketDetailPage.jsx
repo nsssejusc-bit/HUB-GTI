@@ -6,6 +6,7 @@ import { useToast } from "../context/ToastContext";
 import { StatusBadge, InfoItem, Alert, Spinner } from "../components/ui";
 import AppHeader from "../components/AppHeader";
 import { formatElapsed, STATUS_LABEL } from "../lib/statuses";
+import { useServerTick, serverNow } from "../lib/serverTime";
 import { ArrowLeft, Clock, CheckCircle2, ChevronRight, Trash2, AlertTriangle, MonitorSmartphone, Copy, Check as CheckIcon, ClipboardList, Plus, ExternalLink, ShieldCheck, ThumbsUp, ThumbsDown, X, MessageSquare, ArrowRight, FileText, RotateCcw, Users2, Send, Timer } from "lucide-react";
 
 const TRANSITION_LABEL = {
@@ -33,6 +34,7 @@ export default function TicketDetailPage() {
   const nav = useNavigate();
   const { user } = useAuth();
   const addToast = useToast();
+  useServerTick(60000); // re-render every minute for live elapsed time
   const [ticket, setTicket] = useState(null);
   const [units, setUnits] = useState([]);
   const [techs, setTechs] = useState([]);
@@ -305,7 +307,7 @@ export default function TicketDetailPage() {
               <div className="text-lg font-semibold text-slate-900 dark:text-gray-100">{STATUS_LABEL[ticket.status]}</div>
               <div className="flex items-center gap-1 text-xs text-slate-500 dark:text-gray-400 mt-0.5">
                 <Clock size={11} />
-                Aberto há {formatElapsed(ticket.openedAt, ticket.completedAt)}
+                Aberto há {formatElapsed(ticket.openedAt, ticket.completedAt, ticket.completedAt ? null : serverNow())}
                 {ticket.openedAt && (
                   <span className="text-slate-400 dark:text-gray-500 ml-1">
                     · {new Date(ticket.openedAt).toLocaleString("pt-BR")}

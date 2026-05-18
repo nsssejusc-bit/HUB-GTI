@@ -15,8 +15,8 @@ const registerSchema = z.object({
   departmentId: z.number().int().positive("Selecione um setor"),
   matricula:    z.string().optional().nullable(),
   prefixo:      z.enum(["GOVERNO", "TERCEIRIZADO", "ESTAGIARIO"]).optional().nullable(),
-  email:        z.string().email("E-mail inválido").optional().or(z.literal("")).nullable(),
-  telefone:     z.string().optional().nullable(),
+  email:        z.string().email("E-mail inválido"),
+  telefone:     z.string().min(10, "Telefone inválido"),
   isChefe:      z.boolean().optional().default(false),
 });
 

@@ -33,11 +33,13 @@ import {
 } from "../controllers/workOrderController.js";
 import {
   listInventory, getInventoryItem, createInventoryItem, updateInventoryItem,
-  deleteInventoryItem, addMovement, listInventoryCategories,
+  deleteInventoryItem, listInventoryCategories,
+  listUnits as listInventoryUnits,
+  createUnit, updateUnit, deleteUnit,
 } from "../controllers/inventoryController.js";
 import {
   listChecklists, getChecklist, createChecklist, approveChecklist,
-  rejectChecklist, deleteChecklist, downloadChecklistDocx,
+  rejectChecklist, returnChecklist, deleteChecklist, downloadChecklistDocx,
 } from "../controllers/checklistController.js";
 import { authRequired, optionalAuth, requireRole } from "../middleware/auth.js";
 
@@ -72,6 +74,7 @@ const router = Router();
 router.use(generalLimiter);
 
 // ── Público ──────────────────────────────────────────────────────────────────
+router.get("/time",            (req, res) => res.json({ now: Date.now() }));
 router.get("/config",          getPublicConfig);
 router.get("/categories",                    listCategories);
 router.post("/categories",                   authRequired, requireRole("ADMIN"), createCategory);
@@ -151,13 +154,17 @@ router.get("/inventory/checklists/:id",                   ...staffAccess, getChe
 router.get("/inventory/checklists/:id/docx",              ...staffAccess, downloadChecklistDocx);
 router.post("/inventory/checklists/:id/approve",          ...staffAccess, approveChecklist);
 router.post("/inventory/checklists/:id/reject",           ...staffAccess, rejectChecklist);
+router.post("/inventory/checklists/:id/return",           ...staffAccess, returnChecklist);
 router.delete("/inventory/checklists/:id",                ...adminOnly,   deleteChecklist);
 router.get("/inventory",                                  ...staffAccess, listInventory);
 router.post("/inventory",                                 ...staffAccess, createInventoryItem);
 router.get("/inventory/:id",                              ...staffAccess, getInventoryItem);
 router.patch("/inventory/:id",                            ...staffAccess, updateInventoryItem);
 router.delete("/inventory/:id",                           ...adminOnly,   deleteInventoryItem);
-router.post("/inventory/:id/movements",                   ...staffAccess, addMovement);
+router.get("/inventory/:id/units",                        ...staffAccess, listInventoryUnits);
+router.post("/inventory/:id/units",                       ...staffAccess, createUnit);
+router.patch("/inventory/units/:unitId",                  ...staffAccess, updateUnit);
+router.delete("/inventory/units/:unitId",                 ...staffAccess, deleteUnit);
 
 // ── Auditoria ──────────────────────────────────────────────────────────────────
 router.get("/audit-logs", authRequired, requireRole("ADMIN"), listAuditLogs);

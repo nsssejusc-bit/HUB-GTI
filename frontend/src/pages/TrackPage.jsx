@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { STATUS_ORDER, STATUS_LABEL, statusIndex, formatElapsed } from "../lib/statuses";
+import { useServerTick, serverNow } from "../lib/serverTime";
 import { StatusBadge, InfoItem, Spinner } from "../components/ui";
 import { Home, Clock, CheckCircle2, Circle, Star, MonitorSmartphone, Wifi } from "lucide-react";
 
@@ -17,6 +18,7 @@ export default function TrackPage() {
   const { ticketNumber } = useParams();
   const [ticket, setTicket] = useState(null);
   const [error, setError] = useState("");
+  useServerTick(60000);
   const [config, setConfig] = useState({ feedbackEnabled: false });
 
   useEffect(() => {
@@ -94,7 +96,7 @@ export default function TrackPage() {
               <StatusBadge status={ticket.status} />
               <div className="flex items-center gap-1 mt-2 text-xs text-slate-500 dark:text-gray-400 justify-end">
                 <Clock size={11} />
-                {formatElapsed(ticket.openedAt, ticket.completedAt)}
+                {formatElapsed(ticket.openedAt, ticket.completedAt, ticket.completedAt ? null : serverNow())}
               </div>
             </div>
           </div>

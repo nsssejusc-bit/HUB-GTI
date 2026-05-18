@@ -115,12 +115,17 @@ export async function createSubcategory(req, res) {
 
 export async function updateSubcategory(req, res) {
   const subId = Number(req.params.subId);
-  const { name } = req.body || {};
-  const trimmed = name?.trim();
-  if (!trimmed) return res.status(400).json({ error: "Nome obrigatório" });
+  const { name, slaHours } = req.body || {};
   const sub = await prisma.subcategory.findUnique({ where: { id: subId } });
   if (!sub) return res.status(404).json({ error: "Subcategoria não encontrada" });
-  const updated = await prisma.subcategory.update({ where: { id: subId }, data: { name: trimmed } });
+  const data = {};
+  if (name !== undefined) {
+    const trimmed = name.trim();
+    if (!trimmed) return res.status(400).json({ error: "Nome obrigatório" });
+    data.name = trimmed;
+  }
+  if (slaHours !== undefined) data.slaHours = slaHours ? Number(slaHours) : null;
+  const updated = await prisma.subcategory.update({ where: { id: subId }, data });
   res.json(updated);
 }
 

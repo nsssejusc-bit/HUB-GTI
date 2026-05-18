@@ -75,6 +75,12 @@ enum ChecklistStatus {
   REJEITADO
 }
 
+enum UnitStatus {
+  DISPONIVEL
+  EM_USO
+  INATIVO
+}
+
 enum Priority {
   LOW
   MEDIUM
@@ -130,6 +136,7 @@ model User {
   osHistory          OsHistory[]
   ticketApprovals    TicketApproval[] @relation("ApprovalChef")
   inventoryItems     InventoryItem[]  @relation("InventoryCreator")
+  inventoryUnits     InventoryUnit[]  @relation("InventoryUnitCreator")
   inventoryMovements InventoryMovement[] @relation("MovementCreator")
   nucleoResponsavel  Nucleo?
   checklistsCreated  InventoryChecklist[] @relation("ChecklistCreator")
@@ -172,6 +179,7 @@ model Subcategory {
   name               String
   code               String?  @unique
   sortOrder          Int      @default(0)
+  slaHours              Int?
   requiresApproval      Boolean  @default(false)
   dualApproval          Boolean  @default(false)
   requiresPresential    Boolean  @default(true)
@@ -371,26 +379,41 @@ model OsHistory {
 }
 
 model InventoryItem {
-  id             Int               @id @default(autoincrement())
-  name           String
-  code           String?
-  description    String?           @db.Text
-  quantity       Int               @default(0)
-  unitMeasure    String            @default("un")
-  category       String?
-  nucleo         Nucleo?
-  status         InventoryStatus   @default(ATIVO)
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
-  createdById    Int
-  createdBy      User              @relation("InventoryCreator", fields: [createdById], references: [id])
-  movements      InventoryMovement[]
-  checklistItems InventoryChecklistItem[]
+  id          Int               @id @default(autoincrement())
+  name        String
+  description String?           @db.Text
+  unitMeasure String            @default("un")
+  category    String?
+  nucleo      Nucleo?
+  status      InventoryStatus   @default(ATIVO)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  createdById Int
+  createdBy   User              @relation("InventoryCreator", fields: [createdById], references: [id])
+  units       InventoryUnit[]
+  movements   InventoryMovement[]
 
   @@index([status])
-  @@index([code])
   @@index([category])
   @@index([nucleo])
+}
+
+model InventoryUnit {
+  id          Int           @id @default(autoincrement())
+  itemId      Int
+  item        InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  tombo       String?
+  status      UnitStatus    @default(DISPONIVEL)
+  note        String?       @db.Text
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  createdById Int
+  createdBy   User          @relation("InventoryUnitCreator", fields: [createdById], references: [id])
+  checklistItems InventoryChecklistItem[]
+
+  @@index([itemId])
+  @@index([status])
+  @@index([tombo])
 }
 
 model InventoryMovement {
@@ -432,10 +455,9 @@ model InventoryChecklistItem {
   id          Int                @id @default(autoincrement())
   checklistId Int
   checklist   InventoryChecklist @relation(fields: [checklistId], references: [id], onDelete: Cascade)
-  itemId      Int
-  item        InventoryItem      @relation(fields: [itemId], references: [id])
-  quantity    Int
+  unitId      Int
+  unit        InventoryUnit      @relation(fields: [unitId], references: [id])
 
   @@index([checklistId])
-  @@index([itemId])
+  @@index([unitId])
 }

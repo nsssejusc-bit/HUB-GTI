@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { fetchServerOffset } from "./lib/serverTime";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
@@ -83,6 +84,9 @@ function Protected({ children, adminOnly = false, staffOnly = false, fullStaffOn
 
   return children;
 }
+
+// Busca offset do horário do servidor logo na inicialização
+fetchServerOffset();
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>

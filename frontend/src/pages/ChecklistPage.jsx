@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 
 const NUCLEO_LABEL = { NMT: "NMT", NIR: "NIR" };
-const NUCLEO_FULL  = { NMT: "Núcleo de Mídias e Tecnologia", NIR: "Núcleo de Infraestrutura e Redes" };
+const NUCLEO_FULL  = { NMT: "Núcleo de Manutenção Técnica", NIR: "Núcleo de Infraestrutura e Redes" };
 
 const STATUS_STYLE = {
   PENDENTE:  "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",

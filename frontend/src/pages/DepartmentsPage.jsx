@@ -4,7 +4,7 @@ import AppHeader from "../components/AppHeader";
 import { Alert, Spinner } from "../components/ui";
 import {
   Plus, Pencil, Trash2, Check, X, ToggleLeft, ToggleRight,
-  Building2, AlertTriangle, Hash, ChevronDown, Users, ShieldCheck, Crown,
+  Building2, AlertTriangle, Hash, ChevronDown, Users, ShieldCheck, Crown, Search,
 } from "lucide-react";
 
 const ROLE_LABEL = {
@@ -46,6 +46,7 @@ export default function DepartmentsPage() {
 
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [deleting,      setDeleting]      = useState(false);
+  const [filterQuery,   setFilterQuery]   = useState("");
 
   useEffect(() => { load(); }, []);
 
@@ -126,8 +127,11 @@ export default function DepartmentsPage() {
     }
   }
 
-  const active   = departments.filter((d) => d.active);
-  const inactive = departments.filter((d) => !d.active);
+  const filteredDepts = filterQuery.trim()
+    ? departments.filter((d) => d.name.toLowerCase().includes(filterQuery.toLowerCase()))
+    : departments;
+  const active   = filteredDepts.filter((d) => d.active);
+  const inactive = filteredDepts.filter((d) => !d.active);
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-gray-950">
@@ -173,7 +177,7 @@ export default function DepartmentsPage() {
 
         <Alert message={err} />
 
-        <div className="card p-4">
+        <div className="card p-4 space-y-3">
           <form onSubmit={handleAdd} className="flex gap-2">
             <div className="relative flex-1">
               <Building2 size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-gray-500" />
@@ -194,6 +198,16 @@ export default function DepartmentsPage() {
               Adicionar
             </button>
           </form>
+          <div className="relative">
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-gray-500 pointer-events-none" />
+            <input
+              type="text"
+              value={filterQuery}
+              onChange={(e) => setFilterQuery(e.target.value)}
+              placeholder="Filtrar setores..."
+              className="field-input pl-8 py-1.5 text-xs w-full"
+            />
+          </div>
         </div>
 
         {loading ? (

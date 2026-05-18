@@ -679,7 +679,7 @@ export default function NewTicketPage() {
               {/* Subcategorias */}
               {!isRemote && !selectedCategory.allowsFreeText && (
                 <div className="space-y-2">
-                  {selectedCategory.subcategories.map((s) => {
+                  {selectedCategory.subcategories.filter((s) => s.code !== "SIGED_SECTOR_CREATE").map((s) => {
                     const selected = form.subcategoryId === s.id;
                     return (
                       <label

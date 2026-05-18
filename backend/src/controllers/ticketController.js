@@ -98,8 +98,12 @@ export async function createTicket(req, res) {
       ]
     : [];
 
-  const slaDeadline = category.slaHours
-    ? new Date(Date.now() + category.slaHours * 60 * 60 * 1000)
+  // SLA: subcategoria tem precedência; REMOTE sempre usa categoria; fallback para categoria
+  const effectiveSlaHours = isRemote
+    ? category.slaHours
+    : (selectedSub?.slaHours ?? category.slaHours);
+  const slaDeadline = effectiveSlaHours
+    ? new Date(Date.now() + effectiveSlaHours * 60 * 60 * 1000)
     : null;
 
   const ticketPayload = {
@@ -182,7 +186,7 @@ export async function getTicketPublic(req, res) {
 
 // ── LIST ─────────────────────────────────────────────────────────────────────
 export async function listTickets(req, res) {
-  const { status, unitId, technicianId, from, to, categoryId, cursor, limit, search } = req.query;
+  const { status, unitId, technicianId, from, to, categoryId, cursor, limit, search, pendingForDept } = req.query;
   const where = {};
 
   if (status)       where.status      = status;
@@ -202,6 +206,12 @@ export async function listTickets(req, res) {
       { freeTextDescription: { contains: q } },
       { department:          { contains: q } },
     ];
+  }
+
+  // Filtro especial: admin visualizando aprovações pendentes do seu setor
+  if (pendingForDept && req.user.role === "ADMIN") {
+    where.approvalStatus = "PENDING";
+    where.approvals = { some: { chefDeptId: Number(pendingForDept), status: "PENDING" } };
   }
 
   // ── Filtros por role ────────────────────────────────────────────────────

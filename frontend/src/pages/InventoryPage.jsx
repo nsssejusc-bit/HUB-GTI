@@ -8,7 +8,7 @@ import AppHeader from "../components/AppHeader";
 import {
   Package, Plus, Search, Tag, Hash, AlertTriangle,
   CheckCircle, XCircle, ChevronRight, RefreshCw, Filter,
-  ClipboardList, Clock,
+  ClipboardList, Clock, RotateCcw,
 } from "lucide-react";
 
 const STATUS_STYLE_ITEM = {
@@ -23,7 +23,7 @@ const CHECKLIST_STATUS_STYLE = {
 };
 const CHECKLIST_STATUS_ICON = { PENDENTE: Clock, APROVADO: CheckCircle, REJEITADO: XCircle };
 
-const NUCLEO_FULL = { NMT: "Núcleo de Mídias e Tecnologia", NIR: "Núcleo de Infraestrutura e Redes" };
+const NUCLEO_FULL = { NMT: "Núcleo de Manutenção Técnica", NIR: "Núcleo de Infraestrutura e Redes" };
 const UNIT_OPTIONS = ["un", "cx", "par", "rolo", "m", "kg", "L", "pç"];
 
 function fmtDate(d) {
@@ -33,8 +33,7 @@ function fmtDate(d) {
 // ── Create Item Modal ─────────────────────────────────────────────────────────
 function CreateItemModal({ onClose, onCreate, categories }) {
   const [form, setForm] = useState({
-    name: "", code: "", description: "", quantity: "0",
-    unitMeasure: "un", category: "", nucleo: "",
+    name: "", description: "", unitMeasure: "un", category: "", nucleo: "",
   });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
@@ -45,15 +44,11 @@ function CreateItemModal({ onClose, onCreate, categories }) {
     e.preventDefault();
     setErr("");
     if (!form.name.trim()) return setErr("Informe o nome do item.");
-    const qty = parseInt(form.quantity);
-    if (isNaN(qty) || qty < 0) return setErr("Quantidade inválida.");
     setSaving(true);
     try {
       const payload = {
         name:        form.name.trim(),
-        code:        form.code.trim() || null,
         description: form.description.trim() || null,
-        quantity:    qty,
         unitMeasure: form.unitMeasure,
         category:    form.category.trim() || null,
         nucleo:      form.nucleo || null,
@@ -89,10 +84,6 @@ function CreateItemModal({ onClose, onCreate, categories }) {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className={labelCls}>Código / SN <span className="text-slate-400">(opcional)</span></label>
-              <input className={inputCls} value={form.code} onChange={(e) => set("code", e.target.value)} placeholder="Ex: SN123456" />
-            </div>
-            <div>
               <label className={labelCls}>Categoria <span className="text-slate-400">(opcional)</span></label>
               <input
                 className={inputCls}
@@ -111,27 +102,19 @@ function CreateItemModal({ onClose, onCreate, categories }) {
             <label className={labelCls}>Núcleo <span className="text-slate-400">(opcional)</span></label>
             <select className={inputCls} value={form.nucleo} onChange={(e) => set("nucleo", e.target.value)}>
               <option value="">Sem núcleo</option>
-              <option value="NMT">NMT – Mídias e Tecnologia</option>
+              <option value="NMT">NMT – Manutenção Técnica</option>
               <option value="NIR">NIR – Infraestrutura e Redes</option>
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>Quantidade inicial</label>
-              <input
-                className={inputCls}
-                type="number" min="0"
-                value={form.quantity}
-                onChange={(e) => set("quantity", e.target.value)}
-              />
-            </div>
-            <div>
-              <label className={labelCls}>Unidade de medida</label>
-              <select className={inputCls} value={form.unitMeasure} onChange={(e) => set("unitMeasure", e.target.value)}>
-                {UNIT_OPTIONS.map((u) => <option key={u} value={u}>{u}</option>)}
-              </select>
-            </div>
+          <div>
+            <label className={labelCls}>Unidade de medida</label>
+            <select className={inputCls} value={form.unitMeasure} onChange={(e) => set("unitMeasure", e.target.value)}>
+              {UNIT_OPTIONS.map((u) => <option key={u} value={u}>{u}</option>)}
+            </select>
+            <p className="mt-1 text-xs text-slate-400 dark:text-gray-500">
+              Tombos/SNs são adicionados individualmente após criar o item.
+            </p>
           </div>
 
           <div>
@@ -170,16 +153,15 @@ function CreateItemModal({ onClose, onCreate, categories }) {
 function CreateChecklistModal({ onClose, onCreate }) {
   const [step,     setStep]     = useState(1);
   const [form,     setForm]     = useState({ title: "", nucleo: "NMT", note: "" });
-  const [items,    setItems]    = useState([]);
-  const [selected, setSelected] = useState([]);
+  const [items,    setItems]    = useState([]);   // items with available units
+  const [selected, setSelected] = useState([]);   // array of unit ids
   const [search,   setSearch]   = useState("");
   const [saving,   setSaving]   = useState(false);
   const [err,      setErr]      = useState("");
-  const { addToast } = useToast();
 
   useEffect(() => {
     if (step === 2) {
-      api.get(`/inventory?status=ATIVO&nucleo=${form.nucleo}&limit=200`)
+      api.get(`/inventory?status=ATIVO&nucleo=${form.nucleo}&limit=200&withUnits=true`)
         .then((r) => setItems(r.data.items))
         .catch(() => setItems([]));
     }
@@ -187,33 +169,42 @@ function CreateChecklistModal({ onClose, onCreate }) {
 
   function set(k, v) { setForm((f) => ({ ...f, [k]: v })); }
 
-  function toggleItem(item) {
-    setSelected((prev) => {
-      const exists = prev.find((s) => s.itemId === item.id);
-      if (exists) return prev.filter((s) => s.itemId !== item.id);
-      return [...prev, { itemId: item.id, quantity: 1, name: item.name, code: item.code, unitMeasure: item.unitMeasure, stock: item.quantity }];
-    });
+  function toggleUnit(unitId) {
+    setSelected((prev) =>
+      prev.includes(unitId) ? prev.filter((id) => id !== unitId) : [...prev, unitId]
+    );
   }
 
-  function setQty(itemId, val) {
-    const qty = Math.max(1, parseInt(val) || 1);
-    setSelected((prev) => prev.map((s) => s.itemId === itemId ? { ...s, quantity: qty } : s));
-  }
-
-  const filtered = items.filter((i) =>
-    !search || i.name.toLowerCase().includes(search.toLowerCase()) || (i.code || "").toLowerCase().includes(search.toLowerCase())
+  // All available units across items, filtered by search
+  const allUnits = items.flatMap((item) =>
+    (item.units || [])
+      .filter((u) => u.status === "DISPONIVEL")
+      .map((u) => ({ ...u, itemName: item.name, itemUnitMeasure: item.unitMeasure }))
   );
+  const filtered = search.trim()
+    ? allUnits.filter((u) =>
+        u.itemName.toLowerCase().includes(search.toLowerCase()) ||
+        (u.tombo || "").toLowerCase().includes(search.toLowerCase())
+      )
+    : allUnits;
+
+  // Group filtered units by itemName for display
+  const grouped = filtered.reduce((acc, u) => {
+    if (!acc[u.itemName]) acc[u.itemName] = [];
+    acc[u.itemName].push(u);
+    return acc;
+  }, {});
 
   async function handleSubmit() {
     setErr("");
-    if (selected.length === 0) return setErr("Selecione ao menos 1 item.");
+    if (selected.length === 0) return setErr("Selecione ao menos 1 unidade.");
     setSaving(true);
     try {
       const res = await api.post("/inventory/checklists", {
-        title:  form.title.trim(),
-        nucleo: form.nucleo,
-        note:   form.note.trim() || null,
-        items:  selected.map(({ itemId, quantity }) => ({ itemId, quantity })),
+        title:   form.title.trim(),
+        nucleo:  form.nucleo,
+        note:    form.note.trim() || null,
+        unitIds: selected,
       });
       onCreate(res.data);
     } catch (e) {
@@ -277,69 +268,61 @@ function CreateChecklistModal({ onClose, onCreate }) {
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                 <input
                   className="w-full pl-8 pr-3 py-2 rounded-lg border border-slate-200 dark:border-gray-700 bg-slate-50 dark:bg-gray-800 text-sm text-slate-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                  placeholder="Buscar item..."
+                  placeholder="Buscar por item ou tombo..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
               </div>
 
-              {filtered.length === 0 ? (
+              {allUnits.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-8 gap-2">
                   <Package size={28} className="text-slate-300 dark:text-gray-600" />
-                  <p className="text-sm text-slate-400">Nenhum item ativo no núcleo {form.nucleo}.</p>
+                  <p className="text-sm text-slate-400">Nenhuma unidade disponível no núcleo {form.nucleo}.</p>
+                </div>
+              ) : Object.keys(grouped).length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-6 gap-2">
+                  <p className="text-sm text-slate-400">Nenhum resultado para "{search}".</p>
                 </div>
               ) : (
-                <div className="space-y-1.5 max-h-72 overflow-y-auto">
-                  {filtered.map((item) => {
-                    const sel = selected.find((s) => s.itemId === item.id);
-                    return (
-                      <div
-                        key={item.id}
-                        className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition ${
-                          sel
-                            ? "border-brand-500 bg-brand-50 dark:bg-brand-900/20"
-                            : "border-slate-200 dark:border-gray-700 hover:bg-slate-50 dark:hover:bg-gray-800"
-                        }`}
-                        onClick={() => toggleItem(item)}
-                      >
-                        <div className={`h-5 w-5 rounded border-2 flex items-center justify-center shrink-0 transition ${sel ? "border-brand-600 bg-brand-600" : "border-slate-300 dark:border-gray-600"}`}>
-                          {sel && <span className="text-white text-xs">✓</span>}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-slate-800 dark:text-gray-100">{item.name}</div>
-                          <div className="text-xs text-slate-400 dark:text-gray-500">
-                            {item.code ? `Código: ${item.code} · ` : ""}Estoque: {item.quantity} {item.unitMeasure}
-                          </div>
-                        </div>
-                        {sel && (
-                          <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-                            <span className="text-xs text-slate-500 dark:text-gray-400">Qtd:</span>
-                            <input
-                              type="number" min="1" max={item.quantity}
-                              value={sel.quantity}
-                              onChange={(e) => setQty(item.id, e.target.value)}
-                              className="w-16 rounded border border-slate-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-0.5 text-sm text-center focus:outline-none focus:ring-1 focus:ring-brand-500"
-                            />
-                          </div>
-                        )}
+                <div className="space-y-3 max-h-80 overflow-y-auto">
+                  {Object.entries(grouped).map(([itemName, units]) => (
+                    <div key={itemName}>
+                      <div className="text-xs font-semibold text-slate-500 dark:text-gray-400 uppercase tracking-wide mb-1.5 px-1">
+                        {itemName}
                       </div>
-                    );
-                  })}
+                      <div className="space-y-1">
+                        {units.map((u) => {
+                          const isSel = selected.includes(u.id);
+                          return (
+                            <div
+                              key={u.id}
+                              onClick={() => toggleUnit(u.id)}
+                              className={`flex items-center gap-3 px-3 py-2 rounded-lg border cursor-pointer transition ${
+                                isSel
+                                  ? "border-brand-500 bg-brand-50 dark:bg-brand-900/20"
+                                  : "border-slate-200 dark:border-gray-700 hover:bg-slate-50 dark:hover:bg-gray-800"
+                              }`}
+                            >
+                              <div className={`h-4 w-4 rounded border-2 flex items-center justify-center shrink-0 transition ${isSel ? "border-brand-600 bg-brand-600" : "border-slate-300 dark:border-gray-600"}`}>
+                                {isSel && <span className="text-white text-[10px] leading-none">✓</span>}
+                              </div>
+                              <span className="font-mono text-sm text-slate-700 dark:text-gray-300">
+                                {u.tombo || <span className="italic text-slate-400">Sem tombo</span>}
+                              </span>
+                              <span className="ml-auto text-xs text-slate-400 dark:text-gray-500">{u.itemUnitMeasure}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
 
               {selected.length > 0 && (
                 <div className="bg-slate-50 dark:bg-gray-800 rounded-lg p-3">
-                  <div className="text-xs font-semibold text-slate-600 dark:text-gray-400 mb-2">
-                    Selecionados ({selected.length}):
-                  </div>
-                  <div className="space-y-1">
-                    {selected.map((s) => (
-                      <div key={s.itemId} className="flex items-center justify-between text-xs text-slate-700 dark:text-gray-300">
-                        <span>{s.name}</span>
-                        <span className="font-medium">{s.quantity} {s.unitMeasure}</span>
-                      </div>
-                    ))}
+                  <div className="text-xs font-semibold text-slate-600 dark:text-gray-400 mb-1">
+                    {selected.length} unidade(s) selecionada(s)
                   </div>
                 </div>
               )}
@@ -452,21 +435,29 @@ export default function InventoryPage() {
 
   useEffect(() => { loadItems(); }, [loadItems]);
   useEffect(() => { if (tab === "checklists") loadChecklists(); }, [tab, loadChecklists]);
+  // Reload items when switching back to items tab
+  useEffect(() => { if (tab === "items") loadItems(); }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Reload data when the window regains focus (user returns from another page/tab)
+  useEffect(() => {
+    function onFocus() { loadItems(); if (tab === "checklists") loadChecklists(); }
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [loadItems, loadChecklists, tab]);
 
   useEffect(() => {
     api.get("/inventory/categories").then((r) => setCategories(r.data)).catch(() => {});
   }, []);
 
   // KPI counts
-  const totalActive = items.filter((i) => i.status === "ATIVO").length;
-  const lowStock    = items.filter((i) => i.status === "ATIVO" && i.quantity === 0).length;
-  const withCode    = items.filter((i) => i.code).length;
+  const totalActive  = items.filter((i) => i.status === "ATIVO").length;
+  const lowStock     = items.filter((i) => i.status === "ATIVO" && (i.disponivel ?? 0) === 0).length;
+  const totalUnitsAll = items.reduce((acc, i) => acc + (i.totalUnits ?? 0), 0);
 
   const pendingCLCount = checklists.filter((c) => c.status === "PENDENTE").length;
 
   function handleItemCreated(item) {
     setShowCreateItem(false);
-    addToast("Item criado com sucesso!", "success");
+    addToast("Item criado! Agora adicione os tombos/SNs na página do item.", "success");
     loadItems();
     if (item.category && !categories.includes(item.category)) {
       setCategories((c) => [...c, item.category].sort());
@@ -482,6 +473,22 @@ export default function InventoryPage() {
       "success",
     );
     loadChecklists();
+    if (checklist.status === "APROVADO") loadItems();
+  }
+
+  const [confirmReturn, setConfirmReturn] = useState(null);
+
+  async function handleReturn(checklist) {
+    try {
+      await api.post(`/inventory/checklists/${checklist.id}/return`);
+      addToast("Itens devolvidos ao estoque com sucesso!", "success");
+      loadChecklists();
+      loadItems();
+    } catch (e) {
+      addToast(e.response?.data?.error || "Erro ao devolver itens", "error");
+    } finally {
+      setConfirmReturn(null);
+    }
   }
 
   const pillCls = (active) =>
@@ -565,10 +572,10 @@ export default function InventoryPage() {
             {/* KPI cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               {[
-                { label: "Itens ativos",   value: totalActive, icon: CheckCircle,   color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-900/20" },
-                { label: "Sem estoque",    value: lowStock,    icon: AlertTriangle, color: "text-amber-600 dark:text-amber-400",     bg: "bg-amber-50 dark:bg-amber-900/20"     },
-                { label: "Total de itens", value: total,       icon: Package,       color: "text-brand-600 dark:text-brand-400",    bg: "bg-brand-50 dark:bg-brand-900/20"     },
-                { label: "Com código/SN",  value: withCode,    icon: Hash,          color: "text-purple-600 dark:text-purple-400",  bg: "bg-purple-50 dark:bg-purple-900/20"   },
+                { label: "Modelos ativos",  value: totalActive,  icon: CheckCircle,   color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-900/20" },
+                { label: "Sem disponível", value: lowStock,     icon: AlertTriangle, color: "text-amber-600 dark:text-amber-400",     bg: "bg-amber-50 dark:bg-amber-900/20"     },
+                { label: "Total modelos",  value: total,        icon: Package,       color: "text-brand-600 dark:text-brand-400",    bg: "bg-brand-50 dark:bg-brand-900/20"     },
+                { label: "Total tombos",   value: totalUnitsAll,icon: Hash,          color: "text-purple-600 dark:text-purple-400",  bg: "bg-purple-50 dark:bg-purple-900/20"   },
               ].map(({ label, value, icon: Icon, color, bg }) => (
                 <div key={label} className="bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-700 p-4 flex items-center gap-3">
                   <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${bg}`}>
@@ -641,9 +648,9 @@ export default function InventoryPage() {
                   <thead>
                     <tr className="border-b border-slate-100 dark:border-gray-700/60">
                       <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 dark:text-gray-400 uppercase tracking-wide">Item</th>
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 dark:text-gray-400 uppercase tracking-wide hidden sm:table-cell">Código</th>
                       <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 dark:text-gray-400 uppercase tracking-wide hidden md:table-cell">Categoria</th>
-                      <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 dark:text-gray-400 uppercase tracking-wide">Qtd</th>
+                      <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 dark:text-gray-400 uppercase tracking-wide">Disponível</th>
+                      <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 dark:text-gray-400 uppercase tracking-wide hidden sm:table-cell">Em uso</th>
                       <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 dark:text-gray-400 uppercase tracking-wide hidden sm:table-cell">Status</th>
                       <th className="w-8" />
                     </tr>
@@ -661,12 +668,6 @@ export default function InventoryPage() {
                             <div className="text-xs text-slate-400 dark:text-gray-500 truncate max-w-[200px]">{item.description}</div>
                           )}
                         </td>
-                        <td className="px-4 py-3 hidden sm:table-cell">
-                          {item.code
-                            ? <span className="font-mono text-xs bg-slate-100 dark:bg-gray-800 text-slate-600 dark:text-gray-300 px-2 py-0.5 rounded">{item.code}</span>
-                            : <span className="text-slate-300 dark:text-gray-600 text-xs">—</span>
-                          }
-                        </td>
                         <td className="px-4 py-3 hidden md:table-cell">
                           {item.category
                             ? <span className="inline-flex items-center gap-1 text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full"><Tag size={10} />{item.category}</span>
@@ -674,10 +675,15 @@ export default function InventoryPage() {
                           }
                         </td>
                         <td className="px-4 py-3 text-center">
-                          <span className={`font-semibold text-sm ${item.quantity === 0 ? "text-amber-600 dark:text-amber-400" : "text-slate-800 dark:text-gray-100"}`}>
-                            {item.quantity}
+                          <span className={`font-semibold text-sm ${(item.disponivel ?? 0) === 0 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`}>
+                            {item.disponivel ?? 0}
                           </span>
                           <span className="text-xs text-slate-400 dark:text-gray-500 ml-1">{item.unitMeasure}</span>
+                        </td>
+                        <td className="px-4 py-3 text-center hidden sm:table-cell">
+                          <span className={`font-semibold text-sm ${(item.emUso ?? 0) > 0 ? "text-amber-600 dark:text-amber-400" : "text-slate-400 dark:text-gray-600"}`}>
+                            {item.emUso ?? 0}
+                          </span>
                         </td>
                         <td className="px-4 py-3 text-center hidden sm:table-cell">
                           <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_STYLE_ITEM[item.status]}`}>
@@ -765,7 +771,7 @@ export default function InventoryPage() {
                       <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 dark:text-gray-400 uppercase tracking-wide hidden md:table-cell">Itens</th>
                       <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 dark:text-gray-400 uppercase tracking-wide">Status</th>
                       <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 dark:text-gray-400 uppercase tracking-wide hidden lg:table-cell">Criado por</th>
-                      <th className="w-8" />
+                      <th className="px-4 py-3" />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50 dark:divide-gray-700/40">
@@ -798,8 +804,19 @@ export default function InventoryPage() {
                           <td className="px-4 py-3 hidden lg:table-cell text-slate-500 dark:text-gray-400 text-xs">
                             {c.createdBy?.name}
                           </td>
-                          <td className="px-2 py-3">
-                            <ChevronRight size={14} className="text-slate-400 dark:text-gray-500" />
+                          <td className="px-3 py-3 text-right">
+                            {c.status === "APROVADO" ? (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setConfirmReturn(c); }}
+                                title="Devolver itens ao estoque"
+                                className="inline-flex items-center gap-1 text-xs text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 px-2 py-1 rounded-lg transition"
+                              >
+                                <RotateCcw size={11} />
+                                Devolver
+                              </button>
+                            ) : (
+                              <ChevronRight size={14} className="text-slate-400 dark:text-gray-500" />
+                            )}
                           </td>
                         </tr>
                       );
@@ -825,6 +842,37 @@ export default function InventoryPage() {
           onClose={() => setShowCreateCL(false)}
           onCreate={handleChecklistCreated}
         />
+      )}
+
+      {confirmReturn && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-gray-700 p-6 max-w-sm w-full space-y-4">
+            <h3 className="font-semibold text-slate-800 dark:text-gray-100 flex items-center gap-2">
+              <RotateCcw size={16} className="text-emerald-600" />
+              Devolver itens ao estoque
+            </h3>
+            <p className="text-sm text-slate-500 dark:text-gray-400">
+              Os {confirmReturn._count?.items} itens do checklist{" "}
+              <strong className="text-slate-700 dark:text-gray-200">{confirmReturn.title}</strong>{" "}
+              serão adicionados de volta ao estoque. Confirmar?
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmReturn(null)}
+                className="flex-1 rounded-lg border border-slate-200 dark:border-gray-700 py-2 text-sm text-slate-600 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-800 transition"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => handleReturn(confirmReturn)}
+                className="flex-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 py-2 text-sm font-medium text-white transition flex items-center justify-center gap-1.5"
+              >
+                <RotateCcw size={13} />
+                Confirmar devolução
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

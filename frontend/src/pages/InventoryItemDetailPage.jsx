@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
@@ -6,110 +6,71 @@ import { useToast } from "../context/ToastContext";
 import { Spinner } from "../components/ui";
 import AppHeader from "../components/AppHeader";
 import {
-  Package, ArrowLeft, Edit2, Save, X, Plus, Minus, RefreshCw,
-  Tag, Hash, AlertTriangle, ArrowUpCircle, ArrowDownCircle,
-  SlidersHorizontal, Clock, User, Trash2, CheckCircle, XCircle,
+  Package, ArrowLeft, Edit2, Save, X, Plus, Tag,
+  AlertTriangle, User, Trash2, CheckCircle, XCircle,
+  Hash, Clock, Wifi,
 } from "lucide-react";
 
 const UNIT_OPTIONS = ["un", "cx", "par", "rolo", "m", "kg", "L", "pç"];
 
-const MOVEMENT_STYLE = {
-  ENTRADA: { icon: ArrowUpCircle,     cls: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-900/20", label: "Entrada"  },
-  SAIDA:   { icon: ArrowDownCircle,   cls: "text-red-500 dark:text-red-400",         bg: "bg-red-50 dark:bg-red-900/20",         label: "Saída"    },
-  AJUSTE:  { icon: SlidersHorizontal, cls: "text-blue-600 dark:text-blue-400",       bg: "bg-blue-50 dark:bg-blue-900/20",       label: "Ajuste"   },
+const UNIT_STATUS_STYLE = {
+  DISPONIVEL: { cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300", label: "Disponível" },
+  EM_USO:     { cls: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",         label: "Em uso"     },
+  INATIVO:    { cls: "bg-slate-100 text-slate-500 dark:bg-gray-800 dark:text-gray-400",              label: "Inativo"    },
 };
 
+const inputCls = "w-full rounded-lg border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-slate-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-brand-500";
+const labelCls = "block text-xs font-medium text-slate-600 dark:text-gray-400 mb-1";
+
 function fmtDate(d) {
-  return new Date(d).toLocaleString("pt-BR", {
-    day: "2-digit", month: "2-digit", year: "numeric",
-    hour: "2-digit", minute: "2-digit",
-  });
+  return new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
-// ── Movement Modal ────────────────────────────────────────────────────────────
-function MovementModal({ item, onClose, onDone }) {
-  const [type, setType]         = useState("ENTRADA");
-  const [quantity, setQuantity] = useState("1");
-  const [note, setNote]         = useState("");
-  const [saving, setSaving]     = useState(false);
-  const [err, setErr]           = useState("");
-
-  const isAjuste = type === "AJUSTE";
+// ── Add Unit Modal ─────────────────────────────────────────────────────────────
+function AddUnitModal({ itemId, onClose, onAdded }) {
+  const [tombo, setTombo]   = useState("");
+  const [note,  setNote]    = useState("");
+  const [saving, setSaving] = useState(false);
+  const [err,    setErr]    = useState("");
 
   async function handleSubmit(e) {
     e.preventDefault();
     setErr("");
-    const qty = parseInt(quantity);
-    if (isNaN(qty) || qty < 1) return setErr("Quantidade deve ser ao menos 1.");
     setSaving(true);
     try {
-      const res = await api.post(`/inventory/${item.id}/movements`, { type, quantity: qty, note: note.trim() || null });
-      onDone(res.data);
+      const res = await api.post(`/inventory/${itemId}/units`, {
+        tombo: tombo.trim() || null,
+        note:  note.trim()  || null,
+      });
+      onAdded(res.data);
     } catch (e) {
-      setErr(e.response?.data?.error || "Erro ao registrar movimentação.");
+      setErr(e.response?.data?.error || "Erro ao adicionar unidade.");
     } finally {
       setSaving(false);
     }
   }
 
-  const inputCls = "w-full rounded-lg border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-slate-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-brand-500";
-  const labelCls = "block text-xs font-medium text-slate-600 dark:text-gray-400 mb-1";
-
-  const typeBtn = (t, label, Icon) => (
-    <button
-      type="button"
-      onClick={() => setType(t)}
-      className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium border transition ${
-        type === t
-          ? `border-transparent ${MOVEMENT_STYLE[t].bg} ${MOVEMENT_STYLE[t].cls}`
-          : "border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400 hover:bg-slate-50 dark:hover:bg-gray-800"
-      }`}
-    >
-      <Icon size={14} />
-      {label}
-    </button>
-  );
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-gray-700 overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-gray-700/60">
-          <h2 className="text-base font-semibold text-slate-800 dark:text-gray-100">Registrar movimentação</h2>
+          <h2 className="text-base font-semibold text-slate-800 dark:text-gray-100 flex items-center gap-2">
+            <Hash size={15} className="text-brand-600" />
+            Adicionar unidade / tombo
+          </h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-gray-200 text-xl leading-none">×</button>
         </div>
-
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
-            <label className={labelCls}>Tipo</label>
-            <div className="flex gap-2">
-              {typeBtn("ENTRADA", "Entrada",  ArrowUpCircle)}
-              {typeBtn("SAIDA",   "Saída",    ArrowDownCircle)}
-              {typeBtn("AJUSTE",  "Ajuste",   SlidersHorizontal)}
-            </div>
-          </div>
-
-          <div>
-            <label className={labelCls}>
-              {isAjuste ? "Novo valor absoluto" : "Quantidade"}
-            </label>
+            <label className={labelCls}>Tombo / SN <span className="text-slate-400">(opcional)</span></label>
             <input
               className={inputCls}
-              type="number" min="1"
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-              placeholder={isAjuste ? "Quantidade final no estoque" : "Ex: 5"}
+              value={tombo}
+              onChange={(e) => setTombo(e.target.value)}
+              placeholder="Ex: 3071, SN-ABC123..."
+              autoFocus
             />
-            {!isAjuste && (
-              <p className="mt-1 text-xs text-slate-400 dark:text-gray-500">
-                Estoque atual: <strong>{item.quantity} {item.unitMeasure}</strong>
-                {type === "ENTRADA"
-                  ? ` → ${item.quantity + (parseInt(quantity) || 0)} ${item.unitMeasure}`
-                  : ` → ${Math.max(0, item.quantity - (parseInt(quantity) || 0))} ${item.unitMeasure}`
-                }
-              </p>
-            )}
           </div>
-
           <div>
             <label className={labelCls}>Observação <span className="text-slate-400">(opcional)</span></label>
             <textarea
@@ -117,23 +78,21 @@ function MovementModal({ item, onClose, onDone }) {
               rows={2}
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="Ex: Recebimento de NF 001, Empréstimo para setor X..."
+              placeholder="Informações adicionais..."
             />
           </div>
-
           {err && (
             <p className="flex items-center gap-1.5 text-sm text-red-600 dark:text-red-400">
               <AlertTriangle size={14} /> {err}
             </p>
           )}
-
           <div className="flex gap-3 pt-1">
             <button type="button" onClick={onClose} className="flex-1 rounded-lg border border-slate-200 dark:border-gray-700 py-2 text-sm text-slate-600 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-800 transition">
               Cancelar
             </button>
             <button type="submit" disabled={saving} className="flex-1 rounded-lg bg-brand-600 hover:bg-brand-700 disabled:opacity-60 py-2 text-sm font-medium text-white transition flex items-center justify-center gap-1.5">
               {saving ? <Spinner size="sm" /> : <Plus size={14} />}
-              Registrar
+              Adicionar
             </button>
           </div>
         </form>
@@ -142,11 +101,10 @@ function MovementModal({ item, onClose, onDone }) {
   );
 }
 
-// ── Edit Modal ────────────────────────────────────────────────────────────────
+// ── Edit Item Modal ────────────────────────────────────────────────────────────
 function EditModal({ item, onClose, onSaved, categories }) {
   const [form, setForm] = useState({
     name:        item.name,
-    code:        item.code || "",
     description: item.description || "",
     unitMeasure: item.unitMeasure,
     category:    item.category || "",
@@ -154,7 +112,7 @@ function EditModal({ item, onClose, onSaved, categories }) {
     status:      item.status,
   });
   const [saving, setSaving] = useState(false);
-  const [err, setErr]       = useState("");
+  const [err,    setErr]    = useState("");
 
   function set(k, v) { setForm((f) => ({ ...f, [k]: v })); }
 
@@ -166,7 +124,6 @@ function EditModal({ item, onClose, onSaved, categories }) {
     try {
       const payload = {
         name:        form.name.trim(),
-        code:        form.code.trim() || null,
         description: form.description.trim() || null,
         unitMeasure: form.unitMeasure,
         category:    form.category.trim() || null,
@@ -182,12 +139,9 @@ function EditModal({ item, onClose, onSaved, categories }) {
     }
   }
 
-  const inputCls = "w-full rounded-lg border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-slate-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-brand-500";
-  const labelCls = "block text-xs font-medium text-slate-600 dark:text-gray-400 mb-1";
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-lg bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-gray-700 overflow-hidden">
+      <div className="w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-gray-700 overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-gray-700/60">
           <h2 className="text-base font-semibold text-slate-800 dark:text-gray-100 flex items-center gap-2">
             <Edit2 size={15} className="text-brand-600" />
@@ -204,10 +158,6 @@ function EditModal({ item, onClose, onSaved, categories }) {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className={labelCls}>Código / SN</label>
-              <input className={inputCls} value={form.code} onChange={(e) => set("code", e.target.value)} placeholder="Opcional" />
-            </div>
-            <div>
               <label className={labelCls}>Categoria</label>
               <input
                 className={inputCls}
@@ -220,15 +170,15 @@ function EditModal({ item, onClose, onSaved, categories }) {
                 {categories.map((c) => <option key={c} value={c} />)}
               </datalist>
             </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={labelCls}>Unidade de medida</label>
               <select className={inputCls} value={form.unitMeasure} onChange={(e) => set("unitMeasure", e.target.value)}>
                 {UNIT_OPTIONS.map((u) => <option key={u} value={u}>{u}</option>)}
               </select>
             </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={labelCls}>Núcleo</label>
               <select className={inputCls} value={form.nucleo} onChange={(e) => set("nucleo", e.target.value)}>
@@ -237,13 +187,13 @@ function EditModal({ item, onClose, onSaved, categories }) {
                 <option value="NIR">NIR</option>
               </select>
             </div>
-          </div>
-          <div>
-            <label className={labelCls}>Status</label>
-            <select className={inputCls} value={form.status} onChange={(e) => set("status", e.target.value)}>
-              <option value="ATIVO">Ativo</option>
-              <option value="INATIVO">Inativo</option>
-            </select>
+            <div>
+              <label className={labelCls}>Status</label>
+              <select className={inputCls} value={form.status} onChange={(e) => set("status", e.target.value)}>
+                <option value="ATIVO">Ativo</option>
+                <option value="INATIVO">Inativo</option>
+              </select>
+            </div>
           </div>
 
           <div>
@@ -278,23 +228,146 @@ function EditModal({ item, onClose, onSaved, categories }) {
   );
 }
 
+// ── Unit Row (inline edit) ─────────────────────────────────────────────────────
+function UnitRow({ unit, onUpdated, onDeleted }) {
+  const [editing,  setEditing]  = useState(false);
+  const [tomboDft, setTomboDft] = useState(unit.tombo || "");
+  const [statusDft,setStatusDft]= useState(unit.status);
+  const [noteDft,  setNoteDft]  = useState(unit.note || "");
+  const [saving,   setSaving]   = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  async function save() {
+    setSaving(true);
+    try {
+      const res = await api.patch(`/inventory/units/${unit.id}`, {
+        tombo:  tomboDft.trim() || null,
+        status: statusDft,
+        note:   noteDft.trim() || null,
+      });
+      onUpdated(res.data);
+      setEditing(false);
+    } catch (e) {
+      alert(e.response?.data?.error || "Erro ao salvar.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function del() {
+    if (!window.confirm("Remover esta unidade?")) return;
+    setDeleting(true);
+    try {
+      await api.delete(`/inventory/units/${unit.id}`);
+      onDeleted(unit.id);
+    } catch (e) {
+      alert(e.response?.data?.error || "Erro ao excluir.");
+      setDeleting(false);
+    }
+  }
+
+  if (editing) {
+    return (
+      <tr className="bg-brand-50 dark:bg-brand-900/10">
+        <td className="px-3 py-2">
+          <input
+            className="w-full rounded border border-slate-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500"
+            value={tomboDft}
+            onChange={(e) => setTomboDft(e.target.value)}
+            placeholder="Tombo / SN"
+            autoFocus
+          />
+        </td>
+        <td className="px-3 py-2">
+          <select
+            className="rounded border border-slate-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1 text-sm focus:outline-none"
+            value={statusDft}
+            onChange={(e) => setStatusDft(e.target.value)}
+          >
+            <option value="DISPONIVEL">Disponível</option>
+            <option value="EM_USO">Em uso</option>
+            <option value="INATIVO">Inativo</option>
+          </select>
+        </td>
+        <td className="px-3 py-2 hidden md:table-cell">
+          <input
+            className="w-full rounded border border-slate-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1 text-sm focus:outline-none"
+            value={noteDft}
+            onChange={(e) => setNoteDft(e.target.value)}
+            placeholder="Observação"
+          />
+        </td>
+        <td className="px-3 py-2 hidden sm:table-cell text-xs text-slate-400" />
+        <td className="px-3 py-2">
+          <div className="flex items-center gap-1">
+            <button onClick={save} disabled={saving} className="flex h-7 w-7 items-center justify-center rounded bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white transition">
+              {saving ? <Spinner size="sm" /> : <Save size={13} />}
+            </button>
+            <button onClick={() => setEditing(false)} className="flex h-7 w-7 items-center justify-center rounded border border-slate-200 dark:border-gray-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-gray-800 transition">
+              <X size={13} />
+            </button>
+          </div>
+        </td>
+      </tr>
+    );
+  }
+
+  const { cls, label } = UNIT_STATUS_STYLE[unit.status];
+
+  return (
+    <tr className="hover:bg-slate-50 dark:hover:bg-gray-800/50 transition group">
+      <td className="px-3 py-2.5">
+        {unit.tombo
+          ? <span className="font-mono text-sm bg-slate-100 dark:bg-gray-800 text-slate-700 dark:text-gray-300 px-2 py-0.5 rounded">{unit.tombo}</span>
+          : <span className="text-xs text-slate-400 dark:text-gray-500 italic">Sem tombo</span>
+        }
+      </td>
+      <td className="px-3 py-2.5">
+        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${cls}`}>
+          {label}
+        </span>
+      </td>
+      <td className="px-3 py-2.5 hidden md:table-cell text-xs text-slate-500 dark:text-gray-400">
+        {unit.note || <span className="italic text-slate-300 dark:text-gray-600">—</span>}
+      </td>
+      <td className="px-3 py-2.5 hidden sm:table-cell text-xs text-slate-400 dark:text-gray-500">
+        <div className="flex items-center gap-1">
+          <User size={10} />
+          {unit.createdBy?.name}
+          <span className="ml-1 text-slate-300 dark:text-gray-600">{fmtDate(unit.createdAt)}</span>
+        </div>
+      </td>
+      <td className="px-3 py-2.5">
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+          <button onClick={() => setEditing(true)} className="flex h-7 w-7 items-center justify-center rounded border border-slate-200 dark:border-gray-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-gray-800 transition">
+            <Edit2 size={12} />
+          </button>
+          <button onClick={del} disabled={deleting} className="flex h-7 w-7 items-center justify-center rounded border border-red-200 dark:border-red-900/50 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition disabled:opacity-50">
+            {deleting ? <Spinner size="sm" /> : <Trash2 size={12} />}
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function InventoryItemDetailPage() {
-  const { id }      = useParams();
-  const navigate    = useNavigate();
-  const { user }    = useAuth();
+  const { id }       = useParams();
+  const navigate     = useNavigate();
+  const { user }     = useAuth();
   const { addToast } = useToast();
 
-  const [item, setItem]             = useState(null);
-  const [loading, setLoading]       = useState(true);
+  const [item,       setItem]       = useState(null);
+  const [loading,    setLoading]    = useState(true);
   const [categories, setCategories] = useState([]);
-  const [showMovement, setShowMovement] = useState(false);
-  const [showEdit, setShowEdit]     = useState(false);
-  const [deleting, setDeleting]     = useState(false);
+  const [showAddUnit, setShowAddUnit] = useState(false);
+  const [showEdit,    setShowEdit]    = useState(false);
+  const [deleting,    setDeleting]    = useState(false);
 
   const isAdmin = user?.role === "ADMIN";
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await api.get(`/inventory/${id}`);
@@ -305,21 +378,32 @@ export default function InventoryItemDetailPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [id]);
 
-  useEffect(() => { load(); }, [id]);
+  useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
     api.get("/inventory/categories").then((r) => setCategories(r.data)).catch(() => {});
   }, []);
 
-  function handleMovementDone({ movement, newQuantity }) {
-    setShowMovement(false);
-    addToast("Movimentação registrada!", "success");
+  function handleUnitAdded(unit) {
+    setShowAddUnit(false);
+    addToast("Unidade adicionada!", "success");
+    setItem((prev) => ({ ...prev, units: [...(prev.units || []), unit] }));
+  }
+
+  function handleUnitUpdated(updated) {
     setItem((prev) => ({
       ...prev,
-      quantity:  newQuantity,
-      movements: [movement, ...prev.movements],
+      units: prev.units.map((u) => u.id === updated.id ? updated : u),
+    }));
+  }
+
+  function handleUnitDeleted(unitId) {
+    addToast("Unidade removida.", "success");
+    setItem((prev) => ({
+      ...prev,
+      units: prev.units.filter((u) => u.id !== unitId),
     }));
   }
 
@@ -330,7 +414,7 @@ export default function InventoryItemDetailPage() {
   }
 
   async function handleDelete() {
-    if (!window.confirm(`Excluir "${item.name}" permanentemente? Esta ação não pode ser desfeita.`)) return;
+    if (!window.confirm(`Excluir "${item.name}" permanentemente?`)) return;
     setDeleting(true);
     try {
       await api.delete(`/inventory/${item.id}`);
@@ -338,7 +422,6 @@ export default function InventoryItemDetailPage() {
       navigate("/painel/inventario");
     } catch (e) {
       addToast(e.response?.data?.error || "Erro ao excluir.", "error");
-    } finally {
       setDeleting(false);
     }
   }
@@ -354,7 +437,12 @@ export default function InventoryItemDetailPage() {
 
   if (!item) return null;
 
-  const StatusIcon = item.status === "ATIVO" ? CheckCircle : XCircle;
+  const units     = item.units || [];
+  const disponivel = units.filter((u) => u.status === "DISPONIVEL").length;
+  const emUso      = units.filter((u) => u.status === "EM_USO").length;
+  const inativo    = units.filter((u) => u.status === "INATIVO").length;
+
+  const StatusIcon  = item.status === "ATIVO" ? CheckCircle : XCircle;
   const statusColor = item.status === "ATIVO"
     ? "text-emerald-600 dark:text-emerald-400"
     : "text-slate-400 dark:text-gray-500";
@@ -367,20 +455,17 @@ export default function InventoryItemDetailPage() {
 
         {/* Breadcrumb + actions */}
         <div className="flex items-center justify-between flex-wrap gap-3">
-          <Link
-            to="/painel/inventario"
-            className="flex items-center gap-1.5 text-sm text-slate-500 dark:text-gray-400 hover:text-brand-600 dark:hover:text-brand-400 transition"
-          >
+          <Link to="/painel/inventario" className="flex items-center gap-1.5 text-sm text-slate-500 dark:text-gray-400 hover:text-brand-600 dark:hover:text-brand-400 transition">
             <ArrowLeft size={14} />
             Inventário
           </Link>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <button
-              onClick={() => setShowMovement(true)}
+              onClick={() => setShowAddUnit(true)}
               className="flex items-center gap-1.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-3 py-1.5 rounded-lg transition"
             >
               <Plus size={14} />
-              Movimentação
+              Adicionar tombo
             </button>
             <button
               onClick={() => setShowEdit(true)}
@@ -423,39 +508,46 @@ export default function InventoryItemDetailPage() {
           </div>
 
           <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {/* Disponível count */}
             <div>
-              <div className="text-xs text-slate-500 dark:text-gray-400 mb-0.5">Quantidade</div>
-              <div className={`text-2xl font-bold ${item.quantity === 0 ? "text-amber-600 dark:text-amber-400" : "text-slate-800 dark:text-gray-100"}`}>
-                {item.quantity}
-                <span className="text-sm font-normal text-slate-400 dark:text-gray-500 ml-1">{item.unitMeasure}</span>
+              <div className="text-xs text-slate-500 dark:text-gray-400 mb-0.5">Disponível</div>
+              <div className={`text-2xl font-bold ${disponivel === 0 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`}>
+                {disponivel}
+                <span className="text-sm font-normal text-slate-400 ml-1">{item.unitMeasure}</span>
               </div>
-              {item.quantity === 0 && (
+              {disponivel === 0 && emUso === 0 && (
                 <div className="flex items-center gap-1 mt-0.5 text-xs text-amber-600 dark:text-amber-400">
-                  <AlertTriangle size={11} /> Sem estoque
+                  <AlertTriangle size={11} /> Sem unidades
                 </div>
               )}
             </div>
 
+            {/* Em uso */}
             <div>
-              <div className="text-xs text-slate-500 dark:text-gray-400 mb-0.5">Código / SN</div>
-              <div className="text-sm font-medium text-slate-800 dark:text-gray-100">
-                {item.code
-                  ? <span className="font-mono bg-slate-100 dark:bg-gray-800 px-2 py-0.5 rounded text-slate-700 dark:text-gray-300">{item.code}</span>
-                  : <span className="text-slate-400 dark:text-gray-500 font-normal italic">Sem código</span>
-                }
+              <div className="text-xs text-slate-500 dark:text-gray-400 mb-0.5">Em uso</div>
+              <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+                {emUso}
+                {emUso > 0 && (
+                  <span className="ml-2 inline-flex items-center gap-0.5 text-xs font-medium text-amber-600 dark:text-amber-400">
+                    <Wifi size={10} className="animate-pulse" />
+                    checklist
+                  </span>
+                )}
               </div>
             </div>
 
+            {/* Categoria */}
             <div>
               <div className="text-xs text-slate-500 dark:text-gray-400 mb-0.5">Categoria</div>
-              <div className="text-sm">
+              <div className="text-sm mt-1">
                 {item.category
                   ? <span className="inline-flex items-center gap-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full text-xs"><Tag size={10} />{item.category}</span>
-                  : <span className="text-slate-400 dark:text-gray-500 italic">Sem categoria</span>
+                  : <span className="text-slate-400 dark:text-gray-500 italic text-xs">Sem categoria</span>
                 }
               </div>
             </div>
 
+            {/* Cadastrado por */}
             <div>
               <div className="text-xs text-slate-500 dark:text-gray-400 mb-0.5">Cadastrado por</div>
               <div className="text-sm text-slate-700 dark:text-gray-300 flex items-center gap-1">
@@ -469,56 +561,62 @@ export default function InventoryItemDetailPage() {
           </div>
         </div>
 
-        {/* Movement history */}
+        {/* Units table */}
         <div className="bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-700 overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-gray-700/60">
             <h2 className="text-sm font-semibold text-slate-700 dark:text-gray-200 flex items-center gap-2">
-              <Clock size={15} className="text-slate-400" />
-              Histórico de movimentações
+              <Hash size={15} className="text-slate-400" />
+              Tombos / Unidades
             </h2>
-            <span className="text-xs text-slate-400 dark:text-gray-500">{item.movements.length} registro(s)</span>
+            <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-gray-400">
+              <span className="text-emerald-600 dark:text-emerald-400 font-medium">{disponivel} disponível</span>
+              {emUso > 0 && <span className="text-amber-600 dark:text-amber-400 font-medium">{emUso} em uso</span>}
+              {inativo > 0 && <span>{inativo} inativo</span>}
+              <button
+                onClick={() => setShowAddUnit(true)}
+                className="flex items-center gap-1 text-brand-600 dark:text-brand-400 hover:underline font-medium"
+              >
+                <Plus size={12} /> Adicionar
+              </button>
+            </div>
           </div>
 
-          {item.movements.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 text-center gap-2">
-              <Clock size={28} className="text-slate-200 dark:text-gray-700" />
-              <p className="text-sm text-slate-400 dark:text-gray-500">Nenhuma movimentação registrada.</p>
+          {units.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center gap-3">
+              <Hash size={28} className="text-slate-200 dark:text-gray-700" />
+              <p className="text-sm text-slate-400 dark:text-gray-500">Nenhum tombo cadastrado.</p>
+              <button onClick={() => setShowAddUnit(true)} className="text-brand-600 text-sm font-medium hover:underline flex items-center gap-1">
+                <Plus size={13} /> Adicionar primeiro tombo
+              </button>
             </div>
           ) : (
-            <div className="divide-y divide-slate-50 dark:divide-gray-700/40">
-              {item.movements.map((mv) => {
-                const { icon: MvIcon, cls, bg, label } = MOVEMENT_STYLE[mv.type];
-                return (
-                  <div key={mv.id} className="flex items-start gap-3 px-5 py-3.5">
-                    <div className={`flex h-8 w-8 items-center justify-center rounded-lg shrink-0 mt-0.5 ${bg}`}>
-                      <MvIcon size={15} className={cls} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between flex-wrap gap-1">
-                        <span className={`text-sm font-semibold ${cls}`}>
-                          {label}
-                          {mv.type === "AJUSTE"
-                            ? ` → ${mv.quantity} ${item.unitMeasure}`
-                            : ` ${mv.type === "ENTRADA" ? "+" : "−"}${mv.quantity} ${item.unitMeasure}`
-                          }
-                        </span>
-                        <span className="text-xs text-slate-400 dark:text-gray-500">{fmtDate(mv.createdAt)}</span>
-                      </div>
-                      {mv.note && <p className="text-xs text-slate-500 dark:text-gray-400 mt-0.5">{mv.note}</p>}
-                      <p className="text-xs text-slate-400 dark:text-gray-500 mt-0.5 flex items-center gap-1">
-                        <User size={10} /> {mv.createdBy?.name || "—"}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 dark:border-gray-700/60">
+                  <th className="text-left px-3 py-2.5 text-xs font-semibold text-slate-500 dark:text-gray-400 uppercase tracking-wide">Tombo / SN</th>
+                  <th className="text-left px-3 py-2.5 text-xs font-semibold text-slate-500 dark:text-gray-400 uppercase tracking-wide">Status</th>
+                  <th className="text-left px-3 py-2.5 text-xs font-semibold text-slate-500 dark:text-gray-400 uppercase tracking-wide hidden md:table-cell">Observação</th>
+                  <th className="text-left px-3 py-2.5 text-xs font-semibold text-slate-500 dark:text-gray-400 uppercase tracking-wide hidden sm:table-cell">Cadastrado por</th>
+                  <th className="w-20" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50 dark:divide-gray-700/40">
+                {units.map((unit) => (
+                  <UnitRow
+                    key={unit.id}
+                    unit={unit}
+                    onUpdated={handleUnitUpdated}
+                    onDeleted={handleUnitDeleted}
+                  />
+                ))}
+              </tbody>
+            </table>
           )}
         </div>
       </main>
 
-      {showMovement && (
-        <MovementModal item={item} onClose={() => setShowMovement(false)} onDone={handleMovementDone} />
+      {showAddUnit && (
+        <AddUnitModal itemId={item.id} onClose={() => setShowAddUnit(false)} onAdded={handleUnitAdded} />
       )}
       {showEdit && (
         <EditModal item={item} onClose={() => setShowEdit(false)} onSaved={handleSaved} categories={categories} />

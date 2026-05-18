@@ -202,20 +202,25 @@ export default function WorkOrdersPage() {
   const [statusFilter, setStatus] = useState("");
   const [tipoFilter, setTipo]     = useState("");
   const [unitFilter, setUnit]     = useState("");
+  const [dateFilter, setDateFilter] = useState("");
   const [showCreate, setShowCreate] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const params = {};
-      if (tipoFilter) params.tipo   = tipoFilter;
-      if (unitFilter) params.unitId = unitFilter;
+      if (tipoFilter)  params.tipo   = tipoFilter;
+      if (unitFilter)  params.unitId = unitFilter;
+      if (dateFilter) {
+        params.from = new Date(dateFilter + "T00:00:00").toISOString();
+        params.to   = new Date(dateFilter + "T23:59:59").toISOString();
+      }
       const res = await api.get("/work-orders", { params });
       setOrders(res.data);
     } finally {
       setLoading(false);
     }
-  }, [tipoFilter, unitFilter]);
+  }, [tipoFilter, unitFilter, dateFilter]);
 
   useEffect(() => {
     api.get("/units").then((r) => setUnits(r.data));
@@ -242,7 +247,7 @@ export default function WorkOrdersPage() {
     nav(`/painel/os/${os.id}`);
   }
 
-  const hasFilters = tipoFilter || unitFilter;
+  const hasFilters = tipoFilter || unitFilter || dateFilter;
   const visible    = statusFilter ? orders.filter((o) => o.status === statusFilter) : orders;
   const tabCounts  = STATUS_TABS.reduce((acc, tab) => {
     acc[tab.key] = tab.key ? orders.filter((o) => o.status === tab.key).length : orders.length;
@@ -319,9 +324,16 @@ export default function WorkOrdersPage() {
               <option value="">Todos os núcleos</option>
               {units.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
             </select>
+            <input
+              type="date"
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value)}
+              className="field-input py-1.5 text-xs w-auto"
+              title="Filtrar por data de criação"
+            />
             {hasFilters && (
               <button
-                onClick={() => { setTipo(""); setUnit(""); }}
+                onClick={() => { setTipo(""); setUnit(""); setDateFilter(""); }}
                 className="text-xs text-slate-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 transition"
               >
                 Limpar filtros

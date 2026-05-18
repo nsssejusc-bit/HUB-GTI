@@ -114,11 +114,16 @@ export default function RegisterPage() {
   const cpfClean  = stripCpf(cpf);
   const cpfValid  = cpf.length > 0 && isValidCpf(cpfClean);
   const pwdMatch  = password === confirm;
+  const emailValid  = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const phoneClean  = telefone.replace(/\D/g, "");
+  const phoneValid  = phoneClean.length >= 10;
   const canSubmit = (
     name.trim().length >= 3 &&
     cpfValid &&
     !!prefixo &&
     !!departmentId &&
+    emailValid &&
+    phoneValid &&
     password.length >= 6 &&
     pwdMatch
   );
@@ -305,31 +310,37 @@ export default function RegisterPage() {
           {/* E-mail */}
           <div>
             <label className="field-label flex items-center gap-1.5">
-              <Mail className="h-3.5 w-3.5" /> E-mail{" "}
-              <span className="text-gray-400 dark:text-gray-500 font-normal">(opcional)</span>
+              <Mail className="h-3.5 w-3.5" /> E-mail <span className="text-red-500">*</span>
             </label>
             <input
-              className="field-input w-full"
+              className={`field-input w-full ${email && !emailValid ? "border-red-400 dark:border-red-600" : ""}`}
               type="email"
               placeholder="seu@email.gov.br"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              required
             />
+            {email && !emailValid && (
+              <p className="text-xs text-red-500 mt-1">E-mail inválido</p>
+            )}
           </div>
 
           {/* Telefone */}
           <div>
             <label className="field-label flex items-center gap-1.5">
-              <Phone className="h-3.5 w-3.5" /> Telefone para contato{" "}
-              <span className="text-gray-400 dark:text-gray-500 font-normal">(opcional)</span>
+              <Phone className="h-3.5 w-3.5" /> Telefone para contato <span className="text-red-500">*</span>
             </label>
             <input
-              className="field-input w-full"
+              className={`field-input w-full ${telefone && !phoneValid ? "border-red-400 dark:border-red-600" : ""}`}
               type="tel"
               placeholder="(92) 99999-9999"
               value={telefone}
               onChange={(e) => setTelefone(e.target.value)}
+              required
             />
+            {telefone && !phoneValid && (
+              <p className="text-xs text-red-500 mt-1">Informe um número válido (mínimo 10 dígitos)</p>
+            )}
           </div>
 
           {/* Chefe de Setor — visível apenas para Servidor do Governo */}
