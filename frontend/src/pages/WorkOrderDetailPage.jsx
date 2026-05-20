@@ -5,41 +5,25 @@ import { useAuth } from "../context/AuthContext";
 import { StatusBadge, Spinner } from "../components/ui";
 import DateInput from "../components/DateInput";
 import AppHeader from "../components/AppHeader";
+import { TIPO_LABELS, TIPO_OPTIONS as TIPO_OPTIONS_LIST, OS_STATUS_LABEL, OS_STATUS_STYLE } from "../lib/osConstants";
+import DateTimeInput from "../components/DateTimeInput";
 import {
   ArrowLeft, ChevronRight, MapPin, Users, Clock,
   Wrench, Edit2, Check, X, Plus, Trash2, Link2, Unlink,
   AlertTriangle, CheckCircle2, Play, XCircle,
+  Zap, Package, ClipboardCheck, CalendarRange, ExternalLink,
 } from "lucide-react";
 
-const TIPO_LABELS = {
-  VISITA_TECNICA:           "Visita Técnica",
-  TROCA_EQUIPAMENTO:        "Troca de Equipamento",
-  ENTREGA:                  "Entrega",
-  MANUTENCAO_REDE:          "Manutenção de Rede",
-  MANUTENCAO_CAMERA:        "Manutenção de Câmera",
-  RECOLHIMENTO_EQUIPAMENTO: "Recolhimento de Equipamento",
-  ACAO:                     "Ação",
-  OUTRO:                    "Outro",
-};
+const TIPO_OPTIONS = TIPO_OPTIONS_LIST.filter(o => o.value).map(o => o.value);
+const STATUS_STYLE = OS_STATUS_STYLE;
+const STATUS_LABEL = OS_STATUS_LABEL;
 
-const TIPO_OPTIONS = [
-  "VISITA_TECNICA","TROCA_EQUIPAMENTO","ENTREGA",
-  "MANUTENCAO_REDE","MANUTENCAO_CAMERA","RECOLHIMENTO_EQUIPAMENTO","ACAO","OUTRO",
-];
-
-const STATUS_STYLE = {
-  ABERTA:       "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
-  EM_ANDAMENTO: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
-  CONCLUIDA:    "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
-  CANCELADA:    "bg-slate-100 text-slate-500 dark:bg-gray-800 dark:text-gray-400",
+const CHECKLIST_STATUS_STYLE = {
+  PENDENTE:  "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
+  APROVADO:  "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+  REJEITADO: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
 };
-
-const STATUS_LABEL = {
-  ABERTA:       "Aberta",
-  EM_ANDAMENTO: "Em Andamento",
-  CONCLUIDA:    "Concluída",
-  CANCELADA:    "Cancelada",
-};
+const CHECKLIST_STATUS_LABEL = { PENDENTE: "Pendente", APROVADO: "Aprovado", REJEITADO: "Rejeitado" };
 
 const TRANSITION_CONFIG = {
   EM_ANDAMENTO: { label: "Iniciar",   icon: Play,        cls: "bg-blue-600 hover:bg-blue-700 text-white" },
@@ -259,6 +243,7 @@ export default function WorkOrderDetailPage() {
   const { user } = useAuth();
 
   const [os, setOs]               = useState(null);
+  const [loadErr, setLoadErr]     = useState(false);
   const [units, setUnits]         = useState([]);
   const [techs, setTechs]         = useState([]);
   const [transition, setTrans]    = useState(null);
@@ -270,14 +255,19 @@ export default function WorkOrderDetailPage() {
   const [saving, setSaving]       = useState(false);
 
   const load = useCallback(async () => {
-    const [osRes, unitsRes, techsRes] = await Promise.all([
-      api.get(`/work-orders/${id}`),
-      api.get("/units"),
-      api.get("/technicians"),
-    ]);
-    setOs(osRes.data);
-    setUnits(unitsRes.data);
-    setTechs(techsRes.data);
+    setLoadErr(false);
+    try {
+      const [osRes, unitsRes, techsRes] = await Promise.all([
+        api.get(`/work-orders/${id}`),
+        api.get("/units"),
+        api.get("/technicians"),
+      ]);
+      setOs(osRes.data);
+      setUnits(unitsRes.data);
+      setTechs(techsRes.data);
+    } catch {
+      setLoadErr(true);
+    }
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
@@ -287,12 +277,15 @@ export default function WorkOrderDetailPage() {
 
   function startEdit() {
     setEditForm({
-      tipo:      os.tipo,
-      local:     os.local,
-      problema:  os.problema || "",
-      materiais: os.materiais || "",
-      prazo:     os.prazo ? new Date(os.prazo).toISOString().slice(0, 10) : "",
-      unitId:    os.unit ? String(os.unit.id) : "",
+      tipo:          os.tipo,
+      local:         os.local,
+      problema:      os.problema || "",
+      materiais:     os.materiais || "",
+      prazo:         os.prazo ? new Date(os.prazo).toISOString().slice(0, 10) : "",
+      unitId:        os.unit ? String(os.unit.id) : "",
+      nomeEvento:    os.nomeEvento    || "",
+      startDateTime: os.startDateTime ? new Date(os.startDateTime).toISOString().slice(0, 16) : "",
+      endDateTime:   os.endDateTime   ? new Date(os.endDateTime).toISOString().slice(0, 16)   : "",
     });
     setEditing(true);
     setErr("");
@@ -302,14 +295,20 @@ export default function WorkOrderDetailPage() {
     setSaving(true);
     setErr("");
     try {
-      const res = await api.patch(`/work-orders/${id}`, {
+      const payload = {
         tipo:      editForm.tipo,
         local:     editForm.local,
-        problema:  editForm.problema || null,
+        problema:  editForm.problema  || null,
         materiais: editForm.materiais || null,
         prazo:     editForm.prazo ? new Date(editForm.prazo).toISOString() : null,
         unitId:    editForm.unitId ? Number(editForm.unitId) : null,
-      });
+      };
+      if (editForm.tipo === "ACAO") {
+        payload.nomeEvento    = editForm.nomeEvento    || null;
+        payload.startDateTime = editForm.startDateTime ? new Date(editForm.startDateTime).toISOString() : null;
+        payload.endDateTime   = editForm.endDateTime   ? new Date(editForm.endDateTime).toISOString()   : null;
+      }
+      const res = await api.patch(`/work-orders/${id}`, payload);
       setOs(res.data);
       setEditing(false);
     } catch (e) {
@@ -358,9 +357,21 @@ export default function WorkOrderDetailPage() {
   }
 
   async function deleteOs() {
-    await api.delete(`/work-orders/${id}`);
-    nav("/painel/os");
+    try {
+      await api.delete(`/work-orders/${id}`);
+      nav("/painel/os");
+    } catch (e) {
+      setErr(e.response?.data?.error || "Erro ao excluir OS");
+    }
   }
+
+  if (loadErr) return (
+    <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-slate-50 dark:bg-gray-950">
+      <AlertTriangle size={32} className="text-red-400" />
+      <p className="text-slate-600 dark:text-gray-400">Não foi possível carregar a OS.</p>
+      <button onClick={load} className="btn-secondary text-sm px-4 py-2">Tentar novamente</button>
+    </div>
+  );
 
   if (!os) return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-gray-950">
@@ -402,17 +413,92 @@ export default function WorkOrderDetailPage() {
           </div>
         )}
 
+        {/* Progresso da Ação (stepper) */}
+        {os.tipo === "ACAO" && os.preVisita && (() => {
+          const pv = os.preVisita;
+          const pvDone = pv.status === "CONCLUIDA";
+          const stages = [
+            { key: "visita",  label: "Visita Técnica", status: pv.status,  osNumber: pv.osNumber, href: `/painel/os/${pv.id}` },
+            { key: "acao",    label: "Ação",           status: os.status,  osNumber: os.osNumber, href: null },
+          ];
+          const activeStage = pvDone ? 1 : 0;
+
+          return (
+            <div className="card p-4">
+              <div className="flex items-center gap-0">
+                {stages.map((stage, i) => {
+                  const isActive  = i === activeStage;
+                  const isDone    = stage.status === "CONCLUIDA";
+                  const isLocked  = i > activeStage;
+                  const statusStyle = {
+                    ABERTA:       "text-amber-600 dark:text-amber-400",
+                    EM_ANDAMENTO: "text-blue-600 dark:text-blue-400",
+                    CONCLUIDA:    "text-emerald-600 dark:text-emerald-400",
+                    CANCELADA:    "text-slate-400 dark:text-gray-500",
+                  }[stage.status] ?? "";
+
+                  const dot = isDone
+                    ? "bg-emerald-500"
+                    : isActive
+                    ? "bg-brand-500 ring-4 ring-brand-200 dark:ring-brand-900/60"
+                    : "bg-slate-200 dark:bg-gray-700";
+
+                  return (
+                    <div key={stage.key} className="flex items-center flex-1">
+                      <div className={`flex flex-col items-center gap-1 ${isLocked ? "opacity-40" : ""}`}>
+                        <div className={`w-3 h-3 rounded-full shrink-0 transition-all ${dot}`} />
+                        <div className="text-center">
+                          <div className={`text-xs font-semibold ${isActive ? "text-slate-800 dark:text-gray-100" : "text-slate-500 dark:text-gray-400"}`}>
+                            {stage.href ? (
+                              <Link to={stage.href} className="hover:underline">{stage.label}</Link>
+                            ) : stage.label}
+                          </div>
+                          <div className={`text-[11px] font-medium mt-0.5 ${statusStyle}`}>
+                            {STATUS_LABEL[stage.status] ?? stage.status}
+                          </div>
+                          {stage.href && (
+                            <div className="text-[10px] text-slate-400 dark:text-gray-600 font-mono">{stage.osNumber}</div>
+                          )}
+                        </div>
+                      </div>
+                      {i < stages.length - 1 && (
+                        <div className={`flex-1 h-0.5 mx-3 rounded transition-colors ${pvDone ? "bg-emerald-400" : "bg-slate-200 dark:bg-gray-700"}`} />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {!pvDone && (
+                <div className="mt-3 flex items-center gap-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+                  <AlertTriangle size={13} className="shrink-0" />
+                  A Ação só pode ser iniciada após a conclusão da{" "}
+                  <Link to={`/painel/os/${pv.id}`} className="font-semibold underline underline-offset-2">
+                    Visita Técnica ({pv.osNumber})
+                  </Link>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* Barra de ações */}
         <div className="flex items-center gap-2 flex-wrap">
           {os.allowedNext.map((next) => {
             const cfg = TRANSITION_CONFIG[next];
             if (!cfg) return null;
             const Icon = cfg.icon;
+            // Block "Iniciar" for Ação until pre-visit is done
+            const blocked = next === "EM_ANDAMENTO" && os.tipo === "ACAO" && os.preVisita && os.preVisita.status !== "CONCLUIDA";
             return (
               <button
                 key={next}
-                onClick={() => setTrans(next)}
-                className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold transition ${cfg.cls}`}
+                onClick={() => !blocked && setTrans(next)}
+                disabled={blocked}
+                title={blocked ? "Conclua a visita técnica primeiro" : undefined}
+                className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                  blocked ? "opacity-40 cursor-not-allowed bg-slate-200 dark:bg-gray-700 text-slate-500 dark:text-gray-400" : cfg.cls
+                }`}
               >
                 <Icon size={14} /> {cfg.label}
               </button>
@@ -474,6 +560,37 @@ export default function WorkOrderDetailPage() {
                       className="field-input text-sm"
                     />
                   </div>
+
+                  {editForm.tipo === "ACAO" && (
+                    <>
+                      <div>
+                        <label className="field-label">Nome do evento</label>
+                        <input
+                          type="text"
+                          value={editForm.nomeEvento}
+                          onChange={(e) => setEditForm({ ...editForm, nomeEvento: e.target.value })}
+                          className="field-input text-sm"
+                          placeholder="Nome do evento"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="field-label">Início do evento</label>
+                          <DateTimeInput
+                            value={editForm.startDateTime}
+                            onChange={(v) => setEditForm({ ...editForm, startDateTime: v })}
+                          />
+                        </div>
+                        <div>
+                          <label className="field-label">Término do evento</label>
+                          <DateTimeInput
+                            value={editForm.endDateTime}
+                            onChange={(v) => setEditForm({ ...editForm, endDateTime: v })}
+                          />
+                        </div>
+                      </div>
+                    </>
+                  )}
 
                   <div>
                     <label className="field-label">Descrição / Problema</label>
@@ -542,6 +659,126 @@ export default function WorkOrderDetailPage() {
               )}
             </div>
 
+            {/* ── Seção Ação ─────────────────────────────────────────── */}
+            {os.tipo === "ACAO" && (
+              <>
+                {/* Informações do Evento */}
+                <div className="card p-5 space-y-4">
+                  <h2 className="text-sm font-semibold text-slate-700 dark:text-gray-300 flex items-center gap-2">
+                    <Zap size={14} className="text-purple-500" /> Informações do Evento
+                  </h2>
+                  <div className="space-y-3">
+                    <InfoRow label="Nome do evento" value={os.nomeEvento} />
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <div className="text-xs text-slate-400 dark:text-gray-500 mb-0.5 flex items-center gap-1"><CalendarRange size={11} /> Início</div>
+                        <div className="text-sm text-slate-800 dark:text-gray-100">{os.startDateTime ? fmtDate(os.startDateTime) : "—"}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-slate-400 dark:text-gray-500 mb-0.5 flex items-center gap-1"><CalendarRange size={11} /> Término</div>
+                        <div className="text-sm text-slate-800 dark:text-gray-100">{os.endDateTime ? fmtDate(os.endDateTime) : "—"}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Lista de Materiais */}
+                {os.checklist && (
+                  <div className="card p-5 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-sm font-semibold text-slate-700 dark:text-gray-300 flex items-center gap-2">
+                        <Package size={14} className="text-brand-600" />
+                        Lista de Materiais
+                        <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${CHECKLIST_STATUS_STYLE[os.checklist.status]}`}>
+                          {CHECKLIST_STATUS_LABEL[os.checklist.status]}
+                        </span>
+                      </h2>
+                      <Link
+                        to={`/painel/inventario/checklists/${os.checklist.id}`}
+                        className="flex items-center gap-1 text-xs text-brand-600 dark:text-brand-400 hover:underline"
+                      >
+                        Ver detalhes <ExternalLink size={11} />
+                      </Link>
+                    </div>
+                    <div className="text-xs text-slate-500 dark:text-gray-400 font-medium">{os.checklist.title}</div>
+                    {os.checklist.items?.length > 0 ? (
+                      <div className="rounded-xl border border-slate-200 dark:border-gray-700 overflow-hidden">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="border-b border-slate-100 dark:border-gray-700/60 bg-slate-50 dark:bg-gray-800/60">
+                              <th className="px-3 py-2 text-left text-slate-400 dark:text-gray-500 font-medium">Item</th>
+                              <th className="px-3 py-2 text-left text-slate-400 dark:text-gray-500 font-medium">Tombo</th>
+                              <th className="px-3 py-2 text-left text-slate-400 dark:text-gray-500 font-medium">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-50 dark:divide-gray-800/60">
+                            {os.checklist.items.map((ci) => (
+                              <tr key={ci.id}>
+                                <td className="px-3 py-2 text-slate-700 dark:text-gray-300">{ci.item?.name ?? "—"}</td>
+                                <td className="px-3 py-2 text-slate-500 dark:text-gray-400 font-mono">{ci.tombo ?? `#${ci.unitId}`}</td>
+                                <td className="px-3 py-2">
+                                  <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
+                                    ci.status === "EM_USO"    ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" :
+                                    ci.status === "DISPONIVEL" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300" :
+                                    "bg-slate-100 text-slate-500 dark:bg-gray-800 dark:text-gray-400"
+                                  }`}>
+                                    {ci.status === "EM_USO" ? "Em uso" : ci.status === "DISPONIVEL" ? "Disponível" : ci.status}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-slate-400 dark:text-gray-500">Nenhum material na lista.</p>
+                    )}
+                  </div>
+                )}
+
+                {/* Visita Técnica Prévia */}
+                {os.preVisita && (
+                  <div className="card p-5 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-sm font-semibold text-slate-700 dark:text-gray-300 flex items-center gap-2">
+                        <ClipboardCheck size={14} className="text-brand-600" /> Visita Técnica Prévia
+                        <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                          STATUS_STYLE[os.preVisita.status] ?? "bg-slate-100 text-slate-500"
+                        }`}>
+                          {STATUS_LABEL[os.preVisita.status] ?? os.preVisita.status}
+                        </span>
+                      </h2>
+                      <Link
+                        to={`/painel/os/${os.preVisita.id}`}
+                        className="flex items-center gap-1 text-xs text-brand-600 dark:text-brand-400 hover:underline"
+                      >
+                        <span className="font-mono">{os.preVisita.osNumber}</span>
+                        <ExternalLink size={11} />
+                      </Link>
+                    </div>
+                    <div className="space-y-2 text-sm">
+                      <InfoRow label="Local da visita" value={os.preVisita.local} />
+                      {os.preVisita.startDateTime && (
+                        <InfoRow label="Data/hora" value={fmtDate(os.preVisita.startDateTime)} />
+                      )}
+                      {os.preVisita.tecnicos?.length > 0 && (
+                        <div>
+                          <div className="text-xs text-slate-400 dark:text-gray-500 mb-1">Técnicos da visita</div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {os.preVisita.tecnicos.map((t) => (
+                              <span key={t.id} className="text-xs bg-slate-100 dark:bg-gray-800 text-slate-600 dark:text-gray-400 rounded-full px-2 py-0.5">
+                                {t.name}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
             {/* Chamados vinculados */}
             <div className="card p-5 space-y-3">
               <div className="flex items-center justify-between">
@@ -600,11 +837,15 @@ export default function WorkOrderDetailPage() {
             <div className="card p-4 space-y-2">
               <h2 className="text-xs font-semibold text-slate-500 dark:text-gray-400 uppercase tracking-wide">Datas</h2>
               {[
-                { label: "Criada",       val: os.createdAt   },
-                { label: "Iniciada",     val: os.startedAt   },
-                { label: "Concluída",    val: os.concludedAt },
-                { label: "Cancelada",    val: os.cancelledAt },
-                { label: "Prazo limite", val: os.prazo       },
+                { label: "Criada",         val: os.createdAt    },
+                { label: "Iniciada",       val: os.startedAt    },
+                { label: "Concluída",      val: os.concludedAt  },
+                { label: "Cancelada",      val: os.cancelledAt  },
+                { label: "Prazo limite",   val: os.prazo        },
+                ...(os.tipo === "ACAO" ? [
+                  { label: "Início do evento", val: os.startDateTime },
+                  { label: "Fim do evento",    val: os.endDateTime   },
+                ] : []),
               ].map(({ label, val }) => val ? (
                 <div key={label} className="flex justify-between text-xs">
                   <span className="text-slate-400 dark:text-gray-500">{label}</span>

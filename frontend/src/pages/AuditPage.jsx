@@ -5,13 +5,25 @@ import { Spinner } from "../components/ui";
 import { Shield, ChevronDown, RefreshCw, Search, X } from "lucide-react";
 
 const ACTION_LABELS = {
-  UPDATE_USER:   "Usuário atualizado",
-  DELETE_USER:   "Usuário excluído",
-  CREATE_TICKET: "Chamado criado",
-  DELETE_TICKET: "Chamado excluído",
-  TRANSITION:    "Transição de status",
-  ASSIGN:        "Atribuição de técnico",
-  REOPEN:        "Chamado reaberto",
+  // Usuários
+  UPDATE_USER:            "Usuário atualizado",
+  DELETE_USER:            "Usuário excluído",
+  // Chamados
+  CREATE_TICKET:          "Chamado criado",
+  DELETE_TICKET:          "Chamado excluído",
+  TRANSITION:             "Transição de status",
+  ASSIGN:                 "Atribuição de técnico",
+  REOPEN:                 "Chamado reaberto",
+  // Inventário
+  INVENTORY_CREATE:       "Item criado",
+  INVENTORY_UPDATE:       "Item atualizado",
+  INVENTORY_DELETE:       "Item excluído",
+  INVENTORY_UNIT_CREATE:  "Unidade criada",
+  INVENTORY_UNIT_DELETE:  "Unidade excluída",
+  // Checklist
+  CHECKLIST_CREATE:       "Checklist criado",
+  CHECKLIST_APPROVE:      "Checklist aprovado",
+  CHECKLIST_RETURN:       "Checklist devolvido",
 };
 
 function label(action) {
@@ -19,9 +31,24 @@ function label(action) {
 }
 
 function actionColor(action) {
-  if (action.startsWith("DELETE")) return "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 ring-red-200 dark:ring-red-700";
-  if (action.startsWith("UPDATE") || action === "ASSIGN") return "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 ring-blue-200 dark:ring-blue-700";
+  if (action.includes("DELETE")) return "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 ring-red-200 dark:ring-red-700";
+  if (action.includes("CREATE") || action === "CHECKLIST_APPROVE") return "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 ring-green-200 dark:ring-green-700";
+  if (action.includes("UPDATE") || action === "ASSIGN" || action === "TRANSITION") return "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 ring-blue-200 dark:ring-blue-700";
+  if (action === "CHECKLIST_RETURN") return "bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400 ring-yellow-200 dark:ring-yellow-700";
   return "bg-slate-50 dark:bg-gray-800 text-slate-600 dark:text-gray-300 ring-slate-200 dark:ring-gray-600";
+}
+
+function fmtDetails(raw) {
+  if (!raw) return "—";
+  try {
+    const obj = JSON.parse(raw);
+    return Object.entries(obj)
+      .filter(([, v]) => v !== null && v !== undefined && v !== "")
+      .map(([k, v]) => `${k}: ${v}`)
+      .join(" · ");
+  } catch {
+    return raw;
+  }
 }
 
 function fmt(dt) {
@@ -156,7 +183,7 @@ export default function AuditPage() {
                         {log.targetType}{log.targetId ? ` #${log.targetId}` : ""}
                       </td>
                       <td className="px-4 py-3 text-xs text-slate-500 dark:text-gray-400 max-w-xs truncate hidden lg:table-cell" title={log.details || ""}>
-                        {log.details || "—"}
+                        {fmtDetails(log.details)}
                       </td>
                     </tr>
                   ))}

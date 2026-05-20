@@ -5,35 +5,15 @@ import { useSocket } from "../context/SocketContext";
 import { Spinner } from "../components/ui";
 import DateInput from "../components/DateInput";
 import AppHeader from "../components/AppHeader";
+import AcaoFormModal from "../components/AcaoFormModal";
+import { TIPO_LABELS, TIPO_OPTIONS, OS_STATUS_LABEL, OS_STATUS_STYLE } from "../lib/osConstants";
 import {
   ClipboardList, Plus, ChevronRight, Calendar, MapPin,
-  Users, Filter, RefreshCw, Clock,
+  Users, Filter, RefreshCw, Clock, Zap,
 } from "lucide-react";
 
-const TIPO_LABELS = {
-  VISITA_TECNICA:           "Visita Técnica",
-  TROCA_EQUIPAMENTO:        "Troca de Equipamento",
-  ENTREGA:                  "Entrega",
-  MANUTENCAO_REDE:          "Manutenção de Rede",
-  MANUTENCAO_CAMERA:        "Manutenção de Câmera",
-  RECOLHIMENTO_EQUIPAMENTO: "Recolhimento de Equipamento",
-  ACAO:                     "Ação",
-  OUTRO:                    "Outro",
-};
-
-const STATUS_STYLE = {
-  ABERTA:       "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
-  EM_ANDAMENTO: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
-  CONCLUIDA:    "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
-  CANCELADA:    "bg-slate-100 text-slate-500 dark:bg-gray-800 dark:text-gray-400",
-};
-
-const STATUS_LABEL = {
-  ABERTA:       "Aberta",
-  EM_ANDAMENTO: "Em Andamento",
-  CONCLUIDA:    "Concluída",
-  CANCELADA:    "Cancelada",
-};
+const STATUS_STYLE = OS_STATUS_STYLE;
+const STATUS_LABEL = OS_STATUS_LABEL;
 
 const STATUS_TABS = [
   { key: "",             label: "Todas"       },
@@ -42,17 +22,6 @@ const STATUS_TABS = [
   { key: "CONCLUIDA",    label: "Concluídas"  },
 ];
 
-const TIPO_OPTIONS = [
-  { value: "",                         label: "Todos os tipos"            },
-  { value: "VISITA_TECNICA",           label: "Visita Técnica"            },
-  { value: "TROCA_EQUIPAMENTO",        label: "Troca de Equipamento"      },
-  { value: "ENTREGA",                  label: "Entrega"                   },
-  { value: "MANUTENCAO_REDE",          label: "Manutenção de Rede"        },
-  { value: "MANUTENCAO_CAMERA",        label: "Manutenção de Câmera"      },
-  { value: "RECOLHIMENTO_EQUIPAMENTO", label: "Recolhimento de Equipamento"},
-  { value: "ACAO",                     label: "Ação"                      },
-  { value: "OUTRO",                    label: "Outro"                     },
-];
 
 function fmtDate(d) {
   if (!d) return null;
@@ -204,6 +173,7 @@ export default function WorkOrdersPage() {
   const [unitFilter, setUnit]     = useState("");
   const [dateFilter, setDateFilter] = useState("");
   const [showCreate, setShowCreate] = useState(false);
+  const [showCreateAcao, setShowCreateAcao] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -272,6 +242,12 @@ export default function WorkOrdersPage() {
               className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-gray-400 hover:text-brand-600 dark:hover:text-brand-400 transition"
             >
               <RefreshCw size={13} /> Atualizar
+            </button>
+            <button
+              onClick={() => setShowCreateAcao(true)}
+              className="flex items-center gap-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white px-3.5 py-2 text-sm font-semibold transition"
+            >
+              <Zap size={15} /> Nova Ação
             </button>
             <button
               onClick={() => setShowCreate(true)}
@@ -397,10 +373,20 @@ export default function WorkOrdersPage() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-xs font-mono text-slate-400 dark:text-gray-500">{os.osNumber}</span>
                     <OsStatusBadge status={os.status} />
-                    <span className="text-xs text-slate-400 dark:text-gray-500 bg-slate-100 dark:bg-gray-800 rounded px-1.5 py-0.5">
+                    <span className={`text-xs rounded px-1.5 py-0.5 ${
+                      os.tipo === "ACAO"
+                        ? "bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300"
+                        : "bg-slate-100 dark:bg-gray-800 text-slate-400 dark:text-gray-500"
+                    }`}>
                       {TIPO_LABELS[os.tipo]}
                     </span>
                   </div>
+                  {os.tipo === "ACAO" && os.nomeEvento && (
+                    <div className="text-sm font-semibold text-slate-800 dark:text-gray-100 mt-0.5 truncate flex items-center gap-1.5">
+                      <Zap size={11} className="text-purple-500 shrink-0" />
+                      {os.nomeEvento}
+                    </div>
+                  )}
                   <div className="text-sm font-medium text-slate-800 dark:text-gray-100 mt-0.5 truncate flex items-center gap-1.5">
                     <MapPin size={11} className="text-slate-400 shrink-0" />
                     {os.local}
@@ -451,6 +437,13 @@ export default function WorkOrdersPage() {
         <CreateOsModal
           units={units}
           onClose={() => setShowCreate(false)}
+          onCreate={handleCreated}
+        />
+      )}
+
+      {showCreateAcao && (
+        <AcaoFormModal
+          onClose={() => setShowCreateAcao(false)}
           onCreate={handleCreated}
         />
       )}

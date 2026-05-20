@@ -320,30 +320,45 @@ model DailyCounter {
 }
 
 model WorkOrder {
-  id          Int               @id @default(autoincrement())
-  osNumber    String            @unique
-  tipo        OsTipo
-  status      OsStatus          @default(ABERTA)
-  local       String
-  problema    String?           @db.Text
-  materiais   String?           @db.Text
-  prazo       DateTime?
-  relatorio   String?           @db.Text
-  unitId      Int?
-  unit        Unit?             @relation(fields: [unitId], references: [id])
-  createdById Int?
-  createdBy   User?             @relation("OsCreator", fields: [createdById], references: [id])
-  tecnicos    OsTecnico[]
-  tickets     TicketWorkOrder[]
-  history     OsHistory[]
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  startedAt   DateTime?
-  concludedAt DateTime?
-  cancelledAt DateTime?
+  id            Int                @id @default(autoincrement())
+  osNumber      String             @unique
+  tipo          OsTipo
+  status        OsStatus           @default(ABERTA)
+  local         String
+  problema      String?            @db.Text
+  materiais     String?            @db.Text
+  prazo         DateTime?
+  relatorio     String?            @db.Text
+  unitId        Int?
+  unit          Unit?              @relation(fields: [unitId], references: [id])
+  createdById   Int?
+  createdBy     User?              @relation("OsCreator", fields: [createdById], references: [id])
+  tecnicos      OsTecnico[]
+  tickets       TicketWorkOrder[]
+  history       OsHistory[]
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  startedAt     DateTime?
+  concludedAt   DateTime?
+  cancelledAt   DateTime?
+
+  // Ação-specific fields
+  nomeEvento    String?            @db.Text
+  startDateTime DateTime?
+  endDateTime   DateTime?
+
+  // Link to inventory checklist (1:1)
+  checklistId   Int?               @unique
+  checklist     InventoryChecklist? @relation("OsChecklist", fields: [checklistId], references: [id])
+
+  // Link to pre-visit work order (self-reference)
+  preVisitaId   Int?
+  preVisita     WorkOrder?         @relation("OsPreVisita", fields: [preVisitaId], references: [id])
+  linkedAcoes   WorkOrder[]        @relation("OsPreVisita")
 
   @@index([status])
   @@index([unitId])
+  @@index([preVisitaId])
 }
 
 model OsTecnico {
@@ -445,6 +460,7 @@ model InventoryChecklist {
   createdById  Int
   createdBy    User                     @relation("ChecklistCreator", fields: [createdById], references: [id])
   items        InventoryChecklistItem[]
+  workOrder    WorkOrder?               @relation("OsChecklist")
 
   @@index([status])
   @@index([nucleo])
