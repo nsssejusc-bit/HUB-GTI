@@ -345,7 +345,7 @@ export default function UsersPage() {
             <Spinner className="h-8 w-8" />
           </div>
         ) : (
-          <div className={`flex gap-4 items-start transition-all ${selectedUser ? "" : ""}`}>
+          <div className={`flex flex-col lg:flex-row gap-4 items-start transition-all ${selectedUser ? "" : ""}`}>
             {/* ── Lista compacta ──────────────────────────────────── */}
             <div className={`flex-1 min-w-0 card divide-y divide-slate-100 dark:divide-gray-700/60 transition-all ${selectedUser ? "hidden md:block" : ""}`}>
               {displayList.length === 0 ? (

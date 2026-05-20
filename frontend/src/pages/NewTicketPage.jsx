@@ -726,7 +726,7 @@ export default function NewTicketPage() {
               {/* Prioridade */}
               <div>
                 <label className="field-label mb-2">Prioridade</label>
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {[
                     { value: "LOW",    label: "Baixa",   cls: "border-slate-300 dark:border-gray-600 text-slate-600 dark:text-gray-400 data-[sel=true]:border-slate-500 data-[sel=true]:bg-slate-100 dark:data-[sel=true]:bg-gray-700 data-[sel=true]:text-slate-800 dark:data-[sel=true]:text-gray-100" },
                     { value: "MEDIUM", label: "Média",   cls: "border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 data-[sel=true]:border-blue-500 data-[sel=true]:bg-blue-50 dark:data-[sel=true]:bg-blue-900/20 data-[sel=true]:text-blue-700 dark:data-[sel=true]:text-blue-300" },

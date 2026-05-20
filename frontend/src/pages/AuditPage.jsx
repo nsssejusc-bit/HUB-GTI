@@ -155,6 +155,7 @@ export default function AuditPage() {
         ) : (
           <>
             <div className="card overflow-hidden">
+              <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-slate-100 dark:border-gray-700/60 text-left">
@@ -189,6 +190,7 @@ export default function AuditPage() {
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
 
             {nextCursor && (

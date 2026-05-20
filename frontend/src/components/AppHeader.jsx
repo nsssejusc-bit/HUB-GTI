@@ -174,8 +174,11 @@ export default function AppHeader() {
                 <ChevronDown size={11} className={`transition-transform duration-200 ${configOpen ? "rotate-180" : ""}`} />
               </button>
 
-              {configOpen && (
-                <div className="absolute left-0 top-full mt-1.5 w-52 rounded-xl border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg overflow-hidden z-50">
+              <div className={`absolute left-0 top-full mt-1.5 w-52 rounded-xl border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg overflow-hidden z-50 transition-all duration-150 ease-out origin-top-left ${
+                configOpen
+                  ? "opacity-100 scale-100 translate-y-0 pointer-events-auto"
+                  : "opacity-0 scale-95 -translate-y-1 pointer-events-none"
+              }`}>
                   <Link
                     to="/painel/setores"
                     onClick={() => setConfigOpen(false)}
@@ -242,8 +245,7 @@ export default function AppHeader() {
                     <Shield size={15} />
                     Auditoria
                   </Link>
-                </div>
-              )}
+              </div>
             </div>
           )}
         </nav>
@@ -293,30 +295,32 @@ export default function AppHeader() {
               <ChevronDown size={12} className={`text-slate-400 dark:text-gray-500 transition-transform duration-200 ${userOpen ? "rotate-180" : ""}`} />
             </button>
 
-            {userOpen && (
-              <div className="absolute right-0 top-full mt-1.5 w-44 rounded-xl border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg overflow-hidden z-50">
-                <Link
-                  to="/perfil"
-                  onClick={() => setUserOpen(false)}
-                  className={`flex items-center gap-2.5 px-3.5 py-2.5 text-sm transition ${
-                    isActive("/perfil")
-                      ? "bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-400 font-medium"
-                      : "text-slate-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-800"
-                  }`}
-                >
-                  <UserCircle size={15} />
-                  Meu perfil
-                </Link>
-                <div className="h-px bg-slate-100 dark:bg-gray-700/60" />
-                <button
-                  onClick={async () => { setUserOpen(false); await logout(); nav("/login"); }}
-                  className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition"
-                >
-                  <LogOut size={15} />
-                  Sair
-                </button>
-              </div>
-            )}
+            <div className={`absolute right-0 top-full mt-1.5 w-44 rounded-xl border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg overflow-hidden z-50 transition-all duration-150 ease-out origin-top-right ${
+              userOpen
+                ? "opacity-100 scale-100 translate-y-0 pointer-events-auto"
+                : "opacity-0 scale-95 -translate-y-1 pointer-events-none"
+            }`}>
+              <Link
+                to="/perfil"
+                onClick={() => setUserOpen(false)}
+                className={`flex items-center gap-2.5 px-3.5 py-2.5 text-sm transition ${
+                  isActive("/perfil")
+                    ? "bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-400 font-medium"
+                    : "text-slate-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-800"
+                }`}
+              >
+                <UserCircle size={15} />
+                Meu perfil
+              </Link>
+              <div className="h-px bg-slate-100 dark:bg-gray-700/60" />
+              <button
+                onClick={async () => { setUserOpen(false); await logout(); nav("/login"); }}
+                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition"
+              >
+                <LogOut size={15} />
+                Sair
+              </button>
+            </div>
           </div>
 
           {/* Logout mobile (só icone) */}

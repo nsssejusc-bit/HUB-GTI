@@ -250,6 +250,7 @@ export default function ChecklistDetailPage() {
               Itens do checklist
             </h2>
           </div>
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-100 dark:border-gray-700/60">
@@ -289,6 +290,7 @@ export default function ChecklistDetailPage() {
               })}
             </tbody>
           </table>
+          </div>
         </div>
       </main>
 

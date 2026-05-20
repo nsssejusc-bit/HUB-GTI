@@ -82,7 +82,7 @@ function CreateItemModal({ onClose, onCreate, categories }) {
             <input className={inputCls} value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="Ex: Cabo HDMI, Mouse Logitech..." />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className={labelCls}>Categoria <span className="text-slate-400">(opcional)</span></label>
               <input
@@ -644,6 +644,7 @@ export default function InventoryPage() {
                   </button>
                 </div>
               ) : (
+                <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-slate-100 dark:border-gray-700/60">
@@ -697,6 +698,7 @@ export default function InventoryPage() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               )}
             </div>
           </>
@@ -763,6 +765,7 @@ export default function InventoryPage() {
                   </button>
                 </div>
               ) : (
+                <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-slate-100 dark:border-gray-700/60">
@@ -823,6 +826,7 @@ export default function InventoryPage() {
                     })}
                   </tbody>
                 </table>
+                </div>
               )}
             </div>
           </>

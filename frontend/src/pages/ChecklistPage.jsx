@@ -381,6 +381,7 @@ export default function ChecklistPage() {
               <button onClick={() => setShowCreate(true)} className="text-brand-600 text-sm font-medium hover:underline">Criar primeiro checklist</button>
             </div>
           ) : (
+            <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100 dark:border-gray-700/60">
@@ -430,6 +431,7 @@ export default function ChecklistPage() {
                 })}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       </main>

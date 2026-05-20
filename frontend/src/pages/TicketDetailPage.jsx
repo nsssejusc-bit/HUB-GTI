@@ -350,7 +350,7 @@ export default function TicketDetailPage() {
           {/* Dados */}
           <div className="card p-5">
             <h3 className="text-sm font-semibold text-slate-900 dark:text-gray-100 mb-4">Dados do chamado</h3>
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
+            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
               <InfoItem label="Solicitante" value={ticket.requesterName} />
               <InfoItem label="CPF" value={ticket.requesterCpf} />
               <InfoItem label="Departamento" value={ticket.department} />

@@ -192,7 +192,7 @@ function Step2({ form, setForm, onChecklistTitleEdit }) {
 
       {form.hasChecklist && (
         <div className="space-y-3 border-t border-slate-100 dark:border-gray-700/60 pt-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="field-label">Título da lista *</label>
               <input

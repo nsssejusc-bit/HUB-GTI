@@ -84,7 +84,7 @@ function CreateOsModal({ onClose, onCreate, units }) {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="field-label">Tipo *</label>
               <select value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })} className="field-input">
@@ -122,7 +122,7 @@ function CreateOsModal({ onClose, onCreate, units }) {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="field-label">Materiais / equipamentos</label>
               <input

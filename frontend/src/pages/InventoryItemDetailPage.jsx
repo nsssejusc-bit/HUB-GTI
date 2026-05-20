@@ -156,7 +156,7 @@ function EditModal({ item, onClose, onSaved, categories }) {
             <input className={inputCls} value={form.name} onChange={(e) => set("name", e.target.value)} />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className={labelCls}>Categoria</label>
               <input
@@ -178,7 +178,7 @@ function EditModal({ item, onClose, onSaved, categories }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className={labelCls}>Núcleo</label>
               <select className={inputCls} value={form.nucleo} onChange={(e) => set("nucleo", e.target.value)}>
@@ -590,6 +590,7 @@ export default function InventoryItemDetailPage() {
               </button>
             </div>
           ) : (
+            <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100 dark:border-gray-700/60">
@@ -611,6 +612,7 @@ export default function InventoryItemDetailPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       </main>

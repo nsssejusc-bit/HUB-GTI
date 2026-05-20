@@ -535,7 +535,7 @@ export default function WorkOrderDetailPage() {
 
               {editing ? (
                 <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="field-label">Tipo</label>
                       <select value={editForm.tipo} onChange={(e) => setEditForm({ ...editForm, tipo: e.target.value })} className="field-input text-sm">
@@ -573,7 +573,7 @@ export default function WorkOrderDetailPage() {
                           placeholder="Nome do evento"
                         />
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                           <label className="field-label">Início do evento</label>
                           <DateTimeInput
@@ -601,7 +601,7 @@ export default function WorkOrderDetailPage() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="field-label">Materiais / Equipamentos</label>
                       <input
@@ -638,7 +638,7 @@ export default function WorkOrderDetailPage() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <InfoRow label="Tipo" value={TIPO_LABELS[os.tipo]} />
                     <InfoRow label="Núcleo responsável" value={os.unit?.name} />
                   </div>
@@ -669,7 +669,7 @@ export default function WorkOrderDetailPage() {
                   </h2>
                   <div className="space-y-3">
                     <InfoRow label="Nome do evento" value={os.nomeEvento} />
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <div className="text-xs text-slate-400 dark:text-gray-500 mb-0.5 flex items-center gap-1"><CalendarRange size={11} /> Início</div>
                         <div className="text-sm text-slate-800 dark:text-gray-100">{os.startDateTime ? fmtDate(os.startDateTime) : "—"}</div>
@@ -703,6 +703,7 @@ export default function WorkOrderDetailPage() {
                     <div className="text-xs text-slate-500 dark:text-gray-400 font-medium">{os.checklist.title}</div>
                     {os.checklist.items?.length > 0 ? (
                       <div className="rounded-xl border border-slate-200 dark:border-gray-700 overflow-hidden">
+                        <div className="overflow-x-auto">
                         <table className="w-full text-xs">
                           <thead>
                             <tr className="border-b border-slate-100 dark:border-gray-700/60 bg-slate-50 dark:bg-gray-800/60">
@@ -729,6 +730,7 @@ export default function WorkOrderDetailPage() {
                             ))}
                           </tbody>
                         </table>
+                        </div>
                       </div>
                     ) : (
                       <p className="text-sm text-slate-400 dark:text-gray-500">Nenhum material na lista.</p>

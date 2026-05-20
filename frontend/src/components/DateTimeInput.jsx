@@ -9,15 +9,24 @@ import DateInput from "./DateInput";
  */
 export default function DateTimeInput({ value, onChange, className = "" }) {
   // ── parse value ────────────────────────────────────────────────────────────
-  const dateStr = value ? value.slice(0, 10) : "";          // YYYY-MM-DD
-  const rawTime = value && value.length >= 16 ? value.slice(11, 16) : ""; // HH:MM
+  const dateStr = value ? value.slice(0, 10) : "";
+  const rawTime = value && value.length >= 16 ? value.slice(11, 16) : "";
   const [hh, mm] = rawTime ? rawTime.split(":") : ["", ""];
 
   // ── time popover state ─────────────────────────────────────────────────────
-  const [open, setOpen]     = useState(false);
-  const [timeText, setTimeText] = useState(rawTime);        // HH:MM text input
+  const [open, setOpen]         = useState(false);
+  const [timeText, setTimeText] = useState(rawTime);
   const popRef   = useRef(null);
   const btnRef   = useRef(null);
+  const inputRef = useRef(null);
+
+  // focus text input when popover opens
+  useEffect(() => {
+    if (open) {
+      const t = setTimeout(() => inputRef.current?.focus(), 10);
+      return () => clearTimeout(t);
+    }
+  }, [open]);
 
   // sync timeText when value changes externally
   useEffect(() => {
@@ -60,7 +69,6 @@ export default function DateTimeInput({ value, onChange, className = "" }) {
     emit(dateStr || "", t);
   }
 
-  // typed HH:MM
   function handleTimeText(e) {
     const raw = e.target.value.replace(/[^\d:]/g, "").slice(0, 5);
     let masked = raw.replace(/\D/g, "").slice(0, 4);
@@ -98,87 +106,90 @@ export default function DateTimeInput({ value, onChange, className = "" }) {
           </span>
         </button>
 
-        {open && (
-          <div
-            ref={popRef}
-            className="absolute z-50 mt-1 right-0 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-2xl shadow-xl p-3 w-64"
-          >
-            {/* Text input for fast typing */}
-            <div className="mb-3">
-              <label className="text-[11px] text-slate-400 dark:text-gray-500 uppercase tracking-wide mb-1 block">
-                Digitar horário
-              </label>
-              <input
-                type="text"
-                value={timeText}
-                onChange={handleTimeText}
-                placeholder="HH:MM"
-                maxLength={5}
-                inputMode="numeric"
-                className="field-input text-center font-mono text-sm w-full"
-                autoFocus
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              {/* Hours */}
-              <div>
-                <div className="text-[11px] text-slate-400 dark:text-gray-500 uppercase tracking-wide mb-1">Hora</div>
-                <div className="grid grid-cols-4 gap-0.5 max-h-36 overflow-y-auto">
-                  {hours.map((h) => {
-                    const active = parseInt(hh) === h;
-                    return (
-                      <button
-                        key={h}
-                        type="button"
-                        onClick={() => handleHour(h)}
-                        className={`rounded-lg py-1 text-xs font-mono font-medium transition ${
-                          active
-                            ? "bg-brand-600 text-white"
-                            : "hover:bg-slate-100 dark:hover:bg-gray-800 text-slate-700 dark:text-gray-300"
-                        }`}
-                      >
-                        {String(h).padStart(2, "0")}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Minutes */}
-              <div>
-                <div className="text-[11px] text-slate-400 dark:text-gray-500 uppercase tracking-wide mb-1">Minuto</div>
-                <div className="grid grid-cols-2 gap-0.5">
-                  {minutes.map((m) => {
-                    const active = parseInt(mm) === m;
-                    return (
-                      <button
-                        key={m}
-                        type="button"
-                        onClick={() => handleMinute(m)}
-                        className={`rounded-lg py-1.5 text-xs font-mono font-medium transition ${
-                          active
-                            ? "bg-brand-600 text-white"
-                            : "hover:bg-slate-100 dark:hover:bg-gray-800 text-slate-700 dark:text-gray-300"
-                        }`}
-                      >
-                        :{String(m).padStart(2, "0")}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="mt-3 w-full rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold py-1.5 transition"
-            >
-              Confirmar
-            </button>
+        {/* Popover — always rendered, animated with opacity/scale */}
+        <div
+          ref={popRef}
+          className={`absolute z-50 mt-1 right-0 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-2xl shadow-xl p-3 w-64 transition-all duration-150 ease-out origin-top-right ${
+            open
+              ? "opacity-100 scale-100 translate-y-0 pointer-events-auto"
+              : "opacity-0 scale-95 -translate-y-1 pointer-events-none"
+          }`}
+        >
+          {/* Text input for fast typing */}
+          <div className="mb-3">
+            <label className="text-[11px] text-slate-400 dark:text-gray-500 uppercase tracking-wide mb-1 block">
+              Digitar horário
+            </label>
+            <input
+              ref={inputRef}
+              type="text"
+              value={timeText}
+              onChange={handleTimeText}
+              placeholder="HH:MM"
+              maxLength={5}
+              inputMode="numeric"
+              className="field-input text-center font-mono text-sm w-full"
+            />
           </div>
-        )}
+
+          <div className="grid grid-cols-2 gap-3">
+            {/* Hours */}
+            <div>
+              <div className="text-[11px] text-slate-400 dark:text-gray-500 uppercase tracking-wide mb-1">Hora</div>
+              <div className="grid grid-cols-4 gap-0.5 max-h-36 overflow-y-auto">
+                {hours.map((h) => {
+                  const active = parseInt(hh) === h;
+                  return (
+                    <button
+                      key={h}
+                      type="button"
+                      onClick={() => handleHour(h)}
+                      className={`rounded-lg py-1 text-xs font-mono font-medium transition ${
+                        active
+                          ? "bg-brand-600 text-white"
+                          : "hover:bg-slate-100 dark:hover:bg-gray-800 text-slate-700 dark:text-gray-300"
+                      }`}
+                    >
+                      {String(h).padStart(2, "0")}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Minutes */}
+            <div>
+              <div className="text-[11px] text-slate-400 dark:text-gray-500 uppercase tracking-wide mb-1">Minuto</div>
+              <div className="grid grid-cols-2 gap-0.5">
+                {minutes.map((m) => {
+                  const active = parseInt(mm) === m;
+                  return (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => handleMinute(m)}
+                      className={`rounded-lg py-1.5 text-xs font-mono font-medium transition ${
+                        active
+                          ? "bg-brand-600 text-white"
+                          : "hover:bg-slate-100 dark:hover:bg-gray-800 text-slate-700 dark:text-gray-300"
+                      }`}
+                    >
+                      :{String(m).padStart(2, "0")}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            className="mt-3 w-full rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold py-1.5 transition"
+          >
+            Confirmar
+          </button>
+        </div>
       </div>
     </div>
   );
