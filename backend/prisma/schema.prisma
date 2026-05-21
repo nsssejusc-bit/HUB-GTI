@@ -141,6 +141,7 @@ model User {
   nucleoResponsavel  Nucleo?
   checklistsCreated  InventoryChecklist[] @relation("ChecklistCreator")
   checklistsApproved InventoryChecklist[] @relation("ChecklistApprover")
+  ticketMessages     TicketMessage[]      @relation("MessageAuthor")
 
   @@index([departmentId])
   @@index([role, active])
@@ -221,6 +222,7 @@ model Ticket {
   requiresCauseSolution Boolean      @default(true)
   cause               String?      @db.Text
   solution            String?      @db.Text
+  completionNote      String?      @db.Text
   slaDeadline         DateTime?
   openedAt            DateTime     @default(now())
   viewedAt            DateTime?
@@ -229,6 +231,7 @@ model Ticket {
   completedAt         DateTime?
   history             TicketHistory[]
   comments            TicketComment[]
+  messages            TicketMessage[]
   feedback            Feedback?
   workOrders          TicketWorkOrder[]
   approvals           TicketApproval[]
@@ -245,6 +248,19 @@ model Ticket {
   @@index([status, assignedTechId])
   @@index([approvalStatus, status])
   @@index([status, unitId])
+}
+
+model TicketMessage {
+  id        Int      @id @default(autoincrement())
+  ticketId  Int
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId  Int?
+  author    User?    @relation("MessageAuthor", fields: [authorId], references: [id])
+  fromUser  Boolean  @default(false)
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+
+  @@index([ticketId])
 }
 
 model TicketApproval {

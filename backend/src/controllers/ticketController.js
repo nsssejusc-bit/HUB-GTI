@@ -91,11 +91,9 @@ export async function createTicket(req, res) {
   }
 
   // ── Monta registros de aprovação ────────────────────────────────────────
+  // Realocação de setor: apenas o chefe do setor de DESTINO aprova
   const approvalRecords = requiresApproval
-    ? [
-        { chefDeptId: deptId },
-        ...(targetDeptId ? [{ chefDeptId: targetDeptId }] : []),
-      ]
+    ? [{ chefDeptId: dualApproval && targetDeptId ? targetDeptId : deptId }]
     : [];
 
   // SLA: subcategoria tem precedência; REMOTE sempre usa categoria; fallback para categoria
@@ -152,11 +150,16 @@ export async function getTicketPublic(req, res) {
   const ticket = await prisma.ticket.findUnique({
     where: { ticketNumber },
     include: {
-      category:   true,
-      subcategory: true,
-      unit:        true,
+      category:     true,
+      subcategory:  true,
+      unit:         true,
       assignedTech: { select: { name: true } },
-      feedback:    true,
+      feedback:     true,
+      approvals: {
+        where:  { status: "REJECTED" },
+        select: { note: true, decidedAt: true },
+        take:   1,
+      },
     },
   });
   if (!ticket) return res.status(404).json({ error: "Chamado não encontrado" });
@@ -165,6 +168,8 @@ export async function getTicketPublic(req, res) {
     ticketNumber:        ticket.ticketNumber,
     status:              ticket.status,
     approvalStatus:      ticket.approvalStatus,
+    approvalNote:        ticket.approvals?.[0]?.note || null,
+    approvalDecidedAt:   ticket.approvals?.[0]?.decidedAt || null,
     requesterName:       ticket.requesterName,
     requesterCpf:        maskCpf(ticket.requesterCpf),
     department:          ticket.department,
@@ -173,6 +178,8 @@ export async function getTicketPublic(req, res) {
     freeTextDescription: ticket.freeTextDescription,
     anyDeskCode:         ticket.anyDeskCode || null,
     isRemote:            !!(ticket.anyDeskCode),
+    presential:          ticket.presential,
+    completionNote:      ticket.completionNote || null,
     unit:                ticket.unit?.name || null,
     technician:          ticket.assignedTech?.name || null,
     openedAt:            ticket.openedAt,
@@ -407,7 +414,7 @@ export async function approveTicket(req, res) {
 // ── TRANSITION ────────────────────────────────────────────────────────────────
 export async function transitionTicket(req, res) {
   const id = Number(req.params.id);
-  const { toStatus, unitId, assignedTechId, internalNote, cause, solution } = req.body || {};
+  const { toStatus, unitId, assignedTechId, internalNote, cause, solution, completionNote } = req.body || {};
 
   const ticket = await prisma.ticket.findUnique({ where: { id } });
   if (!ticket) return res.status(404).json({ error: "Chamado não encontrado" });
@@ -453,9 +460,10 @@ export async function transitionTicket(req, res) {
     if (ticket.requiresCauseSolution && (!cause || !solution)) {
       return res.status(400).json({ error: "Causa e solução são obrigatórias para concluir" });
     }
-    updateData.completedAt = now;
-    updateData.cause       = cause   || null;
-    updateData.solution    = solution || null;
+    updateData.completedAt    = now;
+    updateData.cause          = cause          || null;
+    updateData.solution       = solution       || null;
+    updateData.completionNote = completionNote || null;
   }
 
   const updated = await prisma.ticket.update({
@@ -686,6 +694,7 @@ function formatTicket(t) {
     status:        t.status,
     unit:          t.unit        ? { id: t.unit.id,        name: t.unit.name }        : null,
     technician:    t.assignedTech || null,
+    completionNote: t.completionNote || null,
     slaDeadline:   t.slaDeadline,
     openedAt:      t.openedAt,
     viewedAt:      t.viewedAt,
@@ -693,4 +702,83 @@ function formatTicket(t) {
     inServiceAt:   t.inServiceAt,
     completedAt:   t.completedAt,
   };
+}
+
+// ── MENSAGENS AO SOLICITANTE ──────────────────────────────────────────────────
+
+// GET /tickets/:id/messages — staff
+export async function listMessages(req, res) {
+  const id = Number(req.params.id);
+  const msgs = await prisma.ticketMessage.findMany({
+    where: { ticketId: id },
+    include: { author: { select: { name: true, role: true } } },
+    orderBy: { createdAt: "asc" },
+  });
+  res.json(msgs);
+}
+
+// POST /tickets/:id/messages — staff envia mensagem ao solicitante
+export async function sendMessage(req, res) {
+  const id = Number(req.params.id);
+  const { content } = req.body || {};
+  if (!content?.trim()) return res.status(400).json({ error: "Mensagem vazia" });
+
+  const ticket = await prisma.ticket.findUnique({ where: { id }, select: { id: true } });
+  if (!ticket) return res.status(404).json({ error: "Chamado não encontrado" });
+
+  const msg = await prisma.ticketMessage.create({
+    data: { ticketId: id, authorId: req.user.id, fromUser: false, content: content.trim() },
+    include: { author: { select: { name: true, role: true } } },
+  });
+
+  req.app.get("io")?.emit("ticket:message", { ticketId: id });
+  res.status(201).json(msg);
+}
+
+// GET /tickets/track/:ticketNumber/messages — público
+export async function listMessagesPublic(req, res) {
+  const { ticketNumber } = req.params;
+  const ticket = await prisma.ticket.findUnique({
+    where: { ticketNumber },
+    select: { id: true },
+  });
+  if (!ticket) return res.status(404).json({ error: "Chamado não encontrado" });
+
+  const msgs = await prisma.ticketMessage.findMany({
+    where: { ticketId: ticket.id },
+    select: {
+      id: true, fromUser: true, content: true, createdAt: true,
+      author: { select: { name: true } },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+  res.json(msgs);
+}
+
+// POST /tickets/track/:ticketNumber/messages — solicitante responde (só se técnico enviou primeiro)
+export async function sendMessagePublic(req, res) {
+  const { ticketNumber } = req.params;
+  const { content } = req.body || {};
+  if (!content?.trim()) return res.status(400).json({ error: "Mensagem vazia" });
+
+  const ticket = await prisma.ticket.findUnique({
+    where: { ticketNumber },
+    select: { id: true },
+  });
+  if (!ticket) return res.status(404).json({ error: "Chamado não encontrado" });
+
+  // Só permite resposta se o técnico já enviou ao menos uma mensagem
+  const techMsg = await prisma.ticketMessage.findFirst({
+    where: { ticketId: ticket.id, fromUser: false },
+  });
+  if (!techMsg) {
+    return res.status(403).json({ error: "Aguarde o técnico enviar uma mensagem primeiro" });
+  }
+
+  const msg = await prisma.ticketMessage.create({
+    data: { ticketId: ticket.id, fromUser: true, content: content.trim() },
+  });
+
+  req.app.get("io")?.emit("ticket:message", { ticketId: ticket.id });
+  res.status(201).json(msg);
 }

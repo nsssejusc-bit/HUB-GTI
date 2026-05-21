@@ -47,7 +47,7 @@ const EXTRA_FORM_TYPE = {
   NETSERVER_VPN:            "freetext",
   NETSERVER_TRUST_FAIL:     "none",
   // SIGED
-  SIGED_USER_CREATE:    "freetext",
+  SIGED_USER_CREATE:    "net_user_create",
   SIGED_SECTOR_MOVE:    "siged_sector_move",
   SIGED_USER_DELETE:    "siged_user_delete",
   SIGED_PASSWORD_RESET: "freetext",
@@ -178,7 +178,7 @@ function ExtraFields({ formType, fields, setFields, departments }) {
         <input className="field-input" placeholder="Ex: Analista, Assistente..." value={fields.cargo || ""} onChange={(e) => set("cargo", e.target.value)} />
       </div>
       <div>
-        <label className="field-label mb-2">Sistemas necessários *</label>
+        <label className="field-label mb-2">Sistemas necessários</label>
         <div className="flex flex-wrap gap-3">
           {["SIGED", "SAM", "AD"].map((sys) => {
             const checked = (fields.systems || []).includes(sys);
@@ -309,7 +309,7 @@ function ExtraFields({ formType, fields, setFields, departments }) {
 function isExtraValid(formType, fields) {
   if (!formType || formType === "none") return true;
   if (formType === "printer")          return !!(fields.printerName?.trim() && fields.block?.trim());
-  if (formType === "net_user_create")  return !!(fields.nome?.trim() && fields.cpf?.trim() && fields.setor?.trim() && fields.cargo?.trim() && (fields.systems || []).length > 0);
+  if (formType === "net_user_create")  return !!(fields.nome?.trim() && fields.cpf?.trim() && fields.setor?.trim() && fields.cargo?.trim());
   if (formType === "net_user_delete")  return !!(fields.cpf?.trim() && fields.setor?.trim());
   if (formType === "net_password_reset") return !!(fields.nome?.trim() && fields.cpf?.trim() && fields.setor?.trim());
   if (formType === "siged_sector_move")  return !!(fields.cpf?.trim() && fields.targetDeptId);
@@ -328,7 +328,7 @@ function buildPayload(formType, fields) {
     extraData = { printerName: fields.printerName, block: fields.block };
   } else if (formType === "net_user_create") {
     const systems = (fields.systems || []).join(", ");
-    freeTextDescription = `Nome: ${fields.nome}\nCPF: ${fields.cpf}\nE-mail: ${fields.email || "—"}\nSetor: ${fields.setor}\nCargo: ${fields.cargo}\nSistemas: ${systems}`;
+    freeTextDescription = `Nome: ${fields.nome}\nCPF: ${fields.cpf}\nE-mail: ${fields.email || "—"}\nSetor: ${fields.setor}\nCargo: ${fields.cargo}${systems ? `\nSistemas: ${systems}` : ""}`;
     extraData = { systems: fields.systems || [] };
   } else if (formType === "net_user_delete") {
     freeTextDescription = `CPF: ${fields.cpf}\nSetor: ${fields.setor}${fields.obs ? `\nObservações: ${fields.obs}` : ""}`;

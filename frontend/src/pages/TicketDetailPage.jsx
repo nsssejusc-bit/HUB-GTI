@@ -38,7 +38,7 @@ export default function TicketDetailPage() {
   const [ticket, setTicket] = useState(null);
   const [units, setUnits] = useState([]);
   const [techs, setTechs] = useState([]);
-  const [form, setForm] = useState({ unitId: "", assignedTechId: "", internalNote: "", cause: "", solution: "" });
+  const [form, setForm] = useState({ unitId: "", assignedTechId: "", internalNote: "", cause: "", solution: "", completionNote: "" });
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -52,6 +52,9 @@ export default function TicketDetailPage() {
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
   const [commentSending, setCommentSending] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState("");
+  const [msgSending, setMsgSending] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showReopenModal,  setShowReopenModal]  = useState(false);
   const [reopenReason,     setReopenReason]     = useState("");
@@ -73,6 +76,7 @@ export default function TicketDetailPage() {
     api.get("/technicians").then((r) => setTechs(r.data));
     api.get(`/work-orders?ticketId=${id}`).then((r) => setLinkedOs(r.data));
     api.get(`/tickets/${id}/comments`).then((r) => setComments(r.data)).catch(() => {});
+    api.get(`/tickets/${id}/messages`).then((r) => setMessages(r.data)).catch(() => {});
   }, [id]);
 
   async function load() {
@@ -118,8 +122,9 @@ export default function TicketDetailPage() {
         internalNote: form.internalNote || undefined,
         cause: form.cause || undefined,
         solution: form.solution || undefined,
+        completionNote: form.completionNote || undefined,
       });
-      setForm((f) => ({ ...f, internalNote: "", cause: "", solution: "" }));
+      setForm((f) => ({ ...f, internalNote: "", cause: "", solution: "", completionNote: "" }));
       addToast({ message: "Status atualizado com sucesso", type: "success" });
       load();
     } catch (e) {
@@ -164,6 +169,20 @@ export default function TicketDetailPage() {
       setErr(e.response?.data?.error || "Erro ao transferir chamado");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function doSendMessage() {
+    if (!newMessage.trim()) return;
+    setMsgSending(true);
+    try {
+      const { data } = await api.post(`/tickets/${id}/messages`, { content: newMessage });
+      setMessages((prev) => [...prev, data]);
+      setNewMessage("");
+    } catch (e) {
+      setErr(e.response?.data?.error || "Erro ao enviar mensagem");
+    } finally {
+      setMsgSending(false);
     }
   }
 
@@ -599,6 +618,74 @@ export default function TicketDetailPage() {
               })}
             </ol>
           </div>
+          {/* Mensagens ao solicitante */}
+          <div className="card p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-gray-100 flex items-center gap-2">
+                <Send size={14} className="text-brand-600" />
+                Mensagens ao solicitante
+                {messages.length > 0 && (
+                  <span className="rounded-full bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-400 text-[10px] font-semibold px-2 py-0.5">
+                    {messages.length}
+                  </span>
+                )}
+              </h3>
+              <span className="text-[10px] rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 font-medium">
+                VISÍVEL AO SOLICITANTE
+              </span>
+            </div>
+
+            {messages.length === 0 ? (
+              <p className="text-sm text-slate-400 dark:text-gray-500">Nenhuma mensagem enviada ainda.</p>
+            ) : (
+              <div className="space-y-2.5">
+                {messages.map((m) => (
+                  <div key={m.id} className={`flex gap-2.5 ${m.fromUser ? "" : "flex-row-reverse"}`}>
+                    <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                      m.fromUser
+                        ? "bg-slate-100 dark:bg-gray-700 text-slate-600 dark:text-gray-300"
+                        : "bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-400"
+                    }`}>
+                      {m.fromUser ? "U" : (m.author?.name?.charAt(0).toUpperCase() || "T")}
+                    </div>
+                    <div className={`flex flex-col ${m.fromUser ? "items-start" : "items-end"} max-w-[85%]`}>
+                      <div className={`rounded-xl px-3 py-2 text-sm ${
+                        m.fromUser
+                          ? "bg-slate-100 dark:bg-gray-800 text-slate-800 dark:text-gray-200"
+                          : "bg-brand-50 dark:bg-brand-900/20 text-brand-900 dark:text-brand-100"
+                      }`}>
+                        {m.content}
+                      </div>
+                      <div className="text-[10px] text-slate-400 dark:text-gray-500 mt-0.5 px-1">
+                        {m.fromUser ? "Solicitante" : (m.author?.name || "Técnico")} · {new Date(m.createdAt).toLocaleString("pt-BR")}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex gap-2 pt-1">
+              <textarea
+                rows={2}
+                className="field-input flex-1 text-sm resize-none"
+                placeholder="Escreva uma mensagem que o solicitante verá ao acompanhar o chamado..."
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) doSendMessage(); }}
+              />
+              <button
+                onClick={doSendMessage}
+                disabled={!newMessage.trim() || msgSending}
+                className="flex h-10 w-10 shrink-0 self-end items-center justify-center rounded-xl bg-brand-600 hover:bg-brand-700 text-white disabled:opacity-50 transition"
+                title="Enviar (Ctrl+Enter)"
+              >
+                {msgSending ? <Spinner className="h-4 w-4" /> : <Send size={15} />}
+              </button>
+            </div>
+            <p className="text-[10px] text-slate-400 dark:text-gray-500">Ctrl+Enter para enviar rapidamente</p>
+          </div>
+
           {/* Comentários */}
           <div className="card p-5 space-y-3">
             <h3 className="text-sm font-semibold text-slate-900 dark:text-gray-100 flex items-center gap-2">
@@ -760,6 +847,24 @@ export default function TicketDetailPage() {
                       )}
                     </div>
                   </>
+                )}
+
+                {ticket.allowedNext.includes("COMPLETED") && (
+                  <div>
+                    <label className="field-label flex flex-wrap items-center gap-x-2 gap-y-1">
+                      Mensagem de conclusão
+                      <span className="whitespace-nowrap rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-[10px] font-medium px-2 py-0.5">
+                        VISÍVEL AO SOLICITANTE
+                      </span>
+                    </label>
+                    <textarea
+                      rows={2}
+                      className="field-input resize-none"
+                      placeholder="Ex: Problema resolvido. Reinicie o computador caso necessário..."
+                      value={form.completionNote}
+                      onChange={(e) => setForm({ ...form, completionNote: e.target.value })}
+                    />
+                  </div>
                 )}
 
                 <div>

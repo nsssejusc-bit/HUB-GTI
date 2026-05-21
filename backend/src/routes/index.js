@@ -9,6 +9,7 @@ import {
   createTicket, getTicketPublic, listTickets, getTicket,
   transitionTicket, approveTicket, deleteTicket, submitFeedback,
   reopenTicket, assignTicket, listComments, addComment, submitFeedbackAuth,
+  listMessages, sendMessage, listMessagesPublic, sendMessagePublic,
 } from "../controllers/ticketController.js";
 import {
   listCategories, listUnits, listTechnicians, getPublicConfig,
@@ -61,10 +62,11 @@ const forgotLimiter = rateLimit({
   message: { error: "Muitas solicitações. Tente novamente em 1 hora." },
 });
 
-// 30 consultas por IP a cada 5 minutos — endpoints públicos de rastreamento/feedback
+// 200 consultas por IP a cada 5 minutos — endpoints públicos de rastreamento/feedback
+// (polls automáticos de status + mensagens justificam limite maior)
 const publicTicketLimiter = rateLimit({
   windowMs: 5 * 60 * 1000,
-  max: 30,
+  max: 200,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Muitas consultas. Tente novamente em alguns minutos." },
@@ -98,8 +100,10 @@ router.delete("/categories/:catId/subcategories/:subId",     authRequired, requi
 router.get("/units",           listUnits);
 router.get("/departments", listDepartments);
 router.post("/tickets",  authRequired, createTicket);
-router.get("/tickets/track/:ticketNumber", publicTicketLimiter, getTicketPublic);
-router.post("/tickets/track/:ticketNumber/feedback", publicTicketLimiter, submitFeedback);
+router.get("/tickets/track/:ticketNumber",                  publicTicketLimiter, getTicketPublic);
+router.post("/tickets/track/:ticketNumber/feedback",        publicTicketLimiter, submitFeedback);
+router.get("/tickets/track/:ticketNumber/messages",         publicTicketLimiter, listMessagesPublic);
+router.post("/tickets/track/:ticketNumber/messages",        publicTicketLimiter, sendMessagePublic);
 
 // ── Autenticação ──────────────────────────────────────────────────────────────
 router.post("/auth/login",           authLimiter, login);
@@ -138,6 +142,8 @@ router.post("/tickets/:id/reopen",     authRequired, reopenTicket);
 router.patch("/tickets/:id/assign",    authRequired, requireRole("TECHNICIAN", "ADMIN"), assignTicket);
 router.get("/tickets/:id/comments",   authRequired, listComments);
 router.post("/tickets/:id/comments",  authRequired, addComment);
+router.get("/tickets/:id/messages",   authRequired, requireRole("TECHNICIAN", "ADMIN"), listMessages);
+router.post("/tickets/:id/messages",  authRequired, requireRole("TECHNICIAN", "ADMIN"), sendMessage);
 router.post("/tickets/:id/feedback",  authRequired, submitFeedbackAuth);
 router.delete("/tickets/:id", authRequired, requireRole("ADMIN"), deleteTicket);
 
