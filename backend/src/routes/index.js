@@ -61,6 +61,15 @@ const forgotLimiter = rateLimit({
   message: { error: "Muitas solicitações. Tente novamente em 1 hora." },
 });
 
+// 30 consultas por IP a cada 5 minutos — endpoints públicos de rastreamento/feedback
+const publicTicketLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Muitas consultas. Tente novamente em alguns minutos." },
+});
+
 // 300 requisições por IP por minuto — proteção geral contra abuso/DoS
 const generalLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -89,8 +98,8 @@ router.delete("/categories/:catId/subcategories/:subId",     authRequired, requi
 router.get("/units",           listUnits);
 router.get("/departments", listDepartments);
 router.post("/tickets",  authRequired, createTicket);
-router.get("/tickets/track/:ticketNumber", getTicketPublic);
-router.post("/tickets/track/:ticketNumber/feedback", submitFeedback);
+router.get("/tickets/track/:ticketNumber", publicTicketLimiter, getTicketPublic);
+router.post("/tickets/track/:ticketNumber/feedback", publicTicketLimiter, submitFeedback);
 
 // ── Autenticação ──────────────────────────────────────────────────────────────
 router.post("/auth/login",           authLimiter, login);

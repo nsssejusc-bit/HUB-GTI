@@ -95,31 +95,49 @@ export async function ticketsByCategory(req, res) {
 }
 
 export async function avgResolutionByCategory(req, res) {
-  const where = { ...parseRange(req.query), ...unitScope(req.user), status: "COMPLETED" };
-  const tickets = await prisma.ticket.findMany({
-    where,
-    select: { categoryId: true, openedAt: true, completedAt: true },
-  });
-  const catIds = [...new Set(tickets.map((t) => t.categoryId).filter(Boolean))];
-  const cats = catIds.length > 0
-    ? await prisma.category.findMany({ where: { id: { in: catIds } }, select: { id: true, name: true } })
-    : [];
-  const map = new Map(cats.map((c) => [c.id, c.name]));
-  const buckets = {};
-  for (const t of tickets) {
-    if (!t.completedAt) continue;
-    const mins = (t.completedAt - t.openedAt) / 60000;
-    buckets[t.categoryId] = buckets[t.categoryId] || { sum: 0, n: 0 };
-    buckets[t.categoryId].sum += mins;
-    buckets[t.categoryId].n += 1;
-  }
-  const result = Object.entries(buckets).map(([catId, b]) => ({
-    categoryId: Number(catId),
-    category: map.get(Number(catId)) || "-",
-    avgMinutes: Math.round(b.sum / b.n),
-    samples: b.n,
-  }));
-  res.json(result);
+  const from   = req.query.from ? new Date(req.query.from) : null;
+  const to     = req.query.to   ? new Date(req.query.to)   : null;
+  const unitId = req.user.role === "TECHNICIAN" && req.user.unitId ? req.user.unitId : null;
+
+  const rows = await (
+    unitId && from && to ? prisma.$queryRaw`
+      SELECT t.categoryId, c.name AS categoryName,
+             ROUND(AVG(TIMESTAMPDIFF(MINUTE, t.openedAt, t.completedAt))) AS avgMinutes,
+             COUNT(*) AS samples
+      FROM Ticket t JOIN Category c ON c.id = t.categoryId
+      WHERE t.status = 'COMPLETED' AND t.completedAt IS NOT NULL
+        AND t.unitId = ${unitId} AND t.openedAt >= ${from} AND t.openedAt <= ${to}
+      GROUP BY t.categoryId, c.name`
+    : unitId ? prisma.$queryRaw`
+      SELECT t.categoryId, c.name AS categoryName,
+             ROUND(AVG(TIMESTAMPDIFF(MINUTE, t.openedAt, t.completedAt))) AS avgMinutes,
+             COUNT(*) AS samples
+      FROM Ticket t JOIN Category c ON c.id = t.categoryId
+      WHERE t.status = 'COMPLETED' AND t.completedAt IS NOT NULL AND t.unitId = ${unitId}
+      GROUP BY t.categoryId, c.name`
+    : from && to ? prisma.$queryRaw`
+      SELECT t.categoryId, c.name AS categoryName,
+             ROUND(AVG(TIMESTAMPDIFF(MINUTE, t.openedAt, t.completedAt))) AS avgMinutes,
+             COUNT(*) AS samples
+      FROM Ticket t JOIN Category c ON c.id = t.categoryId
+      WHERE t.status = 'COMPLETED' AND t.completedAt IS NOT NULL
+        AND t.openedAt >= ${from} AND t.openedAt <= ${to}
+      GROUP BY t.categoryId, c.name`
+    : prisma.$queryRaw`
+      SELECT t.categoryId, c.name AS categoryName,
+             ROUND(AVG(TIMESTAMPDIFF(MINUTE, t.openedAt, t.completedAt))) AS avgMinutes,
+             COUNT(*) AS samples
+      FROM Ticket t JOIN Category c ON c.id = t.categoryId
+      WHERE t.status = 'COMPLETED' AND t.completedAt IS NOT NULL
+      GROUP BY t.categoryId, c.name`
+  );
+
+  res.json(rows.map((r) => ({
+    categoryId: Number(r.categoryId),
+    category:   r.categoryName || "-",
+    avgMinutes: Number(r.avgMinutes),
+    samples:    Number(r.samples),
+  })));
 }
 
 export async function topRequesters(req, res) {
@@ -237,32 +255,49 @@ export async function ticketsByMonth(req, res) {
 }
 
 export async function avgResolutionByUnit(req, res) {
-  const where = { ...parseRange(req.query), ...unitScope(req.user), status: "COMPLETED" };
-  const tickets = await prisma.ticket.findMany({
-    where,
-    select: { unitId: true, openedAt: true, completedAt: true },
-  });
-  const unitIds = [...new Set(tickets.map((t) => t.unitId).filter(Boolean))];
-  const units = unitIds.length > 0
-    ? await prisma.unit.findMany({ where: { id: { in: unitIds } }, select: { id: true, name: true } })
-    : [];
-  const map = new Map(units.map((u) => [u.id, u.name]));
-  const buckets = {};
-  for (const t of tickets) {
-    if (!t.completedAt) continue;
-    const mins = (t.completedAt - t.openedAt) / 60000;
-    const key = t.unitId ?? "null";
-    buckets[key] = buckets[key] || { sum: 0, n: 0 };
-    buckets[key].sum += mins;
-    buckets[key].n += 1;
-  }
-  const result = Object.entries(buckets).map(([unitId, b]) => ({
-    unitId: unitId === "null" ? null : Number(unitId),
-    unit: unitId === "null" ? "Sem unidade" : (map.get(Number(unitId)) || "-"),
-    avgMinutes: Math.round(b.sum / b.n),
-    samples: b.n,
-  }));
-  res.json(result);
+  const from   = req.query.from ? new Date(req.query.from) : null;
+  const to     = req.query.to   ? new Date(req.query.to)   : null;
+  const unitId = req.user.role === "TECHNICIAN" && req.user.unitId ? req.user.unitId : null;
+
+  const rows = await (
+    unitId && from && to ? prisma.$queryRaw`
+      SELECT t.unitId, u.name AS unitName,
+             ROUND(AVG(TIMESTAMPDIFF(MINUTE, t.openedAt, t.completedAt))) AS avgMinutes,
+             COUNT(*) AS samples
+      FROM Ticket t LEFT JOIN Unit u ON u.id = t.unitId
+      WHERE t.status = 'COMPLETED' AND t.completedAt IS NOT NULL
+        AND t.unitId = ${unitId} AND t.openedAt >= ${from} AND t.openedAt <= ${to}
+      GROUP BY t.unitId, u.name`
+    : unitId ? prisma.$queryRaw`
+      SELECT t.unitId, u.name AS unitName,
+             ROUND(AVG(TIMESTAMPDIFF(MINUTE, t.openedAt, t.completedAt))) AS avgMinutes,
+             COUNT(*) AS samples
+      FROM Ticket t LEFT JOIN Unit u ON u.id = t.unitId
+      WHERE t.status = 'COMPLETED' AND t.completedAt IS NOT NULL AND t.unitId = ${unitId}
+      GROUP BY t.unitId, u.name`
+    : from && to ? prisma.$queryRaw`
+      SELECT t.unitId, u.name AS unitName,
+             ROUND(AVG(TIMESTAMPDIFF(MINUTE, t.openedAt, t.completedAt))) AS avgMinutes,
+             COUNT(*) AS samples
+      FROM Ticket t LEFT JOIN Unit u ON u.id = t.unitId
+      WHERE t.status = 'COMPLETED' AND t.completedAt IS NOT NULL
+        AND t.openedAt >= ${from} AND t.openedAt <= ${to}
+      GROUP BY t.unitId, u.name`
+    : prisma.$queryRaw`
+      SELECT t.unitId, u.name AS unitName,
+             ROUND(AVG(TIMESTAMPDIFF(MINUTE, t.openedAt, t.completedAt))) AS avgMinutes,
+             COUNT(*) AS samples
+      FROM Ticket t LEFT JOIN Unit u ON u.id = t.unitId
+      WHERE t.status = 'COMPLETED' AND t.completedAt IS NOT NULL
+      GROUP BY t.unitId, u.name`
+  );
+
+  res.json(rows.map((r) => ({
+    unitId:     r.unitId ? Number(r.unitId) : null,
+    unit:       r.unitName || "Sem unidade",
+    avgMinutes: Number(r.avgMinutes),
+    samples:    Number(r.samples),
+  })));
 }
 
 export async function otherReclassified(req, res) {

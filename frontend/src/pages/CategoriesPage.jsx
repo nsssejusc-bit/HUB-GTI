@@ -6,8 +6,37 @@ import { useToast } from "../context/ToastContext";
 import {
   GripVertical, ChevronDown, Plus, Trash2, Pencil, Check, X,
   Monitor, Wifi, KeyRound, HelpCircle, MonitorSmartphone, Printer, Server, BookOpen,
-  Tag, ToggleLeft, ToggleRight, Clock,
+  Tag, ToggleLeft, ToggleRight, Clock, Flame, Lightbulb,
 } from "lucide-react";
+
+const PRIORITY_OPTIONS = [
+  { value: "LOW",    label: "Baixa",   cls: "bg-slate-100 dark:bg-gray-700 text-slate-600 dark:text-gray-300",  active: "bg-slate-500 text-white" },
+  { value: "MEDIUM", label: "Média",   cls: "bg-blue-50   dark:bg-blue-900/30 text-blue-600 dark:text-blue-300",  active: "bg-blue-500  text-white" },
+  { value: "HIGH",   label: "Alta",    cls: "bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-300", active: "bg-orange-500 text-white" },
+  { value: "URGENT", label: "Urgente", cls: "bg-red-50    dark:bg-red-900/30 text-red-600 dark:text-red-300",    active: "bg-red-500   text-white" },
+];
+
+function PrioritySelector({ value, onChange, compact = false }) {
+  return (
+    <div className={`flex items-center gap-1 ${compact ? "" : "flex-wrap"}`}>
+      {PRIORITY_OPTIONS.map((opt) => (
+        <button
+          key={opt.value}
+          type="button"
+          onClick={() => onChange(opt.value)}
+          title={`Prioridade: ${opt.label}`}
+          className={`rounded-full border text-[11px] font-semibold transition px-2 py-0.5 ${
+            value === opt.value
+              ? `${opt.active} border-transparent`
+              : `${opt.cls} border-transparent hover:opacity-80`
+          }`}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 const CAT_ICONS = {
   HARDWARE:  Monitor,
@@ -174,10 +203,31 @@ function DropLine({ show }) {
 }
 
 // ── Subcategory row ───────────────────────────────────────────────────────────
-function SubRow({ sub, catId, onRename, onDelete, onUpdateSla, onGripPointerDown, isDragging }) {
-  const [deleteErr, setDeleteErr] = useState("");
-  const [slaEdit, setSlaEdit]     = useState(false);
-  const [slaDraft, setSlaDraft]   = useState(sub.slaHours != null ? String(sub.slaHours) : "");
+function SubRow({ sub, catId, onRename, onDelete, onUpdateSla, onUpdatePriority, onUpdateN1Tips, onGripPointerDown, isDragging }) {
+  const [deleteErr,  setDeleteErr]  = useState("");
+  const [slaEdit,    setSlaEdit]    = useState(false);
+  const [slaDraft,   setSlaDraft]   = useState(sub.slaHours != null ? String(sub.slaHours) : "");
+  const [tipsOpen,   setTipsOpen]   = useState(false);
+  const [tipsDraft,  setTipsDraft]  = useState(
+    sub.n1Tips ? JSON.parse(sub.n1Tips).join("\n") : ""
+  );
+
+  const tipsCount = sub.n1Tips ? JSON.parse(sub.n1Tips).length : 0;
+
+  function handlePriorityChange(priority) {
+    api.patch(`/categories/${catId}/subcategories/${sub.id}`, { defaultPriority: priority })
+      .then(() => onUpdatePriority(sub.id, priority))
+      .catch(() => {});
+  }
+
+  function saveTips() {
+    const lines = tipsDraft.split("\n").map((s) => s.trim()).filter(Boolean);
+    const json   = lines.length > 0 ? JSON.stringify(lines) : null;
+    if (json === sub.n1Tips) { setTipsOpen(false); return; }
+    api.patch(`/categories/${catId}/subcategories/${sub.id}`, { n1Tips: json })
+      .then(() => { onUpdateN1Tips(sub.id, json); setTipsOpen(false); })
+      .catch(() => {});
+  }
 
   async function handleDelete() {
     setDeleteErr("");
@@ -216,6 +266,25 @@ function SubRow({ sub, catId, onRename, onDelete, onUpdateSla, onGripPointerDown
           onSave={(name) => onRename(sub.id, name)}
           className="flex-1 text-sm text-slate-700 dark:text-gray-200 font-medium"
         />
+        {/* Prioridade por subcategoria */}
+        <PrioritySelector
+          value={sub.defaultPriority ?? "MEDIUM"}
+          onChange={handlePriorityChange}
+          compact
+        />
+        {/* Dicas N1 */}
+        <button
+          onClick={() => { setTipsOpen((v) => !v); setTipsDraft(sub.n1Tips ? JSON.parse(sub.n1Tips).join("\n") : ""); }}
+          title="Dicas de suporte N1 para este problema"
+          className={`flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-lg transition opacity-0 group-hover:opacity-100 ${
+            tipsCount > 0
+              ? "text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+              : "text-slate-400 dark:text-gray-500 hover:bg-slate-200 dark:hover:bg-gray-700"
+          }`}
+        >
+          <Lightbulb size={12} />
+          {tipsCount > 0 && <span className="font-semibold">{tipsCount}</span>}
+        </button>
         {/* SLA por subcategoria */}
         <div className="flex items-center gap-1 shrink-0" title="SLA desta subcategoria (horas)">
           {slaEdit ? (
@@ -250,6 +319,40 @@ function SubRow({ sub, catId, onRename, onDelete, onUpdateSla, onGripPointerDown
           <Trash2 size={12} />
         </button>
       </div>
+
+      {/* Editor de dicas N1 */}
+      {tipsOpen && (
+        <div className="mt-1 mx-1 rounded-xl border border-amber-200 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/10 p-3 space-y-2">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 dark:text-amber-400">
+            <Lightbulb size={12} />
+            Dicas de suporte N1 — {sub.name}
+          </div>
+          <textarea
+            autoFocus
+            rows={4}
+            value={tipsDraft}
+            onChange={(e) => setTipsDraft(e.target.value)}
+            placeholder={"Uma dica por linha, ex:\nReinicie o computador e tente novamente\nVerifique se o cabo está conectado"}
+            className="w-full rounded-lg border border-amber-200 dark:border-amber-700/60 bg-white dark:bg-gray-900 px-3 py-2 text-xs text-slate-700 dark:text-gray-200 placeholder-slate-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none"
+          />
+          <p className="text-[10px] text-amber-600 dark:text-amber-500">Cada linha vira uma dica numerada exibida ao solicitante antes de abrir o chamado.</p>
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={() => setTipsOpen(false)}
+              className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg text-slate-500 dark:text-gray-400 hover:bg-slate-100 dark:hover:bg-gray-700 transition"
+            >
+              <X size={11} /> Cancelar
+            </button>
+            <button
+              onClick={saveTips}
+              className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-medium transition"
+            >
+              <Check size={11} /> Salvar dicas
+            </button>
+          </div>
+        </div>
+      )}
+
       {deleteErr && <p className="text-xs text-red-500 dark:text-red-400 mt-1 px-3">{deleteErr}</p>}
     </div>
   );
@@ -349,6 +452,24 @@ function CategoryCard({ cat, onUpdate, onDelete, onGripPointerDown, isDragging }
 
   function updateSubcategorySla(subId, slaHours) {
     setSubcats((prev) => prev.map((s) => s.id === subId ? { ...s, slaHours } : s));
+  }
+
+  function updateSubcategoryPriority(subId, defaultPriority) {
+    setSubcats((prev) => prev.map((s) => s.id === subId ? { ...s, defaultPriority } : s));
+  }
+
+  function updateSubcategoryN1Tips(subId, n1Tips) {
+    setSubcats((prev) => prev.map((s) => s.id === subId ? { ...s, n1Tips } : s));
+  }
+
+  async function saveCategoryPriority(defaultPriority) {
+    try {
+      const res = await api.patch(`/categories/${cat.id}`, { defaultPriority });
+      onUpdate({ ...cat, defaultPriority: res.data.defaultPriority });
+      addToast({ message: "Prioridade padrão atualizada", type: "success" });
+    } catch (e) {
+      addToast({ message: e.response?.data?.error || "Erro ao salvar prioridade", type: "error" });
+    }
   }
 
   function deleteSubcategory(subId) {
@@ -455,6 +576,18 @@ function CategoryCard({ cat, onUpdate, onDelete, onGripPointerDown, isDragging }
             )}
           </div>
 
+          {/* Prioridade padrão — exibida para categorias freeText/remote (sem subcategorias) */}
+          {cat.allowsFreeText && (
+            <div className="flex items-center gap-3">
+              <Flame size={14} className="text-slate-400 dark:text-gray-500 shrink-0" />
+              <span className="text-sm text-slate-500 dark:text-gray-400 w-20 shrink-0">Prioridade</span>
+              <PrioritySelector
+                value={cat.defaultPriority ?? "MEDIUM"}
+                onChange={saveCategoryPriority}
+              />
+            </div>
+          )}
+
           {cat.allowsFreeText ? (
             <p className="text-sm text-slate-400 dark:text-gray-500 italic">
               O usuário descreve o problema livremente — nenhuma subcategoria é exibida.
@@ -476,6 +609,8 @@ function CategoryCard({ cat, onUpdate, onDelete, onGripPointerDown, isDragging }
                         onRename={renameSubcategory}
                         onDelete={deleteSubcategory}
                         onUpdateSla={updateSubcategorySla}
+                        onUpdatePriority={updateSubcategoryPriority}
+                        onUpdateN1Tips={updateSubcategoryN1Tips}
                         isDragging={subFromIdx === idx}
                         onGripPointerDown={(e) => { e.stopPropagation(); startSubDrag(e, idx); }}
                       />

@@ -53,6 +53,10 @@ export default function TicketDetailPage() {
   const [newComment, setNewComment] = useState("");
   const [commentSending, setCommentSending] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showReopenModal,  setShowReopenModal]  = useState(false);
+  const [reopenReason,     setReopenReason]     = useState("");
+  const [reopenErr,        setReopenErr]        = useState("");
+  const [showUnsavedModal, setShowUnsavedModal] = useState(false);
 
   const isDirty = !!(form.internalNote.trim() || form.cause.trim() || form.solution.trim());
 
@@ -125,16 +129,22 @@ export default function TicketDetailPage() {
     }
   }
 
-  async function doReopen() {
-    const reason = window.prompt("Motivo para reabrir (opcional):");
-    if (reason === null) return;
+  function doReopen() {
+    setReopenReason("");
+    setReopenErr("");
+    setShowReopenModal(true);
+  }
+
+  async function confirmReopen() {
     setLoading(true);
+    setReopenErr("");
     try {
-      await api.post(`/tickets/${id}/reopen`, { reason: reason.trim() || undefined });
+      await api.post(`/tickets/${id}/reopen`, { reason: reopenReason.trim() || undefined });
+      setShowReopenModal(false);
       addToast({ message: "Chamado reaberto com sucesso", type: "success" });
       load();
     } catch (e) {
-      setErr(e.response?.data?.error || "Erro ao reabrir chamado");
+      setReopenErr(e.response?.data?.error || "Erro ao reabrir chamado");
     } finally {
       setLoading(false);
     }
@@ -257,6 +267,93 @@ export default function TicketDetailPage() {
         </div>
       )}
 
+      {/* Modal reabrir chamado */}
+      {showReopenModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowReopenModal(false); }}
+        >
+          <div className="card w-full max-w-sm p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400">
+                <RotateCcw size={18} />
+              </span>
+              <div>
+                <h3 className="font-semibold text-slate-900 dark:text-gray-100">Reabrir chamado</h3>
+                <p className="text-xs text-slate-500 dark:text-gray-400 mt-0.5">Informe o motivo (opcional)</p>
+              </div>
+            </div>
+            <textarea
+              autoFocus
+              rows={3}
+              className="field-input resize-none w-full"
+              placeholder="Ex: Problema voltou a ocorrer..."
+              value={reopenReason}
+              onChange={(e) => setReopenReason(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) confirmReopen(); }}
+            />
+            {reopenErr && (
+              <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl px-3 py-2">
+                {reopenErr}
+              </p>
+            )}
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setShowReopenModal(false)}
+                className="btn-secondary text-sm py-2 px-4"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmReopen}
+                disabled={loading}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 text-sm font-semibold transition disabled:opacity-50"
+              >
+                {loading ? <Spinner className="h-4 w-4" /> : <RotateCcw size={14} />}
+                Reabrir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal alterações não salvas */}
+      {showUnsavedModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowUnsavedModal(false); }}
+        >
+          <div className="card w-full max-w-sm p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400">
+                <AlertTriangle size={20} />
+              </span>
+              <div>
+                <h3 className="font-semibold text-slate-900 dark:text-gray-100">Alterações não salvas</h3>
+                <p className="text-xs text-slate-500 dark:text-gray-400 mt-0.5">Os campos preenchidos serão perdidos</p>
+              </div>
+            </div>
+            <p className="text-sm text-slate-600 dark:text-gray-300">
+              Você preencheu nota interna, causa ou solução mas ainda não salvou. Deseja sair mesmo assim?
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setShowUnsavedModal(false)}
+                className="btn-secondary text-sm py-2 px-4"
+              >
+                Continuar editando
+              </button>
+              <button
+                onClick={() => nav("/painel")}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-slate-700 hover:bg-slate-800 dark:bg-gray-600 dark:hover:bg-gray-500 text-white px-4 py-2 text-sm font-semibold transition"
+              >
+                <ArrowLeft size={14} /> Sair sem salvar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal criar e vincular OS */}
       {showCreateOs && (
         <CreateOsModal
@@ -270,7 +367,7 @@ export default function TicketDetailPage() {
         <div className="max-w-5xl mx-auto px-4 h-12 flex items-center gap-3 text-sm">
           <button
             onClick={() => {
-              if (isDirty && !window.confirm("Você tem informações não salvas. Deseja sair sem salvar?")) return;
+              if (isDirty) { setShowUnsavedModal(true); return; }
               nav("/painel");
             }}
             className="flex items-center gap-1.5 text-slate-500 dark:text-gray-400 hover:text-slate-700 dark:hover:text-gray-200 transition"

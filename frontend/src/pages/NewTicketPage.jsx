@@ -346,6 +346,28 @@ function buildPayload(formType, fields) {
   return { freeTextDescription, extraData };
 }
 
+// ── Caixa de dicas N1 ────────────────────────────────────────────────────────
+function N1TipsBox({ tips, title }) {
+  return (
+    <div className="rounded-xl border border-amber-200 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/15 px-4 py-3.5 space-y-2">
+      <div className="flex items-center gap-2 text-sm font-semibold text-amber-800 dark:text-amber-300">
+        <Lightbulb size={15} />
+        Antes de continuar — {title}
+      </div>
+      <ul className="space-y-1.5">
+        {tips.map((tip, i) => (
+          <li key={i} className="flex items-start gap-2 text-xs text-amber-800 dark:text-amber-300">
+            <span className="mt-0.5 shrink-0 w-4 h-4 rounded-full bg-amber-200 dark:bg-amber-800/60 text-amber-700 dark:text-amber-300 font-bold flex items-center justify-center text-[10px]">
+              {i + 1}
+            </span>
+            {tip}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 // ── Página principal ─────────────────────────────────────────────────────────
 export default function NewTicketPage() {
   const nav          = useNavigate();
@@ -353,7 +375,7 @@ export default function NewTicketPage() {
   const [categories,   setCategories]   = useState([]);
   const [departments,  setDepartments]  = useState([]);
   const [screen,       setScreen]       = useState("category");
-  const [form,         setForm]         = useState({ categoryId: null, subcategoryId: null, anyDeskCode: "", freeTextDescription: "", priority: "MEDIUM" });
+  const [form,         setForm]         = useState({ categoryId: null, subcategoryId: null, anyDeskCode: "", freeTextDescription: "" });
   const [extraFields,  setExtraFields]  = useState({});
   const [error,        setError]        = useState("");
   const [submitting,   setSubmitting]   = useState(false);
@@ -364,11 +386,12 @@ export default function NewTicketPage() {
     api.get("/departments").then((r)  => setDepartments(r.data)).catch(() => {});
   }, []);
 
-  const selectedCategory   = categories.find((c) => c.id === form.categoryId);
-  const isRemote           = selectedCategory?.code === "REMOTE";
-  const n1Tips             = selectedCategory?.n1Tips ? JSON.parse(selectedCategory.n1Tips) : [];
+  const selectedCategory    = categories.find((c) => c.id === form.categoryId);
+  const isRemote            = selectedCategory?.code === "REMOTE";
+  const catN1Tips           = selectedCategory?.n1Tips ? JSON.parse(selectedCategory.n1Tips) : [];
   const selectedSubcategory = selectedCategory?.subcategories?.find((s) => s.id === form.subcategoryId);
-  const subCode            = selectedSubcategory?.code;
+  const subN1Tips           = selectedSubcategory?.n1Tips ? JSON.parse(selectedSubcategory.n1Tips) : [];
+  const subCode             = selectedSubcategory?.code;
   const formType           = subCode ? (EXTRA_FORM_TYPE[subCode] ?? "none") : null;
   const requiresApproval   = selectedSubcategory?.requiresApproval ?? false;
 
@@ -396,7 +419,6 @@ export default function NewTicketPage() {
         categoryId:    form.categoryId,
         subcategoryId: (selectedCategory?.allowsFreeText || isRemote) ? null : form.subcategoryId,
         anyDeskCode:   isRemote ? form.anyDeskCode.trim() : null,
-        priority:      form.priority,
       };
 
       if (isRemote) {
@@ -613,24 +635,9 @@ export default function NewTicketPage() {
           {screen === "details" && selectedCategory && (
             <div className="space-y-4">
 
-              {/* Dicas N1 */}
-              {n1Tips.length > 0 && !isRemote && (
-                <div className="rounded-xl border border-amber-200 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/15 px-4 py-3.5 space-y-2">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-amber-800 dark:text-amber-300">
-                    <Lightbulb size={15} />
-                    Dicas rápidas — {selectedCategory.name}
-                  </div>
-                  <ul className="space-y-1.5">
-                    {n1Tips.map((tip, i) => (
-                      <li key={i} className="flex items-start gap-2 text-xs text-amber-800 dark:text-amber-300">
-                        <span className="mt-0.5 shrink-0 w-4 h-4 rounded-full bg-amber-200 dark:bg-amber-800/60 text-amber-700 dark:text-amber-300 font-bold flex items-center justify-center text-[10px]">
-                          {i + 1}
-                        </span>
-                        {tip}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+              {/* Dicas N1 — por categoria (só para texto livre / remote) */}
+              {catN1Tips.length > 0 && !isRemote && selectedCategory.allowsFreeText && (
+                <N1TipsBox tips={catN1Tips} title={selectedCategory.name} />
               )}
 
               <div>
@@ -709,6 +716,11 @@ export default function NewTicketPage() {
                     );
                   })}
 
+                  {/* Dicas N1 da subcategoria selecionada */}
+                  {form.subcategoryId && subN1Tips.length > 0 && (
+                    <N1TipsBox tips={subN1Tips} title={selectedSubcategory.name} />
+                  )}
+
                   {/* Campos extras da subcategoria selecionada */}
                   {form.subcategoryId && formType && formType !== "none" && (
                     <div className="rounded-xl border border-slate-200 dark:border-gray-700 p-4 space-y-1 mt-1">
@@ -722,29 +734,6 @@ export default function NewTicketPage() {
                   )}
                 </div>
               )}
-
-              {/* Prioridade */}
-              <div>
-                <label className="field-label mb-2">Prioridade</label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {[
-                    { value: "LOW",    label: "Baixa",   cls: "border-slate-300 dark:border-gray-600 text-slate-600 dark:text-gray-400 data-[sel=true]:border-slate-500 data-[sel=true]:bg-slate-100 dark:data-[sel=true]:bg-gray-700 data-[sel=true]:text-slate-800 dark:data-[sel=true]:text-gray-100" },
-                    { value: "MEDIUM", label: "Média",   cls: "border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 data-[sel=true]:border-blue-500 data-[sel=true]:bg-blue-50 dark:data-[sel=true]:bg-blue-900/20 data-[sel=true]:text-blue-700 dark:data-[sel=true]:text-blue-300" },
-                    { value: "HIGH",   label: "Alta",    cls: "border-orange-300 dark:border-orange-700 text-orange-600 dark:text-orange-400 data-[sel=true]:border-orange-500 data-[sel=true]:bg-orange-50 dark:data-[sel=true]:bg-orange-900/20 data-[sel=true]:text-orange-700 dark:data-[sel=true]:text-orange-300" },
-                    { value: "URGENT", label: "Urgente", cls: "border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 data-[sel=true]:border-red-500 data-[sel=true]:bg-red-50 dark:data-[sel=true]:bg-red-900/20 data-[sel=true]:text-red-700 dark:data-[sel=true]:text-red-300" },
-                  ].map(({ value, label, cls }) => (
-                    <button
-                      key={value}
-                      type="button"
-                      data-sel={form.priority === value ? "true" : "false"}
-                      onClick={() => setForm((f) => ({ ...f, priority: value }))}
-                      className={`rounded-lg border-2 py-2 text-xs font-semibold transition ${cls}`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
 
               <Alert message={error} />
 

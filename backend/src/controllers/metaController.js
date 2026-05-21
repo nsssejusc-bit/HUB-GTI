@@ -37,15 +37,22 @@ function slugify(name) {
     .slice(0, 30);
 }
 
+const VALID_PRIORITIES = ["LOW", "MEDIUM", "HIGH", "URGENT"];
+
 export async function updateCategory(req, res) {
   const id = Number(req.params.id);
-  const { n1Tips, name, allowsFreeText, slaHours } = req.body;
+  const { n1Tips, name, allowsFreeText, slaHours, defaultPriority } = req.body;
   const cat = await prisma.category.findUnique({ where: { id } });
   if (!cat) return res.status(404).json({ error: "Categoria não encontrada" });
   const data = {};
-  if (n1Tips !== undefined)        data.n1Tips        = n1Tips || null;
-  if (allowsFreeText !== undefined) data.allowsFreeText = Boolean(allowsFreeText);
-  if (slaHours !== undefined)       data.slaHours       = slaHours ? Number(slaHours) : null;
+  if (n1Tips !== undefined)           data.n1Tips           = n1Tips || null;
+  if (allowsFreeText !== undefined)   data.allowsFreeText   = Boolean(allowsFreeText);
+  if (slaHours !== undefined)         data.slaHours         = slaHours ? Number(slaHours) : null;
+  if (defaultPriority !== undefined) {
+    if (!VALID_PRIORITIES.includes(defaultPriority))
+      return res.status(400).json({ error: "Prioridade inválida" });
+    data.defaultPriority = defaultPriority;
+  }
   if (name !== undefined) {
     const trimmed = name.trim();
     if (!trimmed) return res.status(400).json({ error: "Nome obrigatório" });
@@ -115,7 +122,7 @@ export async function createSubcategory(req, res) {
 
 export async function updateSubcategory(req, res) {
   const subId = Number(req.params.subId);
-  const { name, slaHours } = req.body || {};
+  const { name, slaHours, defaultPriority, n1Tips } = req.body || {};
   const sub = await prisma.subcategory.findUnique({ where: { id: subId } });
   if (!sub) return res.status(404).json({ error: "Subcategoria não encontrada" });
   const data = {};
@@ -125,6 +132,12 @@ export async function updateSubcategory(req, res) {
     data.name = trimmed;
   }
   if (slaHours !== undefined) data.slaHours = slaHours ? Number(slaHours) : null;
+  if (n1Tips !== undefined)    data.n1Tips   = n1Tips || null;
+  if (defaultPriority !== undefined) {
+    if (!VALID_PRIORITIES.includes(defaultPriority))
+      return res.status(400).json({ error: "Prioridade inválida" });
+    data.defaultPriority = defaultPriority;
+  }
   const updated = await prisma.subcategory.update({ where: { id: subId }, data });
   res.json(updated);
 }

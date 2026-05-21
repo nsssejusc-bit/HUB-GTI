@@ -82,20 +82,36 @@ function CreateItemModal({ onClose, onCreate, categories }) {
             <input className={inputCls} value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="Ex: Cabo HDMI, Mouse Logitech..." />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>Categoria <span className="text-slate-400">(opcional)</span></label>
-              <input
-                className={inputCls}
-                value={form.category}
-                onChange={(e) => set("category", e.target.value)}
-                list="cat-suggestions"
-                placeholder="Ex: Periférico, Cabo..."
-              />
-              <datalist id="cat-suggestions">
-                {categories.map((c) => <option key={c} value={c} />)}
-              </datalist>
-            </div>
+          <div>
+            <label className={labelCls}>Categoria <span className="text-slate-400">(opcional)</span></label>
+
+            {/* Chips das categorias já cadastradas */}
+            {categories.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {categories.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => set("category", form.category === c ? "" : c)}
+                    className={`text-xs px-2.5 py-1 rounded-full border font-medium transition ${
+                      form.category === c
+                        ? "bg-brand-600 text-white border-brand-600"
+                        : "border-slate-200 dark:border-gray-700 text-slate-600 dark:text-gray-400 hover:border-brand-400 dark:hover:border-brand-500 hover:text-brand-600 dark:hover:text-brand-400"
+                    }`}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Input para nova categoria */}
+            <input
+              className={inputCls}
+              value={form.category}
+              onChange={(e) => set("category", e.target.value)}
+              placeholder={categories.length > 0 ? "Ou digite uma nova categoria..." : "Ex: Periférico, Cabo..."}
+            />
           </div>
 
           <div>
@@ -602,16 +618,33 @@ export default function InventoryPage() {
                   />
                 </div>
                 {categories.length > 0 && (
-                  <div className="flex items-center gap-1.5">
-                    <Filter size={14} className="text-slate-400" />
-                    <select
-                      className="rounded-lg border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-slate-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                      value={filterCat}
-                      onChange={(e) => setFilterCat(e.target.value)}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <Filter size={14} className="text-slate-400 dark:text-gray-500 shrink-0" />
+                    <button
+                      type="button"
+                      onClick={() => setFilterCat("")}
+                      className={`text-xs px-2.5 py-1 rounded-full border font-medium transition ${
+                        !filterCat
+                          ? "bg-slate-600 dark:bg-gray-300 text-white dark:text-gray-900 border-slate-600 dark:border-gray-300"
+                          : "border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400 hover:bg-slate-50 dark:hover:bg-gray-800"
+                      }`}
                     >
-                      <option value="">Todas as categorias</option>
-                      {categories.map((c) => <option key={c} value={c}>{c}</option>)}
-                    </select>
+                      Todas
+                    </button>
+                    {categories.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setFilterCat(filterCat === c ? "" : c)}
+                        className={`text-xs px-2.5 py-1 rounded-full border font-medium transition ${
+                          filterCat === c
+                            ? "bg-brand-600 text-white border-brand-600"
+                            : "border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400 hover:border-brand-400 hover:text-brand-600 dark:hover:text-brand-400"
+                        }`}
+                      >
+                        {c}
+                      </button>
+                    ))}
                   </div>
                 )}
                 <button onClick={loadItems} title="Atualizar" className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400 hover:bg-slate-50 dark:hover:bg-gray-800 transition">

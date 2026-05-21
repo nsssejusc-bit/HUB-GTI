@@ -6,7 +6,7 @@ import { useSocketConnected } from "../context/SocketContext";
 import { api } from "../lib/api";
 import {
   LayoutDashboard, BarChart2, LogOut, Users,
-  Crown, Sun, Moon, Building2, ChevronDown, UserCircle, Ticket, KeyRound, ClipboardList, Lightbulb, Settings, Tag, Shield, Package,
+  Crown, Sun, Moon, Building2, ChevronDown, UserCircle, Ticket, KeyRound, ClipboardList, Settings, Tag, Shield, Package,
 } from "lucide-react";
 
 const ROLE_LABEL = {
@@ -81,7 +81,7 @@ export default function AppHeader() {
 
   const isActive = (path) => loc.pathname === path;
   const isActiveSearch = (path, search) => loc.pathname === path && loc.search.includes(search);
-  const configActive = isActive("/painel/setores") || isActive("/painel/n1") || isActive("/painel/categorias") || isActive("/painel/auditoria") || isActiveSearch("/painel/usuarios", "tab=resets");
+  const configActive = isActive("/painel/setores") || isActive("/painel/categorias") || isActive("/painel/auditoria") || isActiveSearch("/painel/usuarios", "tab=resets");
 
   const navCls = (active) =>
     `relative flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg transition whitespace-nowrap ${
@@ -190,18 +190,6 @@ export default function AppHeader() {
                   >
                     <Building2 size={15} />
                     Setores
-                  </Link>
-                  <Link
-                    to="/painel/n1"
-                    onClick={() => setConfigOpen(false)}
-                    className={`flex items-center gap-2.5 px-3.5 py-2.5 text-sm transition ${
-                      isActive("/painel/n1")
-                        ? "bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-400 font-medium"
-                        : "text-slate-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-800"
-                    }`}
-                  >
-                    <Lightbulb size={15} />
-                    Suporte N1
                   </Link>
                   <Link
                     to="/painel/categorias"

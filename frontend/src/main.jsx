@@ -19,7 +19,6 @@ import WorkOrdersPage from "./pages/WorkOrdersPage";
 import WorkOrderDetailPage from "./pages/WorkOrderDetailPage";
 import UsersPage from "./pages/UsersPage";
 import DepartmentsPage from "./pages/DepartmentsPage";
-import N1Page from "./pages/N1Page";
 import CategoriesPage from "./pages/CategoriesPage";
 import AuditPage from "./pages/AuditPage";
 import ProfilePage from "./pages/ProfilePage";
@@ -125,7 +124,6 @@ ReactDOM.createRoot(document.getElementById("root")).render(
                 {/* Admin only */}
                 <Route path="/painel/usuarios" element={<Protected adminOnly><UsersPage /></Protected>} />
                 <Route path="/painel/setores" element={<Protected adminOnly><DepartmentsPage /></Protected>} />
-                <Route path="/painel/n1" element={<Protected adminOnly><N1Page /></Protected>} />
                 <Route path="/painel/categorias" element={<Protected adminOnly><CategoriesPage /></Protected>} />
                 <Route path="/painel/auditoria" element={<Protected adminOnly><AuditPage /></Protected>} />
 

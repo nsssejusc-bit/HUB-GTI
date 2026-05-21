@@ -14,7 +14,7 @@ const createTicketSchema = z.object({
   freeTextDescription: z.string().max(2000).optional().nullable(),
   anyDeskCode:         z.string().max(20).optional().nullable(),
   extraData:           z.record(z.unknown()).optional().nullable(),
-  priority:            z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).optional().default("MEDIUM"),
+  // priority removido do input do usuário — agora é derivado da subcategoria/categoria
 });
 
 export async function createTicket(req, res) {
@@ -111,7 +111,7 @@ export async function createTicket(req, res) {
     requesterCpf:        requester.cpf,
     department:          dept.name,
     departmentId:        dept.id,
-    priority:            data.priority ?? "MEDIUM",
+    priority:            (selectedSub?.defaultPriority ?? category.defaultPriority ?? "MEDIUM"),
     slaDeadline,
     categoryId:          data.categoryId,
     subcategoryId:       (!isRemote && !category.allowsFreeText) ? data.subcategoryId : null,
@@ -238,18 +238,38 @@ export async function listTickets(req, res) {
   }
   // ADMIN vê tudo (sem filtro adicional)
 
-  const take        = Math.min(Number(limit) || 200, 500);
+  const take        = Math.min(Number(limit) || 200, 200);
   const cursorClause = cursor ? { cursor: { id: Number(cursor) }, skip: 1 } : {};
 
   const rows = await prisma.ticket.findMany({
     where,
-    include: {
-      category:    true,
-      subcategory: true,
-      unit:        true,
+    select: {
+      id:                    true,
+      ticketNumber:          true,
+      requesterName:         true,
+      requesterCpf:          true,
+      department:            true,
+      freeTextDescription:   true,
+      extraData:             true,
+      anyDeskCode:           true,
+      priority:              true,
+      presential:            true,
+      requiresCauseSolution: true,
+      approvalStatus:        true,
+      status:                true,
+      slaDeadline:           true,
+      openedAt:              true,
+      viewedAt:              true,
+      enRouteAt:             true,
+      inServiceAt:           true,
+      completedAt:           true,
+      category:    { select: { id: true, name: true } },
+      subcategory: { select: { id: true, name: true, code: true } },
+      unit:        { select: { id: true, name: true } },
       assignedTech: { select: { id: true, name: true } },
       approvals: {
-        include: {
+        select: {
+          id: true, chefDeptId: true, status: true, note: true, decidedAt: true,
           chefDept: { select: { name: true } },
           chefUser: { select: { name: true } },
         },

@@ -162,31 +162,34 @@ model PasswordResetRequest {
 }
 
 model Category {
-  id             Int           @id @default(autoincrement())
-  code           String        @unique
-  name           String
-  icon           String?
-  sortOrder      Int           @default(0)
-  allowsFreeText Boolean       @default(false)
-  n1Tips         String?       @db.Text
-  slaHours       Int?
-  subcategories  Subcategory[]
-  tickets        Ticket[]
+  id              Int           @id @default(autoincrement())
+  code            String        @unique
+  name            String
+  icon            String?
+  sortOrder       Int           @default(0)
+  allowsFreeText  Boolean       @default(false)
+  n1Tips          String?       @db.Text
+  slaHours        Int?
+  defaultPriority Priority      @default(MEDIUM)
+  subcategories   Subcategory[]
+  tickets         Ticket[]
 }
 
 model Subcategory {
-  id                 Int      @id @default(autoincrement())
-  name               String
-  code               String?  @unique
-  sortOrder          Int      @default(0)
+  id                    Int      @id @default(autoincrement())
+  name                  String
+  code                  String?  @unique
+  sortOrder             Int      @default(0)
   slaHours              Int?
+  n1Tips                String?  @db.Text
+  defaultPriority       Priority @default(MEDIUM)
   requiresApproval      Boolean  @default(false)
   dualApproval          Boolean  @default(false)
   requiresPresential    Boolean  @default(true)
   requiresCauseSolution Boolean  @default(true)
   categoryId            Int
-  category           Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  tickets            Ticket[]
+  category              Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  tickets               Ticket[]
 }
 
 model Ticket {
@@ -238,6 +241,10 @@ model Ticket {
   @@index([openedAt])
   @@index([categoryId])
   @@index([departmentId])
+  // Composite indexes for common filter combinations
+  @@index([status, assignedTechId])
+  @@index([approvalStatus, status])
+  @@index([status, unitId])
 }
 
 model TicketApproval {

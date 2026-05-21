@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { useSocket } from "../context/SocketContext";
@@ -49,6 +49,17 @@ const HIST_RANGES = [
   { key: "90", label: "90 dias" },
   { key: "0",  label: "Tudo"   },
 ];
+
+// ── Chips de categoria ────────────────────────────────────────────────────────
+const CAT_CHIP = {
+  HARDWARE:  { on: "bg-orange-500 text-white border-orange-500",  off: "border-orange-200 dark:border-orange-800/60 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20" },
+  NETWORK:   { on: "bg-blue-500   text-white border-blue-500",    off: "border-blue-200   dark:border-blue-800/60   text-blue-600   dark:text-blue-400   hover:bg-blue-50   dark:hover:bg-blue-900/20"   },
+  NETSERVER: { on: "bg-indigo-500 text-white border-indigo-500",  off: "border-indigo-200 dark:border-indigo-800/60 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20" },
+  SIGED:     { on: "bg-teal-500   text-white border-teal-500",    off: "border-teal-200   dark:border-teal-800/60   text-teal-600   dark:text-teal-400   hover:bg-teal-50   dark:hover:bg-teal-900/20"   },
+  REMOTE:    { on: "bg-cyan-500   text-white border-cyan-500",    off: "border-cyan-200   dark:border-cyan-800/60   text-cyan-600   dark:text-cyan-400   hover:bg-cyan-50   dark:hover:bg-cyan-900/20"   },
+  PRINTER:   { on: "bg-green-500  text-white border-green-500",   off: "border-green-200  dark:border-green-800/60  text-green-600  dark:text-green-400  hover:bg-green-50  dark:hover:bg-green-900/20"  },
+  _default:  { on: "bg-slate-600  text-white border-slate-600",   off: "border-slate-200  dark:border-gray-700      text-slate-600  dark:text-gray-400   hover:bg-slate-50  dark:hover:bg-gray-800"      },
+};
 
 // ── View simplificada para Chefe de Setor ────────────────────────────────────
 function ChefeDashboard() {
@@ -308,9 +319,10 @@ export default function DashboardPage() {
   // Filtros avançados
   const [departments, setDepartments]     = useState([]);
   const [categories, setCategories]       = useState([]);
-  const [deptFilter, setDeptFilter]       = useState("");
+  const [deptFilter, setDeptFilter]         = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
-  const [dateFilter, setDateFilter]       = useState("");
+  const [priorityFilter, setPriorityFilter] = useState("");
+  const [dateFilter, setDateFilter]         = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -377,6 +389,8 @@ export default function DashboardPage() {
     load();
   }, [load]);
 
+  const loadDebounceRef = useRef(null);
+
   useEffect(() => {
     const s = socket?.current;
     if (!s) return;
@@ -386,7 +400,10 @@ export default function DashboardPage() {
       load();
     };
 
-    const onUpdated  = () => load();
+    const onUpdated = () => {
+      clearTimeout(loadDebounceRef.current);
+      loadDebounceRef.current = setTimeout(() => load(), 300);
+    };
     const onDeleted  = ({ id }) => setTickets((prev) => prev.filter((t) => t.id !== id));
 
     s.on("ticket:created", onCreated);
@@ -400,7 +417,7 @@ export default function DashboardPage() {
   }, [socket, load, addToast]);
 
   // KPI counts — respeitam deptFilter e dateFilter
-  const kpiBase = (() => {
+  const kpiBase = useMemo(() => {
     let base = tickets;
     if (deptFilter) base = base.filter((t) => t.department === deptFilter);
     if (dateFilter) {
@@ -409,51 +426,62 @@ export default function DashboardPage() {
       base = base.filter((t) => { const d = new Date(t.openedAt); return d >= from && d <= to; });
     }
     return base;
-  })();
-  const active    = kpiBase.filter((t) => ACTIVE_STATUSES.includes(t.status));
-  const completed = kpiBase.filter((t) => t.status === "COMPLETED");
-  const noUnit    = kpiBase.filter((t) => ACTIVE_STATUSES.includes(t.status) && !t.unit);
-  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-  const todayTotal = kpiBase.filter((t) => new Date(t.openedAt) >= todayStart);
+  }, [tickets, deptFilter, dateFilter]);
+  const active    = useMemo(() => kpiBase.filter((t) => ACTIVE_STATUSES.includes(t.status)), [kpiBase]);
+  const completed = useMemo(() => kpiBase.filter((t) => t.status === "COMPLETED"), [kpiBase]);
+  const noUnit    = useMemo(() => kpiBase.filter((t) => ACTIVE_STATUSES.includes(t.status) && !t.unit), [kpiBase]);
+  const todayTotal = useMemo(() => {
+    const start = new Date(); start.setHours(0, 0, 0, 0);
+    return kpiBase.filter((t) => new Date(t.openedAt) >= start);
+  }, [kpiBase]);
 
-  // Filtro de exibição
-  let visible = filter === "active"    ? active
-              : filter === "completed" ? completed
-              : filter === "history"   ? history
-              : tickets;
-  if (deptFilter && filter !== "history") visible = visible.filter((t) => t.department === deptFilter);
-  if (dateFilter) {
-    const from = new Date(dateFilter + "T00:00:00");
-    const to   = new Date(dateFilter + "T23:59:59");
-    visible = visible.filter((t) => {
-      const d = new Date(t.openedAt);
-      return d >= from && d <= to;
-    });
-  }
-  if (searchQuery) {
-    const q = searchQuery.toLowerCase();
-    visible = visible.filter((t) =>
-      t.ticketNumber?.toLowerCase().includes(q) ||
-      t.requesterName?.toLowerCase().includes(q) ||
-      t.department?.toLowerCase().includes(q) ||
-      t.category?.name?.toLowerCase().includes(q)
-    );
-  }
+  // Filtro de exibição + ordenação por prioridade
+  const PRIORITY_WEIGHT = { URGENT: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
+  const visible = useMemo(() => {
+    let result = filter === "active"    ? active
+               : filter === "completed" ? completed
+               : filter === "history"   ? history
+               : tickets;
+    if (deptFilter && filter !== "history") result = result.filter((t) => t.department === deptFilter);
+    if (dateFilter) {
+      const from = new Date(dateFilter + "T00:00:00");
+      const to   = new Date(dateFilter + "T23:59:59");
+      result = result.filter((t) => { const d = new Date(t.openedAt); return d >= from && d <= to; });
+    }
+    if (priorityFilter) result = result.filter((t) => t.priority === priorityFilter);
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter((t) =>
+        t.ticketNumber?.toLowerCase().includes(q) ||
+        t.requesterName?.toLowerCase().includes(q) ||
+        t.department?.toLowerCase().includes(q) ||
+        t.category?.name?.toLowerCase().includes(q)
+      );
+    }
+    if (filter !== "history") {
+      result = [...result].sort((a, b) => {
+        const pw = (PRIORITY_WEIGHT[b.priority] ?? 2) - (PRIORITY_WEIGHT[a.priority] ?? 2);
+        if (pw !== 0) return pw;
+        return new Date(b.openedAt) - new Date(a.openedAt);
+      });
+    }
+    return result;
+  }, [filter, active, completed, history, tickets, deptFilter, dateFilter, priorityFilter, searchQuery]);
 
   // Agrupar por unidade
-  const byUnit = visible.reduce((acc, t) => {
+  const byUnit = useMemo(() => visible.reduce((acc, t) => {
     const key = t.unit?.name || "__sem_unidade__";
     (acc[key] = acc[key] || []).push(t);
     return acc;
-  }, {});
+  }, {}), [visible]);
 
-  const sortedUnits = Object.entries(byUnit).sort(([a]) =>
-    a === "__sem_unidade__" ? -1 : 1
-  );
+  const sortedUnits = useMemo(() =>
+    Object.entries(byUnit).sort(([a]) => a === "__sem_unidade__" ? -1 : 1),
+  [byUnit]);
 
   const now = new Date();
   const dateLabel = now.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
-  const hasFilters = deptFilter || categoryFilter || dateFilter;
+  const hasFilters = deptFilter || categoryFilter || priorityFilter || dateFilter;
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-gray-950">
@@ -602,7 +630,7 @@ export default function DashboardPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Buscar por número, solicitante, setor ou categoria..."
-              className="field-input pl-8 py-1.5 text-xs w-full"
+              className="field-input pl-8 py-2 text-xs w-full"
             />
             {searchQuery && (
               <button
@@ -614,52 +642,103 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* Filtros avançados */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <Filter size={13} className="text-slate-400 dark:text-gray-500 shrink-0" />
-            <select
-              value={deptFilter}
-              onChange={(e) => setDeptFilter(e.target.value)}
-              className="field-input py-1.5 text-xs w-auto min-w-0 max-w-[200px]"
-            >
-              <option value="">Todos os setores</option>
-              {departments.map((d) => (
-                <option key={d.id} value={d.name}>{d.name}</option>
-              ))}
-            </select>
-            <select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="field-input py-1.5 text-xs w-auto min-w-0 max-w-[180px]"
-            >
-              <option value="">Todas as categorias</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-            <input
-              type="date"
-              value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value)}
-              className="field-input py-1.5 text-xs w-auto"
-              title="Filtrar por data de abertura"
-            />
-            {(hasFilters || searchQuery) && (
-              <button
-                onClick={() => { setDeptFilter(""); setCategoryFilter(""); setDateFilter(""); setSearchQuery(""); }}
-                className="text-xs text-slate-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 transition"
-              >
-                Limpar filtros
-              </button>
+          {/* Filtros avançados — painel estruturado */}
+          <div className="rounded-xl border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-900 divide-y divide-slate-100 dark:divide-gray-700/50 overflow-hidden">
+
+            {/* Linha: Categoria */}
+            {categories.length > 0 && (
+              <div className="flex items-start gap-3 px-3 py-2.5">
+                <span className="text-[10px] font-semibold text-slate-400 dark:text-gray-500 uppercase tracking-wide pt-1 w-16 shrink-0">Categoria</span>
+                <div className="flex flex-wrap gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setCategoryFilter("")}
+                    className={`text-xs px-2.5 py-1 rounded-full border font-medium transition ${
+                      !categoryFilter
+                        ? "bg-slate-600 dark:bg-gray-300 text-white dark:text-gray-900 border-slate-600 dark:border-gray-300"
+                        : "border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400 hover:bg-slate-50 dark:hover:bg-gray-800"
+                    }`}
+                  >
+                    Todas
+                  </button>
+                  {categories.map((c) => {
+                    const isCatActive = categoryFilter === String(c.id);
+                    const chip = CAT_CHIP[c.code] || CAT_CHIP._default;
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => setCategoryFilter(isCatActive ? "" : String(c.id))}
+                        className={`text-xs px-2.5 py-1 rounded-full border font-medium transition ${isCatActive ? chip.on : chip.off}`}
+                      >
+                        {c.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             )}
-            <button
-              onClick={() => exportCsv(visible)}
-              disabled={visible.length === 0}
-              className="ml-auto flex items-center gap-1.5 text-xs text-slate-500 dark:text-gray-400 hover:text-brand-600 dark:hover:text-brand-400 transition disabled:opacity-40"
-              title="Exportar lista atual como CSV"
-            >
-              <Download size={13} /> CSV
-            </button>
+
+            {/* Linha: Prioridade */}
+            <div className="flex items-center gap-3 px-3 py-2.5">
+              <span className="text-[10px] font-semibold text-slate-400 dark:text-gray-500 uppercase tracking-wide w-16 shrink-0">Prioridade</span>
+              <div className="flex flex-wrap gap-1">
+                {[
+                  { value: "",       label: "Todas",   on: "bg-slate-600 dark:bg-gray-300 text-white dark:text-gray-900 border-slate-600",   off: "border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400 hover:bg-slate-50 dark:hover:bg-gray-800" },
+                  { value: "URGENT", label: "Urgente", on: "bg-red-500    text-white border-red-500",    off: "border-red-200    dark:border-red-800/60    text-red-600    dark:text-red-400    hover:bg-red-50    dark:hover:bg-red-900/20"    },
+                  { value: "HIGH",   label: "Alta",    on: "bg-orange-500 text-white border-orange-500", off: "border-orange-200 dark:border-orange-800/60 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20" },
+                  { value: "MEDIUM", label: "Média",   on: "bg-blue-500   text-white border-blue-500",   off: "border-blue-200   dark:border-blue-800/60   text-blue-600   dark:text-blue-400   hover:bg-blue-50   dark:hover:bg-blue-900/20"   },
+                  { value: "LOW",    label: "Baixa",   on: "bg-slate-400  text-white border-slate-400",  off: "border-slate-200  dark:border-gray-700      text-slate-500  dark:text-gray-400   hover:bg-slate-50  dark:hover:bg-gray-800"      },
+                ].map(({ value, label, on, off }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setPriorityFilter(value)}
+                    className={`text-xs px-2.5 py-1 rounded-full border font-medium transition ${priorityFilter === value ? on : off}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Linha: Setor + Data + ações */}
+            <div className="flex items-center gap-2 px-3 py-2.5 flex-wrap">
+              <span className="text-[10px] font-semibold text-slate-400 dark:text-gray-500 uppercase tracking-wide w-16 shrink-0">Setor</span>
+              <select
+                value={deptFilter}
+                onChange={(e) => setDeptFilter(e.target.value)}
+                className="field-input py-1.5 text-xs w-auto min-w-0 max-w-[200px]"
+              >
+                <option value="">Todos</option>
+                {departments.map((d) => (
+                  <option key={d.id} value={d.name}>{d.name}</option>
+                ))}
+              </select>
+              <input
+                type="date"
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+                className="field-input py-1.5 text-xs w-auto"
+                title="Filtrar por data de abertura"
+              />
+              {(hasFilters || searchQuery) && (
+                <button
+                  onClick={() => { setDeptFilter(""); setCategoryFilter(""); setPriorityFilter(""); setDateFilter(""); setSearchQuery(""); }}
+                  className="flex items-center gap-1 text-xs text-slate-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 transition"
+                >
+                  <X size={11} /> Limpar filtros
+                </button>
+              )}
+              <button
+                onClick={() => exportCsv(visible)}
+                disabled={visible.length === 0}
+                className="ml-auto flex items-center gap-1.5 text-xs text-slate-500 dark:text-gray-400 hover:text-brand-600 dark:hover:text-brand-400 transition disabled:opacity-40"
+                title="Exportar lista atual como CSV"
+              >
+                <Download size={13} /> CSV
+              </button>
+            </div>
           </div>
         </div>
 
@@ -697,7 +776,7 @@ export default function DashboardPage() {
                     {categoryFilter && <p>Categoria: <strong className="text-slate-600 dark:text-gray-300">{categories.find((c) => String(c.id) === categoryFilter)?.name}</strong></p>}
                     {searchQuery && <p>Busca: <strong className="text-slate-600 dark:text-gray-300">"{searchQuery}"</strong></p>}
                     <button
-                      onClick={() => { setDeptFilter(""); setCategoryFilter(""); setSearchQuery(""); }}
+                      onClick={() => { setDeptFilter(""); setCategoryFilter(""); setPriorityFilter(""); setSearchQuery(""); }}
                       className="mt-2 text-brand-600 dark:text-brand-400 hover:underline font-medium"
                     >
                       Limpar filtros
