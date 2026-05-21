@@ -185,7 +185,7 @@ function buildPdfHelpers(doc, autoTable) {
     for (let p = 1; p <= pages; p++) {
       doc.setPage(p);
       doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(148, 163, 184);
-      doc.text(`Pagina ${p} de ${pages}  —  HelpDesk SEJUSC`, W / 2, H - 6, { align: "center" });
+      doc.text(`Pagina ${p} de ${pages}  —  HUB GTI · SEJUSC`, W / 2, H - 6, { align: "center" });
     }
   }
 
@@ -198,7 +198,7 @@ function pdfHeader(doc, subtitle, range) {
   doc.setFillColor(...BLUE);
   doc.rect(0, 0, W, 8, "F");
   doc.setFont("helvetica", "bold"); doc.setFontSize(15); doc.setTextColor(...DARK);
-  doc.text("HelpDesk SEJUSC", M, 19);
+  doc.text("HUB GTI · SEJUSC", M, 19);
   doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(...SLATE);
   doc.text(subtitle, M, 26);
   doc.text(`Periodo: ${range.from} a ${range.to}   |   Gerado: ${new Date().toLocaleDateString("pt-BR")}`, M, 32);

@@ -171,7 +171,15 @@ function ExtraFields({ formType, fields, setFields, departments }) {
       </div>
       <div>
         <label className="field-label">Setor *</label>
-        <input className="field-input" placeholder="Setor do novo usuário" value={fields.setor || ""} onChange={(e) => set("setor", e.target.value)} />
+        <DeptSelect
+          value={fields.setorId || null}
+          onChange={(id) => {
+            const dept = departments.find((d) => d.id === id);
+            setFields((prev) => ({ ...prev, setorId: id, setorName: dept?.name || "" }));
+          }}
+          departments={departments}
+          placeholder="Selecione o setor..."
+        />
       </div>
       <div>
         <label className="field-label">Cargo / Função *</label>
@@ -180,7 +188,7 @@ function ExtraFields({ formType, fields, setFields, departments }) {
       <div>
         <label className="field-label mb-2">Sistemas necessários</label>
         <div className="flex flex-wrap gap-3">
-          {["SIGED", "SAM", "AD"].map((sys) => {
+          {["SIGED", "SAM", "Pastas"].map((sys) => {
             const checked = (fields.systems || []).includes(sys);
             return (
               <label key={sys} className={`flex items-center gap-2 px-4 py-2 rounded-xl border cursor-pointer transition text-sm font-medium ${
@@ -217,7 +225,15 @@ function ExtraFields({ formType, fields, setFields, departments }) {
       </div>
       <div>
         <label className="field-label">Setor do usuário *</label>
-        <input className="field-input" placeholder="Setor atual do usuário" value={fields.setor || ""} onChange={(e) => set("setor", e.target.value)} />
+        <DeptSelect
+          value={fields.setorId || null}
+          onChange={(id) => {
+            const dept = departments.find((d) => d.id === id);
+            setFields((prev) => ({ ...prev, setorId: id, setorName: dept?.name || "" }));
+          }}
+          departments={departments}
+          placeholder="Selecione o setor..."
+        />
       </div>
       <div>
         <label className="field-label">Observações</label>
@@ -238,7 +254,15 @@ function ExtraFields({ formType, fields, setFields, departments }) {
       </div>
       <div>
         <label className="field-label">Setor *</label>
-        <input className="field-input" placeholder="Setor do usuário" value={fields.setor || ""} onChange={(e) => set("setor", e.target.value)} />
+        <DeptSelect
+          value={fields.setorId || null}
+          onChange={(id) => {
+            const dept = departments.find((d) => d.id === id);
+            setFields((prev) => ({ ...prev, setorId: id, setorName: dept?.name || "" }));
+          }}
+          departments={departments}
+          placeholder="Selecione o setor..."
+        />
       </div>
     </div>
   );
@@ -309,9 +333,9 @@ function ExtraFields({ formType, fields, setFields, departments }) {
 function isExtraValid(formType, fields) {
   if (!formType || formType === "none") return true;
   if (formType === "printer")          return !!(fields.printerName?.trim() && fields.block?.trim());
-  if (formType === "net_user_create")  return !!(fields.nome?.trim() && fields.cpf?.trim() && fields.setor?.trim() && fields.cargo?.trim());
-  if (formType === "net_user_delete")  return !!(fields.cpf?.trim() && fields.setor?.trim());
-  if (formType === "net_password_reset") return !!(fields.nome?.trim() && fields.cpf?.trim() && fields.setor?.trim());
+  if (formType === "net_user_create")  return !!(fields.nome?.trim() && fields.cpf?.trim() && fields.setorId && fields.cargo?.trim());
+  if (formType === "net_user_delete")  return !!(fields.cpf?.trim() && fields.setorId);
+  if (formType === "net_password_reset") return !!(fields.nome?.trim() && fields.cpf?.trim() && fields.setorId);
   if (formType === "siged_sector_move")  return !!(fields.cpf?.trim() && fields.targetDeptId);
   if (formType === "siged_user_delete")  return !!(fields.cpf?.trim());
   if (formType === "freetext")           return (fields.freetext?.trim().length || 0) >= 5;
@@ -328,12 +352,12 @@ function buildPayload(formType, fields) {
     extraData = { printerName: fields.printerName, block: fields.block };
   } else if (formType === "net_user_create") {
     const systems = (fields.systems || []).join(", ");
-    freeTextDescription = `Nome: ${fields.nome}\nCPF: ${fields.cpf}\nE-mail: ${fields.email || "—"}\nSetor: ${fields.setor}\nCargo: ${fields.cargo}${systems ? `\nSistemas: ${systems}` : ""}`;
+    freeTextDescription = `Nome: ${fields.nome}\nCPF: ${fields.cpf}\nE-mail: ${fields.email || "—"}\nSetor: ${fields.setorName}\nCargo: ${fields.cargo}${systems ? `\nSistemas: ${systems}` : ""}`;
     extraData = { systems: fields.systems || [] };
   } else if (formType === "net_user_delete") {
-    freeTextDescription = `CPF: ${fields.cpf}\nSetor: ${fields.setor}${fields.obs ? `\nObservações: ${fields.obs}` : ""}`;
+    freeTextDescription = `CPF: ${fields.cpf}\nSetor: ${fields.setorName}${fields.obs ? `\nObservações: ${fields.obs}` : ""}`;
   } else if (formType === "net_password_reset") {
-    freeTextDescription = `Nome: ${fields.nome}\nCPF: ${fields.cpf}\nSetor: ${fields.setor}`;
+    freeTextDescription = `Nome: ${fields.nome}\nCPF: ${fields.cpf}\nSetor: ${fields.setorName}`;
   } else if (formType === "siged_sector_move") {
     freeTextDescription = `CPF: ${fields.cpf}\nSetor de destino: ${fields.targetDeptName}${fields.obs ? `\nObservações: ${fields.obs}` : ""}`;
     extraData = { targetDeptId: fields.targetDeptId, targetDeptName: fields.targetDeptName };

@@ -26,6 +26,8 @@ import ChangePasswordPage from "./pages/ChangePasswordPage";
 import InventoryPage from "./pages/InventoryPage";
 import InventoryItemDetailPage from "./pages/InventoryItemDetailPage";
 import ChecklistDetailPage from "./pages/ChecklistDetailPage";
+import TeamPage from "./pages/TeamPage";
+import Footer from "./components/Footer";
 import "./index.css";
 
 // Hierarquia: ADMIN > TECHNICIAN > CHEFE_SETOR > USER
@@ -94,6 +96,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         <AuthProvider>
           <SocketProvider>
             <ToastProvider>
+              <div className="flex flex-col min-h-screen">
+              <div className="flex-1">
               <Routes>
                 {/* Público */}
                 <Route path="/" element={<HomePage />} />
@@ -127,8 +131,12 @@ ReactDOM.createRoot(document.getElementById("root")).render(
                 <Route path="/painel/categorias" element={<Protected adminOnly><CategoriesPage /></Protected>} />
                 <Route path="/painel/auditoria" element={<Protected adminOnly><AuditPage /></Protected>} />
 
+                <Route path="/equipe" element={<TeamPage />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
+              </div>
+              <Footer />
+              </div>
             </ToastProvider>
           </SocketProvider>
         </AuthProvider>

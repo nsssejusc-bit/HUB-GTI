@@ -9,6 +9,27 @@ import {
   Crown, Sun, Moon, Building2, ChevronDown, UserCircle, Ticket, KeyRound, ClipboardList, Settings, Tag, Shield, Package,
 } from "lucide-react";
 
+// Slot da logo — quando /logo.png existir, a imagem aparece automaticamente;
+// enquanto isso exibe o ícone de texto.
+function LogoMark() {
+  const [hasLogo, setHasLogo] = useState(true);
+  if (hasLogo) {
+    return (
+      <img
+        src="/logo.png"
+        alt="HUB GTI"
+        className="h-8 w-auto"
+        onError={() => setHasLogo(false)}
+      />
+    );
+  }
+  return (
+    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-white text-xs font-bold shadow-sm">
+      GTI
+    </span>
+  );
+}
+
 const ROLE_LABEL = {
   ADMIN:       "Administrador",
   TECHNICIAN:  "Técnico",
@@ -96,11 +117,10 @@ export default function AppHeader() {
 
         {/* ── Brand ── */}
         <Link to={isStaff ? "/painel" : "/"} className="flex items-center gap-2 shrink-0 mr-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-white text-sm font-bold shadow-sm">
-            HD
-          </span>
+          {/* Logo: substituir img src por /logo.png quando a logo estiver pronta */}
+          <LogoMark />
           <span className="hidden md:block text-sm font-semibold text-slate-800 dark:text-gray-100">
-            HelpDesk <span className="text-slate-400 dark:text-gray-500 font-normal">SEJUSC</span>
+            HUB <span className="text-slate-400 dark:text-gray-500 font-normal">GTI</span>
           </span>
         </Link>
 

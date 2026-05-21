@@ -6,6 +6,21 @@ import { useTheme } from "../context/ThemeContext";
 import { Alert, Spinner } from "../components/ui";
 import { ArrowLeft, Sun, Moon, KeyRound, CheckCircle2, Phone } from "lucide-react";
 
+function ForgotLogo() {
+  const [hasLogo, setHasLogo] = useState(true);
+  if (hasLogo) {
+    return (
+      <img src="/logo.png" alt="HUB GTI" className="h-12 w-auto mb-3"
+        onError={() => setHasLogo(false)} />
+    );
+  }
+  return (
+    <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-600 text-white text-lg font-bold shadow-card-md mb-3">
+      GTI
+    </span>
+  );
+}
+
 function maskPhone(v) {
   const d = v.replace(/\D/g, "").slice(0, 11);
   if (d.length <= 2)  return d;
@@ -56,11 +71,9 @@ export default function ForgotPasswordPage() {
 
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-8">
-          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-600 text-white text-lg font-bold shadow-card-md mb-3">
-            HD
-          </span>
+          <ForgotLogo />
           <h1 className="text-xl font-bold text-slate-900 dark:text-gray-100">Esqueci minha senha</h1>
-          <p className="text-sm text-slate-500 dark:text-gray-400 mt-1">HelpDesk SEJUSC</p>
+          <p className="text-sm text-slate-500 dark:text-gray-400 mt-1">HUB GTI · SEJUSC</p>
         </div>
 
         {step === 1 ? (

@@ -6,6 +6,21 @@ import { maskCpf, isValidCpf } from "../lib/cpf";
 import { Alert, Spinner } from "../components/ui";
 import { LogIn, ArrowLeft, Sun, Moon } from "lucide-react";
 
+function LoginLogo() {
+  const [hasLogo, setHasLogo] = useState(true);
+  if (hasLogo) {
+    return (
+      <img src="/logo.png" alt="HUB GTI" className="h-12 w-auto mb-3"
+        onError={() => setHasLogo(false)} />
+    );
+  }
+  return (
+    <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-600 text-white text-lg font-bold shadow-card-md mb-3">
+      GTI
+    </span>
+  );
+}
+
 export default function LoginPage() {
   const nav = useNavigate();
   const [searchParams] = useSearchParams();
@@ -53,11 +68,9 @@ export default function LoginPage() {
 
         {/* Brand */}
         <div className="flex flex-col items-center mb-8">
-          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-600 text-white text-lg font-bold shadow-card-md mb-3">
-            HD
-          </span>
+          <LoginLogo />
           <h1 className="text-xl font-bold text-slate-900 dark:text-gray-100">Entrar na conta</h1>
-          <p className="text-sm text-slate-500 dark:text-gray-400 mt-1">HelpDesk SEJUSC</p>
+          <p className="text-sm text-slate-500 dark:text-gray-400 mt-1">HUB GTI · SEJUSC</p>
         </div>
 
         <form onSubmit={submit} className="card p-6 space-y-4">
