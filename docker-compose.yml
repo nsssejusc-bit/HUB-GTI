@@ -18,6 +18,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 12
+    ports:
+      - "3303:3306"
     networks:
       - helpdesk-net
 
