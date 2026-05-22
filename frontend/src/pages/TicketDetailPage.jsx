@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
@@ -55,6 +55,7 @@ export default function TicketDetailPage() {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
   const [msgSending, setMsgSending] = useState(false);
+  const msgEndRef = useRef(null);
   const [deleting, setDeleting] = useState(false);
   const [showReopenModal,  setShowReopenModal]  = useState(false);
   const [reopenReason,     setReopenReason]     = useState("");
@@ -78,6 +79,10 @@ export default function TicketDetailPage() {
     api.get(`/tickets/${id}/comments`).then((r) => setComments(r.data)).catch(() => {});
     api.get(`/tickets/${id}/messages`).then((r) => setMessages(r.data)).catch(() => {});
   }, [id]);
+
+  useEffect(() => {
+    msgEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   async function load() {
     const { data } = await api.get(`/tickets/${id}`);
@@ -638,7 +643,7 @@ export default function TicketDetailPage() {
             {messages.length === 0 ? (
               <p className="text-sm text-slate-400 dark:text-gray-500">Nenhuma mensagem enviada ainda.</p>
             ) : (
-              <div className="space-y-2.5">
+              <div className="max-h-64 overflow-y-auto space-y-2.5 pr-1">
                 {messages.map((m) => (
                   <div key={m.id} className={`flex gap-2.5 ${m.fromUser ? "" : "flex-row-reverse"}`}>
                     <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
@@ -662,6 +667,7 @@ export default function TicketDetailPage() {
                     </div>
                   </div>
                 ))}
+                <div ref={msgEndRef} />
               </div>
             )}
 
@@ -672,18 +678,18 @@ export default function TicketDetailPage() {
                 placeholder="Escreva uma mensagem que o solicitante verá ao acompanhar o chamado..."
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) doSendMessage(); }}
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); doSendMessage(); } }}
               />
               <button
                 onClick={doSendMessage}
                 disabled={!newMessage.trim() || msgSending}
                 className="flex h-10 w-10 shrink-0 self-end items-center justify-center rounded-xl bg-brand-600 hover:bg-brand-700 text-white disabled:opacity-50 transition"
-                title="Enviar (Ctrl+Enter)"
+                title="Enviar (Enter)"
               >
                 {msgSending ? <Spinner className="h-4 w-4" /> : <Send size={15} />}
               </button>
             </div>
-            <p className="text-[10px] text-slate-400 dark:text-gray-500">Ctrl+Enter para enviar rapidamente</p>
+            <p className="text-[10px] text-slate-400 dark:text-gray-500">Enter para enviar · Shift+Enter para nova linha</p>
           </div>
 
           {/* Comentários */}

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { api } from "../lib/api";
@@ -14,6 +14,7 @@ const STAFF_ROLES = ["TECHNICIAN", "ADMIN"];
 
 export default function HomePage() {
   const nav = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, login, logout, loading: authLoading } = useAuth();
   const { dark, toggle } = useTheme();
 
@@ -27,10 +28,12 @@ export default function HomePage() {
   const [tickets, setTickets]           = useState([]);
   const [loadingTickets, setLoadingTickets] = useState(false);
 
+  const next = searchParams.get("next");
+
   useEffect(() => {
     if (!user) return;
     if (user.mustChangePassword) { nav("/trocar-senha", { replace: true }); return; }
-    if (STAFF_ROLES.includes(user.role)) { nav("/painel", { replace: true }); }
+    if (STAFF_ROLES.includes(user.role)) { nav(next?.startsWith("/painel") ? next : "/painel", { replace: true }); }
   }, [user]);
 
   useEffect(() => {
@@ -49,7 +52,7 @@ export default function HomePage() {
     setLoggingIn(true);
     try {
       const u = await login(cpf, password);
-      if (STAFF_ROLES.includes(u.role)) nav("/painel", { replace: true });
+      if (STAFF_ROLES.includes(u.role)) nav(next?.startsWith("/painel") ? next : "/painel", { replace: true });
     } catch (ex) {
       setErr(ex.response?.data?.error || "Credenciais incorretas.");
     } finally {

@@ -67,7 +67,7 @@ function Protected({ children, adminOnly = false, staffOnly = false, fullStaffOn
 
   if (loading || refreshing) return spinner;
 
-  if (!user) return <Navigate to={`/login${loc.pathname !== "/" ? `?next=${encodeURIComponent(loc.pathname)}` : ""}`} replace />;
+  if (!user) return <Navigate to={`/${loc.pathname !== "/" ? `?next=${encodeURIComponent(loc.pathname)}` : ""}`} replace />;
 
   if (user.mustChangePassword && loc.pathname !== "/trocar-senha") {
     return <Navigate to="/trocar-senha" replace />;
@@ -103,7 +103,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
                 <Route path="/" element={<HomePage />} />
                 <Route path="/novo-chamado" element={<Protected><NewTicketPage /></Protected>} />
                 <Route path="/acompanhar/:ticketNumber" element={<TrackPage />} />
-                <Route path="/login" element={<LoginPage />} />
+                <Route path="/login" element={<Navigate to="/" replace />} />
                 <Route path="/cadastro" element={<RegisterPage />} />
                 <Route path="/esqueci-senha" element={<ForgotPasswordPage />} />
 
