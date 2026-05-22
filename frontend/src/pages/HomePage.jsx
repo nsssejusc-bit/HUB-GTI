@@ -94,7 +94,7 @@ export default function HomePage() {
         </div>
       </header>
 
-      <main className="flex flex-1 flex-col items-center justify-start px-4 py-10">
+      <main className="flex flex-1 flex-col items-center justify-start px-4 py-10 pb-12">
         <div className="w-full max-w-md">
 
           {/* Brand */}
@@ -279,13 +279,6 @@ export default function HomePage() {
         </div>
       </main>
 
-      <footer className="py-4 text-center">
-        <img
-          src="/logo-gov.svg"
-          alt="Governo do Amazonas"
-          className="h-8 object-contain mx-auto opacity-40 dark:opacity-20 dark:brightness-0 dark:invert"
-        />
-      </footer>
     </div>
   );
 }
