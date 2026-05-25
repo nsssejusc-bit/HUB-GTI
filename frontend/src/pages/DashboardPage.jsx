@@ -273,8 +273,8 @@ export default function DashboardPage() {
   const isAdmin = user?.role === "ADMIN";
   useServerTick(60000);
 
-  // ── Aprovações pendentes para admin que também é chefe de setor ──────────
-  const adminDeptId = user?.department?.id ?? null;
+  // ── Aprovações pendentes apenas para ADMIN que também é chefe de setor ──
+  const adminDeptId = isAdmin ? (user?.department?.id ?? null) : null;
   const [pendingApprovals, setPendingApprovals]   = useState([]);
   const [approvalRejectId, setApprovalRejectId]   = useState(null);
   const [approvalRejectNote, setApprovalRejectNote] = useState("");
