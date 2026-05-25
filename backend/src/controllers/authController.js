@@ -121,12 +121,8 @@ export async function resolveResetRequest(req, res) {
     return res.status(400).json({ error: "Usuário não encontrado ou inativo" });
   }
 
-  const chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
-  const tempPassword = Array.from({ length: 8 }, () =>
-    chars[Math.floor(Math.random() * chars.length)]
-  ).join("");
-
-  const passwordHash = await bcrypt.hash(tempPassword, 10);
+  const DEFAULT_PASSWORD = "abc@123";
+  const passwordHash = await bcrypt.hash(DEFAULT_PASSWORD, 10);
   await prisma.user.update({
     where: { id: user.id },
     data: { passwordHash, mustChangePassword: true },
@@ -138,7 +134,7 @@ export async function resolveResetRequest(req, res) {
   });
 
   res.setHeader("Cache-Control", "no-store");
-  res.json({ ok: true, tempPassword, phone: request.phone, name: request.name });
+  res.json({ ok: true, name: request.name });
 }
 
 export async function me(req, res) {

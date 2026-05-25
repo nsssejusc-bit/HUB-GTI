@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { useSocket } from "../context/SocketContext";
 import { useToast } from "../context/ToastContext";
@@ -265,6 +265,7 @@ export default function DashboardPage() {
   const socket  = useSocket();
   const addToast = useToast();
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // CHEFE_SETOR vê view simplificada
   if (user?.role === "CHEFE_SETOR") return <ChefeDashboard />;
@@ -311,7 +312,11 @@ export default function DashboardPage() {
   const [histHasMore, setHistHasMore] = useState(false);
   const [loading, setLoading]         = useState(true);
   const [histLoading, setHistLoading] = useState(false);
-  const [filter, setFilter]           = useState("active");
+  const VALID_TABS = ["active", "completed", "all", "history"];
+  const [filter, setFilter]           = useState(() => {
+    const tab = searchParams.get("tab");
+    return VALID_TABS.includes(tab) ? tab : "active";
+  });
   const [histRange, setHistRange]     = useState("30");
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [searchQuery, setSearchQuery] = useState("");
@@ -373,6 +378,21 @@ export default function DashboardPage() {
     }
   }, [histRange]);
 
+  // Persiste a aba selecionada na URL (permite voltar com o botão do browser e usar nav(-1))
+  function changeFilter(newFilter) {
+    setFilter(newFilter);
+    const params = {};
+    if (newFilter !== "active") params.tab = newFilter;
+    setSearchParams(params, { replace: true });
+  }
+
+  // Sincroniza a aba a partir de mudanças na URL (botão voltar/avançar do browser)
+  useEffect(() => {
+    const urlTab = searchParams.get("tab");
+    const resolved = VALID_TABS.includes(urlTab) ? urlTab : "active";
+    if (resolved !== filter) setFilter(resolved);
+  }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Carrega filtros disponíveis
   useEffect(() => {
     api.get("/departments").then((r) => setDepartments(r.data));
@@ -382,11 +402,18 @@ export default function DashboardPage() {
   // Carrega histórico ao trocar para essa aba ou mudar o período
   useEffect(() => {
     if (filter === "history") { setHistory([]); setHistCursor(null); loadHistory(false, null); }
-  }, [filter, loadHistory, histRange]);
+  }, [filter, loadHistory, histRange]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Carrega tickets e escuta socket (sem polling)
   useEffect(() => {
     load();
+  }, [load]);
+
+  // Recarrega ao voltar para esta aba do browser (visibilidade)
+  useEffect(() => {
+    const handler = () => { if (!document.hidden) load(); };
+    document.addEventListener("visibilitychange", handler);
+    return () => document.removeEventListener("visibilitychange", handler);
   }, [load]);
 
   const loadDebounceRef = useRef(null);
@@ -570,7 +597,7 @@ export default function DashboardPage() {
             {FILTER_TABS.map((tab) => (
               <button
                 key={tab.key}
-                onClick={() => setFilter(tab.key)}
+                onClick={() => changeFilter(tab.key)}
                 className={`relative pb-2 text-sm font-medium transition ${
                   filter === tab.key
                     ? "text-brand-600 dark:text-brand-400"
@@ -586,7 +613,7 @@ export default function DashboardPage() {
             <span className="ml-auto text-xs text-slate-400 dark:text-gray-500">{visible.length} chamado{visible.length !== 1 ? "s" : ""}</span>
             {isAdmin && (
               <button
-                onClick={() => setFilter(filter === "history" ? "active" : "history")}
+                onClick={() => changeFilter(filter === "history" ? "active" : "history")}
                 className={`relative pb-2 text-sm font-medium transition flex items-center gap-1 ${
                   filter === "history"
                     ? "text-brand-600 dark:text-brand-400"

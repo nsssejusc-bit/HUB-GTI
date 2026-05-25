@@ -350,14 +350,20 @@ function TypeToggle({ type, onChange }) {
 }
 
 function ChartCard({ title, data, xKey, yKey = "total", loading, onlyBar = false }) {
-  const [type, setType] = useState("bar");
+  const storageKey = `chart-type-${title.replace(/\s+/g, "-").toLowerCase()}`;
+  const [type, setType] = useState(() => localStorage.getItem(storageKey) || "bar");
   const { grid, tick, tooltip } = useChartTheme();
+
+  function handleTypeChange(v) {
+    setType(v);
+    localStorage.setItem(storageKey, v);
+  }
 
   return (
     <div className="card p-5">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-semibold text-slate-800 dark:text-gray-100">{title}</h2>
-        {!onlyBar && <TypeToggle type={type} onChange={setType} />}
+        {!onlyBar && <TypeToggle type={type} onChange={handleTypeChange} />}
       </div>
       {loading ? (
         <div className="flex items-center justify-center h-40"><Spinner /></div>

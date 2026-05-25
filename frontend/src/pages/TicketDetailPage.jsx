@@ -209,7 +209,7 @@ export default function TicketDetailPage() {
     setDeleting(true);
     try {
       await api.delete(`/tickets/${id}`);
-      nav("/painel");
+      nav(-1);
     } catch (e) {
       setDeleteErr(e.response?.data?.error || "Erro ao excluir chamado");
     } finally {
@@ -368,7 +368,7 @@ export default function TicketDetailPage() {
                 Continuar editando
               </button>
               <button
-                onClick={() => nav("/painel")}
+                onClick={() => nav(-1)}
                 className="inline-flex items-center gap-1.5 rounded-xl bg-slate-700 hover:bg-slate-800 dark:bg-gray-600 dark:hover:bg-gray-500 text-white px-4 py-2 text-sm font-semibold transition"
               >
                 <ArrowLeft size={14} /> Sair sem salvar
@@ -392,7 +392,7 @@ export default function TicketDetailPage() {
           <button
             onClick={() => {
               if (isDirty) { setShowUnsavedModal(true); return; }
-              nav("/painel");
+              nav(-1);
             }}
             className="flex items-center gap-1.5 text-slate-500 dark:text-gray-400 hover:text-slate-700 dark:hover:text-gray-200 transition"
           >

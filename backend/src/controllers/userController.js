@@ -195,7 +195,7 @@ export async function deleteUser(req, res) {
   res.json({ ok: true });
 }
 
-// POST /api/users/:id/reset-password — ADMIN gera senha temporária
+// POST /api/users/:id/reset-password — redefine senha para abc@123
 export async function resetPassword(req, res) {
   const id = Number(req.params.id);
   const user = await prisma.user.findUnique({ where: { id } });
@@ -204,19 +204,15 @@ export async function resetPassword(req, res) {
     return res.status(403).json({ error: "Não é possível resetar senha de outro administrador" });
   }
 
-  const chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
-  const tempPassword = Array.from({ length: 8 }, () =>
-    chars[Math.floor(Math.random() * chars.length)]
-  ).join("");
-
-  const passwordHash = await bcrypt.hash(tempPassword, 10);
+  const DEFAULT_PASSWORD = "abc@123";
+  const passwordHash = await bcrypt.hash(DEFAULT_PASSWORD, 10);
   await prisma.user.update({
     where: { id },
     data: { passwordHash, mustChangePassword: true },
   });
 
   res.setHeader("Cache-Control", "no-store");
-  res.json({ ok: true, tempPassword });
+  res.json({ ok: true });
 }
 
 // POST /api/auth/change-password — usuário troca a própria senha

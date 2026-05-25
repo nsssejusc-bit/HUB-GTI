@@ -6,7 +6,7 @@ import { Alert, Spinner } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 import {
   CheckCircle2, XCircle, UserCheck, Building2, Shield, Trash2,
-  AlertTriangle, Crown, KeyRound, Copy, Check as CheckIcon, Phone,
+  AlertTriangle, Crown, KeyRound, Check as CheckIcon, Phone,
   Bell, Pencil, X, ChevronRight, Mail, Hash, Briefcase, Users, ShieldCheck,
 } from "lucide-react";
 
@@ -57,7 +57,6 @@ export default function UsersPage() {
   const [confirmDelete,  setConfirmDelete]  = useState(null);
   const [confirmAdmin,   setConfirmAdmin]   = useState(null);
   const [resetResult,    setResetResult]    = useState(null);
-  const [copied,         setCopied]         = useState(false);
   const [resetRequests,  setResetRequests]  = useState([]);
   const [resolvingId,    setResolvingId]    = useState(null);
 
@@ -120,8 +119,8 @@ export default function UsersPage() {
   async function doResetPassword(id, name) {
     setErr("");
     try {
-      const { data } = await api.post(`/users/${id}/reset-password`);
-      setResetResult({ name, tempPassword: data.tempPassword });
+      await api.post(`/users/${id}/reset-password`);
+      setResetResult({ name });
     } catch (e) {
       setErr(e.response?.data?.error || "Erro ao resetar senha");
     }
@@ -131,19 +130,13 @@ export default function UsersPage() {
     setResolvingId(id);
     try {
       const { data } = await api.post(`/password-reset-requests/${id}/resolve`);
-      setResetResult({ name: data.name, tempPassword: data.tempPassword, phone: data.phone });
+      setResetResult({ name: data.name });
       loadResetRequests();
     } catch (e) {
       setErr(e.response?.data?.error || "Erro ao resolver solicitação");
     } finally {
       setResolvingId(null);
     }
-  }
-
-  function copyTempPassword() {
-    navigator.clipboard.writeText(resetResult.tempPassword);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
   }
 
   // ── Agrupamentos de tabs ─────────────────────────────────────────────────
@@ -168,48 +161,35 @@ export default function UsersPage() {
     <div className="min-h-screen bg-slate-50 dark:bg-gray-950">
       <AppHeader />
 
-      {/* ── Modal: senha temporária ─────────────────────────────────────── */}
+      {/* ── Modal: confirmação de reset ──────────────────────────────────── */}
       {resetResult && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
-          onClick={(e) => { if (e.target === e.currentTarget) { setResetResult(null); setCopied(false); } }}
+          onClick={(e) => { if (e.target === e.currentTarget) setResetResult(null); }}
         >
           <div className="card w-full max-w-sm p-6 space-y-4">
             <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-100 dark:bg-brand-900/40 text-brand-600 dark:text-brand-400">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400">
                 <KeyRound size={20} />
               </span>
               <div>
-                <h3 className="font-semibold text-slate-900 dark:text-gray-100">Senha temporária gerada</h3>
-                <p className="text-xs text-slate-500 dark:text-gray-400 mt-0.5">Anote e comunique ao usuário</p>
+                <h3 className="font-semibold text-slate-900 dark:text-gray-100">Senha redefinida</h3>
+                <p className="text-xs text-slate-500 dark:text-gray-400 mt-0.5">Comunique ao usuário</p>
               </div>
             </div>
-            <div>
-              <p className="text-sm text-slate-600 dark:text-gray-300 mb-2">
-                Senha para <strong>{resetResult.name}</strong>:
-              </p>
-              <div className="flex items-center gap-2 rounded-xl bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 px-4 py-3">
-                <span className="font-mono font-bold text-lg tracking-widest text-slate-800 dark:text-gray-100 flex-1">
-                  {resetResult.tempPassword}
-                </span>
-                <button onClick={copyTempPassword} className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:text-brand-600 transition">
-                  {copied ? <CheckIcon size={14} className="text-emerald-500" /> : <Copy size={14} />}
-                </button>
-              </div>
+            <p className="text-sm text-slate-600 dark:text-gray-300">
+              A senha de <strong>{resetResult.name}</strong> foi redefinida para a senha padrão.
+            </p>
+            <div className="rounded-xl bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 px-4 py-3">
+              <p className="text-xs text-slate-500 dark:text-gray-400 mb-1">Nova senha (padrão)</p>
+              <span className="font-mono font-bold text-xl tracking-widest text-slate-800 dark:text-gray-100">
+                abc@123
+              </span>
             </div>
-            {resetResult.phone && (
-              <div className="flex items-center gap-3 rounded-xl bg-brand-50 dark:bg-brand-900/20 border border-brand-200 dark:border-brand-700 px-4 py-3">
-                <Phone size={16} className="text-brand-600 dark:text-brand-400 shrink-0" />
-                <div>
-                  <p className="text-xs text-brand-700 dark:text-brand-300 font-medium">Entre em contato</p>
-                  <p className="text-sm font-semibold text-brand-800 dark:text-brand-200">{resetResult.phone}</p>
-                </div>
-              </div>
-            )}
             <div className="rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 px-4 py-3 text-xs text-amber-800 dark:text-amber-300">
-              ⚠️ Esta senha é exibida apenas uma vez. O usuário deverá alterá-la no próximo login.
+              ⚠️ O usuário será obrigado a criar uma nova senha ao fazer login.
             </div>
-            <button onClick={() => { setResetResult(null); setCopied(false); }} className="btn-primary w-full">
+            <button onClick={() => setResetResult(null)} className="btn-primary w-full">
               Entendido
             </button>
           </div>
@@ -647,6 +627,14 @@ function UserDetailPanel({ user, units, me, onUpdate, onDelete, onGrantAdmin, on
               <button onClick={() => onUpdate(user.id, { role: "CHEFE_SETOR" })}
                 className="inline-flex items-center gap-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 text-xs font-semibold transition">
                 <ShieldCheck size={12} /> Tornar Chefe de Setor
+              </button>
+            )}
+
+            {/* Técnico → USER */}
+            {isTech && !isMe && (
+              <button onClick={() => onUpdate(user.id, { role: "USER" })}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-slate-100 dark:bg-gray-700 hover:bg-slate-200 dark:hover:bg-gray-600 text-slate-700 dark:text-gray-300 px-3 py-1.5 text-xs font-semibold transition">
+                <X size={12} /> Remover função de Técnico
               </button>
             )}
 

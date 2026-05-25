@@ -5,6 +5,7 @@ export async function listCategories(req, res) {
     orderBy: { sortOrder: "asc" },
     include: { subcategories: { orderBy: [{ sortOrder: "asc" }, { name: "asc" }] } },
   });
+  res.setHeader("Cache-Control", "no-store");
   res.json(categories);
 }
 

@@ -4,7 +4,7 @@ import { api } from "../lib/api";
 import { STATUS_ORDER, STATUS_LABEL, statusIndex, formatElapsed } from "../lib/statuses";
 import { useServerTick, serverNow } from "../lib/serverTime";
 import { StatusBadge, InfoItem, Spinner } from "../components/ui";
-import { Home, Clock, CheckCircle2, Circle, Star, MonitorSmartphone, Wifi, Shield, ShieldCheck, ShieldX, MessageSquare, Send } from "lucide-react";
+import { Home, Clock, CheckCircle2, Circle, Star, MonitorSmartphone, Wifi, Shield, ShieldCheck, ShieldX, MessageSquare, Send, UserCheck } from "lucide-react";
 
 const STATUS_DESC = {
   OPEN:       "Chamado registrado, aguardando análise",
@@ -309,7 +309,7 @@ export default function TrackPage() {
                             }`}>
                               {done ? <CheckCircle2 size={14} /> : <Circle size={14} />}
                             </div>
-                            {(!isLast || isRejected) && (
+                            {(!isLast || isRejected || (s === "VIEWED" && ticket.technician)) && (
                               <div className={`w-0.5 flex-1 min-h-[28px] my-1 ${done ? "bg-brand-600" : "bg-slate-200 dark:bg-gray-700"}`} />
                             )}
                           </div>
@@ -324,6 +324,29 @@ export default function TrackPage() {
                                   · {new Date(timestamps[s]).toLocaleString("pt-BR")}
                                 </span>
                               )}
+                            </div>
+                          </div>
+                        </li>
+                      )}
+
+                      {/* Técnico atribuído — exibido logo após VIEWED */}
+                      {s === "VIEWED" && ticket.technician && !isRejected && (
+                        <li key="tech-assigned" className="flex gap-3">
+                          <div className="flex flex-col items-center">
+                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-brand-400 bg-brand-50 dark:bg-brand-900/20 text-brand-500 dark:text-brand-400">
+                              <UserCheck size={13} />
+                            </div>
+                            {!isLast && (
+                              <div className={`w-0.5 flex-1 min-h-[28px] my-1 ${done ? "bg-brand-600" : "bg-slate-200 dark:bg-gray-700"}`} />
+                            )}
+                          </div>
+                          <div className="pb-4 min-w-0">
+                            <div className="text-sm font-medium leading-7 text-slate-900 dark:text-gray-100">
+                              Técnico responsável atribuído
+                            </div>
+                            <div className="text-xs text-slate-500 dark:text-gray-500 -mt-1">
+                              {ticket.technician}
+                              {ticket.unit && <span className="text-slate-400 dark:text-gray-600"> · {ticket.unit}</span>}
                             </div>
                           </div>
                         </li>

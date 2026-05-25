@@ -5,7 +5,7 @@ import { ArrowLeft, ExternalLink } from "lucide-react";
 const TEAM = [
   {
     name:     "Gabriel Nery",
-    role:     "Coordenador do Projeto",
+    role:     "Gerente de Tecnlogia da Informação",
     linkedin: "https://www.linkedin.com/in/gabriel-nery-b87a0b258/",
     avatar:   "https://unavatar.io/linkedin/gabriel-nery-b87a0b258",
     initials: "GN",
@@ -84,7 +84,7 @@ export default function TeamPage() {
           Central de Suporte TI - SEJUSC
         </h1>
         <p className="text-brand-100 text-sm max-w-xs mx-auto leading-relaxed">
-          Desenvolvido pela equipe de TI da<br />
+          Desenvolvido pela equipe de Desenvolvimento da<br />
           Secretaria de Estado de Justiça, <br />
           Direitos Humanos e Cidadania -  SEJUSC
         </p>
