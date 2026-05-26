@@ -84,7 +84,7 @@ export default function TeamPage() {
           HUB GTI - SEJUSC
         </h1>
         <p className="text-brand-100 text-sm max-w-xs mx-auto leading-relaxed">
-          Desenvolvido pela equipe de Desenvolvimento da<br />
+          Desenvolvido pelo time de Desenvolvimento da<br />
           Secretaria de Estado de Justiça, <br />
           Direitos Humanos e Cidadania -  SEJUSC
         </p>

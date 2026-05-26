@@ -1,80 +1,68 @@
 # HelpDesk SEJUSC
 
-Sistema interno de chamados de TI para a SEJUSC.
+Sistema interno de chamados de TI da Secretaria de Estado de Justiça, Cidadania e Direitos Humanos (SEJUSC).
 
-## Stack
-- **Backend**: Node.js + Express + Prisma (MySQL) + JWT + bcrypt + Socket.io
-- **Frontend**: React + Vite + TailwindCSS + React Router + Recharts
+## Visão Geral
 
-## Estrutura
+Plataforma web para abertura, acompanhamento e resolução de chamados técnicos de TI. Permite que servidores registrem problemas, que monitores de plantão gerenciem a fila de atendimento e que técnicos acompanhem os chamados atribuídos à sua unidade.
+
+## Arquitetura
+
 ```
 helpdesk-sejusc/
-├── backend/        # API Express + Prisma
-├── frontend/       # SPA React + Vite
+├── backend/        # API REST — Node.js + Express + Prisma (MySQL)
+├── frontend/       # SPA — React + Vite + TailwindCSS
 └── docker-compose.yml
 ```
 
-## Setup com Docker (recomendado)
-```bash
-cp .env.example .env
-# Edite as variáveis em .env
-docker-compose up -d
+| Camada    | Tecnologias principais                                      |
+|-----------|-------------------------------------------------------------|
+| Backend   | Node.js, Express, Prisma ORM, MySQL, JWT, bcrypt, Socket.io |
+| Frontend  | React, Vite, TailwindCSS, React Router, Recharts            |
+
+## Módulos
+
+### Abertura de chamado (público)
+Servidores acessam `/novo-chamado`, selecionam categoria e subcategoria e registram o problema. Ao concluir, recebem um número de protocolo no formato `YYYYMMDD-NNNN` para acompanhamento.
+
+### Acompanhamento (público)
+A rota `/acompanhar/:numero` exibe o status atual do chamado sem exigir login. Após a conclusão, o servidor pode avaliar o atendimento com uma nota de 1 a 5 estrelas.
+
+### Painel do monitor de plantão (`MONITOR`)
+- Rota `/painel` com todos os chamados do dia agrupados por unidade
+- Controla as transições de estado e atribui técnicos responsáveis
+- Ao concluir um chamado, os campos **Causa** e **Solução** são obrigatórios
+- Aba **Senhas** para aprovar ou recusar solicitações de redefinição de senha
+- Relatórios consolidados em `/painel/relatorios`
+
+### Painel do técnico (`TECHNICIAN`)
+- Visualiza chamados da própria unidade ou atribuídos diretamente a ele
+- Não realiza transições de estado — esse controle é exclusivo do monitor de plantão
+
+### Administração (`ADMIN`)
+- Gerenciamento de usuários, departamentos, categorias e subcategorias
+- Definição do núcleo responsável por cada subcategoria
+
+## Ciclo de vida do chamado
+
+```
+OPEN → VIEWED → (EN_ROUTE) → IN_SERVICE → COMPLETED
 ```
 
-API disponível em `http://localhost:3333` · Frontend em `http://localhost:5173`.
-
-## Setup manual
-
-### Backend
-```bash
-cd backend
-cp .env.example .env
-# Edite DATABASE_URL e JWT_SECRET em .env
-npm install
-npx prisma migrate deploy
-npm run prisma:seed
-npm run dev
-```
-
-### Frontend
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-**Credenciais criadas pelo seed:**
-- Admin: CPF `482.153.748-67` · senha `admin@2025`
-
-## Fluxos
-
-### Usuário (requer login)
-1. Acessa `/login` e entra com CPF + senha
-2. Seleciona categoria e subcategoria do problema
-3. Recebe protocolo `YYYYMMDD-NNNN`
-4. Acompanha o progresso em `/acompanhar/:numero`
-5. Quando concluído, pode avaliar o atendimento (1–5 estrelas)
-
-### Monitor de Plantão (MONITOR)
-- Painel `/painel` com chamados do dia agrupados por unidade
-- Executa transições de estado e atribui técnicos
-- Campos obrigatórios ao concluir: **Causa** e **Solução**
-- Aba **Senhas** para gerenciar solicitações de redefinição de senha
-- Relatórios em `/painel/relatorios`
-
-### Técnico (TECHNICIAN)
-- Vê apenas chamados da sua unidade ou atribuídos a ele
-- Não pode alterar o status — quem controla é o monitor de plantão
-
-## Estados do chamado
-`OPEN → VIEWED → (EN_ROUTE) → IN_SERVICE → COMPLETED`
-
-A máquina de estados é validada no backend — o frontend só renderiza as ações permitidas.
+As transições são validadas no backend. O frontend renderiza apenas as ações permitidas para o perfil e o estado atual do chamado.
 
 ## Módulo de Feedback
-Controlado pela variável `FEEDBACK_ENABLED` em `.env`. Quando desativada, o formulário não aparece e o endpoint retorna 404.
 
-## Próximos passos sugeridos
-- QR code nos departamentos apontando para `/novo-chamado`
-- HTTPS com certificado interno da SEJUSC
-- Backup automático da base MySQL
+Controlado pela variável de ambiente `FEEDBACK_ENABLED`. Quando desativado, o formulário de avaliação não é exibido e o endpoint retorna 404.
+
+## Comunicação em tempo real
+
+Socket.io é utilizado para notificar o painel do monitor em tempo real sempre que um novo chamado é aberto ou um estado é alterado, sem necessidade de atualizar a página.
+
+## Perfis de acesso
+
+| Perfil      | Descrição                                                  |
+|-------------|-------------------------------------------------------------|
+| `ADMIN`     | Administração completa do sistema                           |
+| `MONITOR`   | Gerenciamento da fila de chamados e atribuição de técnicos  |
+| `TECHNICIAN`| Visualização de chamados da unidade                         |
