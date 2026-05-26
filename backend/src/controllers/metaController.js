@@ -121,9 +121,11 @@ export async function createSubcategory(req, res) {
   res.status(201).json(sub);
 }
 
+const VALID_NUCLEOS = ["NMT", "NIR"];
+
 export async function updateSubcategory(req, res) {
   const subId = Number(req.params.subId);
-  const { name, slaHours, defaultPriority, n1Tips } = req.body || {};
+  const { name, slaHours, defaultPriority, n1Tips, nucleoResponsavel } = req.body || {};
   const sub = await prisma.subcategory.findUnique({ where: { id: subId } });
   if (!sub) return res.status(404).json({ error: "Subcategoria não encontrada" });
   const data = {};
@@ -138,6 +140,11 @@ export async function updateSubcategory(req, res) {
     if (!VALID_PRIORITIES.includes(defaultPriority))
       return res.status(400).json({ error: "Prioridade inválida" });
     data.defaultPriority = defaultPriority;
+  }
+  if (nucleoResponsavel !== undefined) {
+    if (nucleoResponsavel && !VALID_NUCLEOS.includes(nucleoResponsavel))
+      return res.status(400).json({ error: "Núcleo inválido" });
+    data.nucleoResponsavel = nucleoResponsavel || null;
   }
   const updated = await prisma.subcategory.update({ where: { id: subId }, data });
   res.json(updated);

@@ -75,7 +75,8 @@ function ChefeDashboard() {
   async function load() {
     setLoading(true);
     try {
-      const { data } = await api.get("/tickets");
+      const deptId = user.department?.id;
+      const { data } = await api.get("/tickets", deptId ? { params: { pendingForDept: deptId } } : undefined);
       setTickets(data.tickets ?? data);
     } catch {}
     finally { setLoading(false); }
@@ -443,17 +444,18 @@ export default function DashboardPage() {
     };
   }, [socket, load, addToast]);
 
-  // KPI counts — respeitam deptFilter e dateFilter
+  // KPI counts — respeitam deptFilter, dateFilter e priorityFilter
   const kpiBase = useMemo(() => {
     let base = tickets;
-    if (deptFilter) base = base.filter((t) => t.department === deptFilter);
+    if (deptFilter)      base = base.filter((t) => t.department === deptFilter);
     if (dateFilter) {
       const from = new Date(dateFilter + "T00:00:00");
       const to   = new Date(dateFilter + "T23:59:59");
       base = base.filter((t) => { const d = new Date(t.openedAt); return d >= from && d <= to; });
     }
+    if (priorityFilter)  base = base.filter((t) => t.priority === priorityFilter);
     return base;
-  }, [tickets, deptFilter, dateFilter]);
+  }, [tickets, deptFilter, dateFilter, priorityFilter]);
   const active    = useMemo(() => kpiBase.filter((t) => ACTIVE_STATUSES.includes(t.status)), [kpiBase]);
   const completed = useMemo(() => kpiBase.filter((t) => t.status === "COMPLETED"), [kpiBase]);
   const noUnit    = useMemo(() => kpiBase.filter((t) => ACTIVE_STATUSES.includes(t.status) && !t.unit), [kpiBase]);

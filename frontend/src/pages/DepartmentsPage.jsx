@@ -4,7 +4,7 @@ import AppHeader from "../components/AppHeader";
 import { Alert, Spinner } from "../components/ui";
 import {
   Plus, Pencil, Trash2, Check, X, ToggleLeft, ToggleRight,
-  Building2, AlertTriangle, Hash, ChevronDown, Users, ShieldCheck, Crown, Search,
+  Building2, AlertTriangle, Hash, ChevronDown, Users, ShieldCheck, Crown, Search, Ticket, ChevronRight as ChevronRightIcon, Activity, CheckCircle2,
 } from "lucide-react";
 
 const ROLE_LABEL = {
@@ -285,13 +285,43 @@ export default function DepartmentsPage() {
   );
 }
 
+const TICKET_STATUS_LABEL = {
+  OPEN: "Aberto", VIEWED: "Visualizado", EN_ROUTE: "A Caminho",
+  IN_SERVICE: "Em Atendimento", COMPLETED: "Concluído",
+};
+const TICKET_STATUS_COLOR = {
+  OPEN:       "bg-slate-100 dark:bg-gray-700 text-slate-500 dark:text-gray-400",
+  VIEWED:     "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400",
+  EN_ROUTE:   "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400",
+  IN_SERVICE: "bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400",
+  COMPLETED:  "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400",
+};
+
 function DeptRow({ dept, deptUsers, editingId, editName, setEditingId, setEditName, onSaveEdit, onToggle, onDelete }) {
   const isEditing = editingId === dept.id;
   const [expanded, setExpanded] = useState(false);
+  const [ticketsOpen, setTicketsOpen] = useState(false);
+  const [deptTickets, setDeptTickets] = useState([]);
+  const [ticketsLoading, setTicketsLoading] = useState(false);
 
   const chefe = deptUsers.find((u) => u.role === "CHEFE_SETOR" || (u.isChefe && u.role !== "USER" ));
   const chefeDeclarado = deptUsers.find((u) => u.isChefe && u.role === "USER");
   const totalUsers = deptUsers.length;
+
+  async function loadTickets() {
+    setTicketsLoading(true);
+    try {
+      const { data } = await api.get("/tickets", { params: { department: dept.name, limit: 200 } });
+      setDeptTickets(data.tickets ?? []);
+    } catch {}
+    finally { setTicketsLoading(false); }
+  }
+
+  function toggleTickets() {
+    const next = !ticketsOpen;
+    setTicketsOpen(next);
+    if (next && deptTickets.length === 0) loadTickets();
+  }
 
   function startEdit() {
     setEditingId(dept.id);
@@ -366,6 +396,22 @@ function DeptRow({ dept, deptUsers, editingId, editName, setEditingId, setEditNa
               <Users size={12} />
               {totalUsers}
               <ChevronDown size={11} className={`transition-transform ${expanded ? "rotate-180" : ""}`} />
+            </button>
+          )}
+          {/* Botão ver chamados */}
+          {!isEditing && (
+            <button
+              onClick={toggleTickets}
+              className={`flex items-center gap-1 h-7 px-2 rounded-lg text-xs font-medium transition ${
+                ticketsOpen
+                  ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400"
+                  : "text-slate-500 dark:text-gray-400 hover:bg-slate-100 dark:hover:bg-gray-800"
+              }`}
+              title="Ver chamados do setor"
+            >
+              <Ticket size={12} />
+              {dept._count?.tickets ?? ""}
+              <ChevronDown size={11} className={`transition-transform ${ticketsOpen ? "rotate-180" : ""}`} />
             </button>
           )}
 
@@ -467,6 +513,53 @@ function DeptRow({ dept, deptUsers, editingId, editName, setEditingId, setEditNa
             <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-2">
               * Auto-declarado — aguardando validação pelo admin
             </p>
+          )}
+        </div>
+      )}
+
+      {/* Lista de chamados do setor */}
+      {ticketsOpen && (
+        <div className="border-t border-slate-100 dark:border-gray-700/60 bg-slate-50/60 dark:bg-gray-800/30 px-4 py-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-slate-500 dark:text-gray-400 flex items-center gap-1.5">
+              <Ticket size={11} /> Chamados do setor
+            </span>
+            <button onClick={loadTickets} className="text-[10px] text-brand-600 dark:text-brand-400 hover:underline">
+              Atualizar
+            </button>
+          </div>
+          {ticketsLoading ? (
+            <div className="flex items-center justify-center py-4">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
+            </div>
+          ) : deptTickets.length === 0 ? (
+            <p className="text-xs text-slate-400 dark:text-gray-500 py-1">Nenhum chamado encontrado para este setor.</p>
+          ) : (
+            <>
+              {/* Resumo por status */}
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {Object.entries(
+                  deptTickets.reduce((acc, t) => { acc[t.status] = (acc[t.status] || 0) + 1; return acc; }, {})
+                ).map(([status, count]) => (
+                  <span key={status} className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${TICKET_STATUS_COLOR[status]}`}>
+                    {count} {TICKET_STATUS_LABEL[status]}
+                  </span>
+                ))}
+              </div>
+              {/* Lista compact */}
+              <ul className="space-y-1 max-h-48 overflow-y-auto">
+                {deptTickets.map((t) => (
+                  <li key={t.id} className="flex items-center gap-2 text-xs">
+                    <span className="font-mono text-slate-400 dark:text-gray-500 shrink-0">{t.ticketNumber}</span>
+                    <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium shrink-0 ${TICKET_STATUS_COLOR[t.status]}`}>
+                      {TICKET_STATUS_LABEL[t.status]}
+                    </span>
+                    <span className="text-slate-600 dark:text-gray-300 truncate flex-1">{t.requesterName}</span>
+                    <span className="text-slate-400 dark:text-gray-500 shrink-0">{t.category?.name}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
         </div>
       )}

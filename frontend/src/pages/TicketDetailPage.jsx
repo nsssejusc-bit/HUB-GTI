@@ -5,9 +5,9 @@ import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { StatusBadge, InfoItem, Alert, Spinner } from "../components/ui";
 import AppHeader from "../components/AppHeader";
-import { formatElapsed, STATUS_LABEL } from "../lib/statuses";
+import { formatElapsed, STATUS_LABEL, STATUS_ORDER, statusIndex } from "../lib/statuses";
 import { useServerTick, serverNow } from "../lib/serverTime";
-import { ArrowLeft, Clock, CheckCircle2, ChevronRight, Trash2, AlertTriangle, MonitorSmartphone, Copy, Check as CheckIcon, ClipboardList, Plus, ExternalLink, ShieldCheck, ThumbsUp, ThumbsDown, X, MessageSquare, ArrowRight, FileText, RotateCcw, Users2, Send, Timer } from "lucide-react";
+import { ArrowLeft, Clock, CheckCircle2, Circle, ChevronRight, Trash2, AlertTriangle, MonitorSmartphone, Copy, Check as CheckIcon, ClipboardList, Plus, ExternalLink, Shield, ShieldCheck, ShieldX, ThumbsUp, ThumbsDown, UserCheck, X, MessageSquare, ArrowRight, FileText, RotateCcw, Users2, Send, Timer } from "lucide-react";
 
 const TRANSITION_LABEL = {
   VIEWED:     "Marcar como Visualizado",
@@ -29,6 +29,14 @@ const TRANSITION_COLOR = {
   COMPLETED:  "bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl px-4 py-2.5 text-sm font-semibold inline-flex items-center gap-2 transition",
 };
 
+const STATUS_DESC = {
+  OPEN:       "Chamado registrado, aguardando análise",
+  VIEWED:     "Técnico visualizou e atribuiu responsável",
+  EN_ROUTE:   "Técnico a caminho do departamento",
+  IN_SERVICE: "Atendimento em andamento",
+  COMPLETED:  "Problema resolvido",
+};
+
 export default function TicketDetailPage() {
   const { id } = useParams();
   const nav = useNavigate();
@@ -38,7 +46,7 @@ export default function TicketDetailPage() {
   const [ticket, setTicket] = useState(null);
   const [units, setUnits] = useState([]);
   const [techs, setTechs] = useState([]);
-  const [form, setForm] = useState({ unitId: "", assignedTechId: "", internalNote: "", cause: "", solution: "", completionNote: "" });
+  const [form, setForm] = useState({ unitId: "", assignedTechId: "", nucleoResponsavel: "", internalNote: "", cause: "", solution: "", completionNote: "" });
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -87,7 +95,7 @@ export default function TicketDetailPage() {
   async function load() {
     const { data } = await api.get(`/tickets/${id}`);
     setTicket(data);
-    setForm((f) => ({ ...f, unitId: data.unit?.id || "", assignedTechId: data.technician?.id || "" }));
+    setForm((f) => ({ ...f, unitId: data.unit?.id || "", assignedTechId: data.technician?.id || "", nucleoResponsavel: data.nucleoResponsavel || "" }));
   }
 
   async function linkToOs(osId) {
@@ -124,6 +132,7 @@ export default function TicketDetailPage() {
         toStatus,
         unitId: form.unitId || undefined,
         assignedTechId: form.assignedTechId || undefined,
+        nucleoResponsavel: form.nucleoResponsavel || undefined,
         internalNote: form.internalNote || undefined,
         cause: form.cause || undefined,
         solution: form.solution || undefined,
@@ -164,8 +173,9 @@ export default function TicketDetailPage() {
     setLoading(true);
     try {
       const { data } = await api.patch(`/tickets/${id}/assign`, {
-        assignedTechId: transferForm.assignedTechId ? Number(transferForm.assignedTechId) : undefined,
-        unitId:         transferForm.unitId         ? Number(transferForm.unitId)         : undefined,
+        assignedTechId:   transferForm.assignedTechId   ? Number(transferForm.assignedTechId) : undefined,
+        unitId:           transferForm.unitId           ? Number(transferForm.unitId)         : undefined,
+        nucleoResponsavel: transferForm.nucleoResponsavel || undefined,
       });
       addToast({ message: "Chamado transferido com sucesso", type: "success" });
       setShowTransfer(false);
@@ -479,6 +489,9 @@ export default function TicketDetailPage() {
               <InfoItem label="Subcategoria" value={ticket.subcategory?.name} />
               <InfoItem label="Unidade" value={ticket.unit?.name} />
               <InfoItem label="Técnico" value={ticket.technician?.name} />
+              {ticket.nucleoResponsavel && (
+                <InfoItem label="Núcleo" value={ticket.nucleoResponsavel === "NMT" ? "NMT – Manutenção Técnica" : "NIR – Infraestrutura e Redes"} />
+              )}
             </dl>
 
             {ticket.freeTextDescription && (
@@ -501,6 +514,143 @@ export default function TicketDetailPage() {
               </div>
             )}
           </div>
+
+          {/* Acompanhamento — timeline */}
+          {(() => {
+            const currentIdx    = statusIndex(ticket.status);
+            const needsApproval = ticket.approvalStatus && ticket.approvalStatus !== "NOT_REQUIRED";
+            const isRejected    = ticket.approvalStatus === "REJECTED";
+            const visibleStatuses = STATUS_ORDER.filter(
+              (s) => s !== "EN_ROUTE" || (ticket.presential && !ticket.isRemote)
+            );
+            const timestamps = {
+              OPEN:       ticket.openedAt,
+              VIEWED:     ticket.viewedAt,
+              EN_ROUTE:   ticket.enRouteAt,
+              IN_SERVICE: ticket.inServiceAt,
+              COMPLETED:  ticket.completedAt,
+            };
+            const approvalDone   = ticket.approvalStatus === "APPROVED" || ticket.approvalStatus === "REJECTED";
+            const approvalColors =
+              ticket.approvalStatus === "APPROVED" ? "border-emerald-500 bg-emerald-500 text-white"
+              : ticket.approvalStatus === "REJECTED" ? "border-red-500 bg-red-500 text-white"
+              : "border-amber-400 bg-amber-50 dark:bg-amber-900/20 text-amber-500 dark:text-amber-400";
+            const approvalLabel =
+              ticket.approvalStatus === "APPROVED" ? "Autorizado pelo Chefe de Setor"
+              : ticket.approvalStatus === "REJECTED" ? "Reprovado pelo Chefe de Setor"
+              : "Aguardando aprovação do Chefe de Setor";
+            const approvalDesc =
+              ticket.approvalStatus === "APPROVED" ? "Solicitação autorizada — encaminhada para a GTI"
+              : ticket.approvalStatus === "REJECTED" ? (ticket.approvalNote ? `Motivo: ${ticket.approvalNote}` : "Solicitação não autorizada")
+              : "Aguardando decisão do Chefe de Setor";
+
+            return (
+              <div className="card p-5">
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-gray-100 mb-5">Acompanhamento</h3>
+                <ol className="space-y-0">
+                  {visibleStatuses.map((s, i) => {
+                    const done   = !isRejected && i <= currentIdx;
+                    const isLast = i === visibleStatuses.length - 1;
+                    const approvalInsert = needsApproval && s === "VIEWED";
+
+                    return (
+                      <li key={s}>
+                        {/* Approval step inserted before VIEWED */}
+                        {approvalInsert && (
+                          <div className="flex gap-3">
+                            <div className="flex flex-col items-center">
+                              <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 transition ${
+                                approvalDone ? approvalColors : "border-amber-300 bg-amber-50 dark:bg-amber-900/20 text-amber-400"
+                              }`}>
+                                {ticket.approvalStatus === "APPROVED" ? <ShieldCheck size={13} />
+                                 : ticket.approvalStatus === "REJECTED" ? <ShieldX size={13} />
+                                 : <Shield size={13} />}
+                              </div>
+                              <div className={`w-0.5 flex-1 min-h-[28px] my-1 ${ticket.approvalStatus === "APPROVED" ? "bg-brand-600" : "bg-slate-200 dark:bg-gray-700"}`} />
+                            </div>
+                            <div className="pb-4 min-w-0">
+                              <div className={`text-sm font-medium leading-7 ${approvalDone ? "text-slate-900 dark:text-gray-100" : "text-amber-600 dark:text-amber-400"}`}>
+                                {approvalLabel}
+                              </div>
+                              <div className="text-xs text-slate-500 dark:text-gray-500 -mt-1">
+                                {approvalDesc}
+                                {ticket.approvalStatus === "APPROVED" && ticket.approvalDecidedAt && (
+                                  <span className="ml-2 text-slate-400 dark:text-gray-600">
+                                    · {new Date(ticket.approvalDecidedAt).toLocaleString("pt-BR")}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Main step — hide intermediate statuses when rejected (only show OPEN) */}
+                        {(!isRejected || s === "OPEN") && (
+                          <div className="flex gap-3">
+                            <div className="flex flex-col items-center">
+                              <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 transition ${
+                                done
+                                  ? "border-brand-600 bg-brand-600 text-white"
+                                  : "border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-slate-300 dark:text-gray-600"
+                              }`}>
+                                {done ? <CheckCircle2 size={14} /> : <Circle size={14} />}
+                              </div>
+                              {(!isLast || isRejected || (s === "VIEWED" && ticket.technician)) && (
+                                <div className={`w-0.5 flex-1 min-h-[28px] my-1 ${done ? "bg-brand-600" : "bg-slate-200 dark:bg-gray-700"}`} />
+                              )}
+                            </div>
+                            <div className="pb-4 min-w-0">
+                              <div className={`text-sm font-medium leading-7 ${done ? "text-slate-900 dark:text-gray-100" : "text-slate-400 dark:text-gray-600"}`}>
+                                {STATUS_LABEL[s]}
+                              </div>
+                              <div className="text-xs text-slate-500 dark:text-gray-500 -mt-1">
+                                {STATUS_DESC[s]}
+                                {done && timestamps[s] && (
+                                  <span className="ml-2 text-slate-400 dark:text-gray-600">
+                                    · {new Date(timestamps[s]).toLocaleString("pt-BR")}
+                                  </span>
+                                )}
+                              </div>
+                              {/* Completion note inline */}
+                              {s === "COMPLETED" && done && ticket.completionNote && (
+                                <div className="mt-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 px-3 py-2">
+                                  <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 mb-0.5">Instruções do técnico</p>
+                                  <p className="text-xs text-emerald-900 dark:text-emerald-200 whitespace-pre-wrap leading-relaxed">{ticket.completionNote}</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Technician assigned — shown inline after VIEWED */}
+                        {s === "VIEWED" && ticket.technician && !isRejected && (
+                          <div className="flex gap-3">
+                            <div className="flex flex-col items-center">
+                              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-brand-400 bg-brand-50 dark:bg-brand-900/20 text-brand-500 dark:text-brand-400">
+                                <UserCheck size={13} />
+                              </div>
+                              {!isLast && (
+                                <div className={`w-0.5 flex-1 min-h-[28px] my-1 ${done ? "bg-brand-600" : "bg-slate-200 dark:bg-gray-700"}`} />
+                              )}
+                            </div>
+                            <div className="pb-4 min-w-0">
+                              <div className="text-sm font-medium leading-7 text-slate-900 dark:text-gray-100">
+                                Técnico responsável atribuído
+                              </div>
+                              <div className="text-xs text-slate-500 dark:text-gray-500 -mt-1">
+                                {ticket.technician?.name}
+                                {ticket.unit && <span className="text-slate-400 dark:text-gray-600"> · {ticket.unit?.name}</span>}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ol>
+              </div>
+            );
+          })()}
 
           {/* Ordens de Serviço vinculadas */}
           <div className="card p-5">
@@ -782,7 +932,7 @@ export default function TicketDetailPage() {
             {canTransition && ticket.status !== "OPEN" && ticket.status !== "COMPLETED" && (
               <button
                 onClick={() => {
-                  setTransferForm({ unitId: ticket.unit?.id || "", assignedTechId: ticket.technician?.id || "" });
+                  setTransferForm({ unitId: ticket.unit?.id || "", assignedTechId: ticket.technician?.id || "", nucleoResponsavel: ticket.nucleoResponsavel || "" });
                   setShowTransfer(true);
                 }}
                 className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2 text-sm font-medium text-slate-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-700 transition"
@@ -819,6 +969,18 @@ export default function TicketDetailPage() {
                         {filteredTechs.map((t) => (
                           <option key={t.id} value={t.id}>{t.name}</option>
                         ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="field-label">Núcleo responsável</label>
+                      <select
+                        className="field-input"
+                        value={form.nucleoResponsavel}
+                        onChange={(e) => setForm({ ...form, nucleoResponsavel: e.target.value })}
+                      >
+                        <option value="">— Não definido</option>
+                        <option value="NMT">NMT – Manutenção Técnica</option>
+                        <option value="NIR">NIR – Infraestrutura e Redes</option>
                       </select>
                     </div>
                   </>
@@ -972,6 +1134,18 @@ function TransferModal({ units, techs, form, setForm, onClose, onConfirm, loadin
             >
               <option value="">Selecione o técnico...</option>
               {filtered.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="field-label">Núcleo responsável</label>
+            <select
+              className="field-input"
+              value={form.nucleoResponsavel ?? ""}
+              onChange={(e) => setForm({ ...form, nucleoResponsavel: e.target.value })}
+            >
+              <option value="">— Não definido</option>
+              <option value="NMT">NMT – Manutenção Técnica</option>
+              <option value="NIR">NIR – Infraestrutura e Redes</option>
             </select>
           </div>
         </div>

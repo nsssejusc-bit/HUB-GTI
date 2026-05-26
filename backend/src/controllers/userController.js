@@ -84,6 +84,12 @@ export async function listUsers(req, res) {
       createdAt: true,
       unit: { select: { id: true, name: true } },
       department: { select: { id: true, name: true } },
+      _count: {
+        select: {
+          assignedTickets: { where: { status: "COMPLETED" } },
+          openedTickets: true,
+        },
+      },
     },
     orderBy: [{ role: "asc" }, { createdAt: "desc" }],
   });

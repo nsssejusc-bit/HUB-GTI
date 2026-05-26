@@ -110,6 +110,7 @@ export async function createTicket(req, res) {
     department:          dept.name,
     departmentId:        dept.id,
     priority:            (selectedSub?.defaultPriority ?? category.defaultPriority ?? "MEDIUM"),
+    nucleoResponsavel:   selectedSub?.nucleoResponsavel ?? null,
     slaDeadline,
     categoryId:          data.categoryId,
     subcategoryId:       (!isRemote && !category.allowsFreeText) ? data.subcategoryId : null,
@@ -193,13 +194,14 @@ export async function getTicketPublic(req, res) {
 
 // ── LIST ─────────────────────────────────────────────────────────────────────
 export async function listTickets(req, res) {
-  const { status, unitId, technicianId, from, to, categoryId, cursor, limit, search, pendingForDept } = req.query;
+  const { status, unitId, technicianId, from, to, categoryId, cursor, limit, search, pendingForDept, department } = req.query;
   const where = {};
 
   if (status)       where.status      = status;
   if (unitId)       where.unitId      = Number(unitId);
   if (technicianId) where.assignedTechId = Number(technicianId);
   if (categoryId)   where.categoryId  = Number(categoryId);
+  if (department)   where.department  = department;
   if (from || to) {
     where.openedAt = {};
     if (from) where.openedAt.gte = new Date(from);
@@ -215,12 +217,6 @@ export async function listTickets(req, res) {
     ];
   }
 
-  // Filtro especial: admin visualizando aprovações pendentes do seu setor
-  if (pendingForDept && req.user.role === "ADMIN") {
-    where.approvalStatus = "PENDING";
-    where.approvals = { some: { chefDeptId: Number(pendingForDept), status: "PENDING" } };
-  }
-
   // ── Filtros por role ────────────────────────────────────────────────────
   if (req.user.role === "CHEFE_SETOR") {
     // Chefe vê apenas chamados PENDENTES da aprovação do seu setor
@@ -234,6 +230,13 @@ export async function listTickets(req, res) {
     where.approvals = {
       some: { chefDeptId: chefeUser.departmentId, status: "PENDING" },
     };
+  } else if (req.user.role === "ADMIN") {
+    // Filtro especial: admin visualizando aprovações pendentes do seu setor
+    if (pendingForDept) {
+      where.approvalStatus = "PENDING";
+      where.approvals = { some: { chefDeptId: Number(pendingForDept), status: "PENDING" } };
+    }
+    // ADMIN sem pendingForDept vê tudo (sem filtro adicional)
   } else if (req.user.role === "TECHNICIAN") {
     // Técnico não vê chamados aguardando aprovação
     where.approvalStatus = { not: "PENDING" };
@@ -260,6 +263,7 @@ export async function listTickets(req, res) {
       extraData:             true,
       anyDeskCode:           true,
       priority:              true,
+      nucleoResponsavel:     true,
       presential:            true,
       requiresCauseSolution: true,
       approvalStatus:        true,
@@ -414,7 +418,7 @@ export async function approveTicket(req, res) {
 // ── TRANSITION ────────────────────────────────────────────────────────────────
 export async function transitionTicket(req, res) {
   const id = Number(req.params.id);
-  const { toStatus, unitId, assignedTechId, internalNote, cause, solution, completionNote } = req.body || {};
+  const { toStatus, unitId, assignedTechId, internalNote, cause, solution, completionNote, nucleoResponsavel } = req.body || {};
 
   const ticket = await prisma.ticket.findUnique({ where: { id } });
   if (!ticket) return res.status(404).json({ error: "Chamado não encontrado" });
@@ -453,6 +457,10 @@ export async function transitionTicket(req, res) {
     }
     updateData.unitId          = Number(unitId);
     updateData.assignedTechId  = Number(assignedTechId);
+    // auto-preenche ou sobrescreve o núcleo
+    if (nucleoResponsavel !== undefined) {
+      updateData.nucleoResponsavel = nucleoResponsavel || null;
+    }
   }
   if (toStatus === STATUS.EN_ROUTE)   updateData.enRouteAt   = now;
   if (toStatus === STATUS.IN_SERVICE) updateData.inServiceAt = now;
@@ -565,7 +573,7 @@ export async function reopenTicket(req, res) {
 // ── ASSIGN (transferir técnico/unidade sem mudar status) ──────────────────────
 export async function assignTicket(req, res) {
   const id = Number(req.params.id);
-  const { assignedTechId, unitId } = req.body || {};
+  const { assignedTechId, unitId, nucleoResponsavel } = req.body || {};
   const ticket = await prisma.ticket.findUnique({ where: { id } });
   if (!ticket) return res.status(404).json({ error: "Chamado não encontrado" });
   if (ticket.status === STATUS.OPEN || ticket.status === STATUS.COMPLETED) {
@@ -573,8 +581,9 @@ export async function assignTicket(req, res) {
   }
 
   const patch = {};
-  if (assignedTechId !== undefined) patch.assignedTechId = assignedTechId ? Number(assignedTechId) : null;
-  if (unitId !== undefined)         patch.unitId         = unitId         ? Number(unitId)         : null;
+  if (assignedTechId !== undefined)     patch.assignedTechId    = assignedTechId ? Number(assignedTechId) : null;
+  if (unitId !== undefined)             patch.unitId            = unitId         ? Number(unitId)         : null;
+  if (nucleoResponsavel !== undefined)  patch.nucleoResponsavel = nucleoResponsavel || null;
 
   const updated = await prisma.ticket.update({
     where: { id },
@@ -678,6 +687,7 @@ function formatTicket(t) {
     extraData:           t.extraData,
     anyDeskCode:         t.anyDeskCode || null,
     priority:            t.priority ?? "MEDIUM",
+    nucleoResponsavel:   t.nucleoResponsavel ?? null,
     isRemote:             !!(t.anyDeskCode),
     presential:           t.presential,
     requiresCauseSolution: t.requiresCauseSolution,

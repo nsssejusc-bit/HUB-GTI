@@ -184,6 +184,7 @@ model Subcategory {
   slaHours              Int?
   n1Tips                String?  @db.Text
   defaultPriority       Priority @default(MEDIUM)
+  nucleoResponsavel     Nucleo?
   requiresApproval      Boolean  @default(false)
   dualApproval          Boolean  @default(false)
   requiresPresential    Boolean  @default(true)
@@ -206,6 +207,7 @@ model Ticket {
   subcategoryId       Int?
   subcategory         Subcategory? @relation(fields: [subcategoryId], references: [id])
   freeTextDescription String?      @db.Text
+  nucleoResponsavel   Nucleo?
   status              TicketStatus @default(OPEN)
   unitId              Int?
   unit                Unit?        @relation(fields: [unitId], references: [id])

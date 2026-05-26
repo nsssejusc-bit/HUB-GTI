@@ -6,8 +6,14 @@ import { useToast } from "../context/ToastContext";
 import {
   GripVertical, ChevronDown, Plus, Trash2, Pencil, Check, X,
   Monitor, Wifi, KeyRound, HelpCircle, MonitorSmartphone, Printer, Server, BookOpen,
-  Tag, ToggleLeft, ToggleRight, Clock, Flame, Lightbulb,
+  Tag, ToggleLeft, ToggleRight, Clock, Flame, Lightbulb, Network,
 } from "lucide-react";
+
+const NUCLEO_OPTIONS = [
+  { value: "",    label: "Núcleo" },
+  { value: "NMT", label: "NMT" },
+  { value: "NIR", label: "NIR" },
+];
 
 const PRIORITY_OPTIONS = [
   { value: "LOW",    label: "Baixa",   cls: "bg-slate-100 dark:bg-gray-700 text-slate-600 dark:text-gray-300",  active: "bg-slate-500 text-white" },
@@ -203,7 +209,7 @@ function DropLine({ show }) {
 }
 
 // ── Subcategory row ───────────────────────────────────────────────────────────
-function SubRow({ sub, catId, onRename, onDelete, onUpdateSla, onUpdatePriority, onUpdateN1Tips, onGripPointerDown, isDragging }) {
+function SubRow({ sub, catId, onRename, onDelete, onUpdateSla, onUpdatePriority, onUpdateN1Tips, onUpdateNucleo, onGripPointerDown, isDragging }) {
   const [deleteErr,  setDeleteErr]  = useState("");
   const [slaEdit,    setSlaEdit]    = useState(false);
   const [slaDraft,   setSlaDraft]   = useState(sub.slaHours != null ? String(sub.slaHours) : "");
@@ -217,6 +223,13 @@ function SubRow({ sub, catId, onRename, onDelete, onUpdateSla, onUpdatePriority,
   function handlePriorityChange(priority) {
     api.patch(`/categories/${catId}/subcategories/${sub.id}`, { defaultPriority: priority })
       .then(() => onUpdatePriority(sub.id, priority))
+      .catch(() => {});
+  }
+
+  function handleNucleoChange(e) {
+    const nucleo = e.target.value;
+    api.patch(`/categories/${catId}/subcategories/${sub.id}`, { nucleoResponsavel: nucleo || null })
+      .then(() => onUpdateNucleo(sub.id, nucleo || null))
       .catch(() => {});
   }
 
@@ -272,6 +285,22 @@ function SubRow({ sub, catId, onRename, onDelete, onUpdateSla, onUpdatePriority,
           onChange={handlePriorityChange}
           compact
         />
+        {/* Núcleo responsável */}
+        <select
+          value={sub.nucleoResponsavel ?? ""}
+          onChange={handleNucleoChange}
+          onClick={(e) => e.stopPropagation()}
+          title="Núcleo responsável por este tipo de chamado"
+          className={`text-[11px] rounded-lg border px-1.5 py-0.5 font-semibold transition opacity-0 group-hover:opacity-100 focus:opacity-100 ${
+            sub.nucleoResponsavel
+              ? "border-brand-300 dark:border-brand-700 bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400"
+              : "border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-slate-400 dark:text-gray-500"
+          }`}
+        >
+          {NUCLEO_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
         {/* Dicas N1 */}
         <button
           onClick={() => { setTipsOpen((v) => !v); setTipsDraft(sub.n1Tips ? JSON.parse(sub.n1Tips).join("\n") : ""); }}
@@ -462,6 +491,10 @@ function CategoryCard({ cat, onUpdate, onDelete, onGripPointerDown, isDragging }
     setSubcats((prev) => prev.map((s) => s.id === subId ? { ...s, n1Tips } : s));
   }
 
+  function updateSubcategoryNucleo(subId, nucleoResponsavel) {
+    setSubcats((prev) => prev.map((s) => s.id === subId ? { ...s, nucleoResponsavel } : s));
+  }
+
   async function saveCategoryPriority(defaultPriority) {
     try {
       const res = await api.patch(`/categories/${cat.id}`, { defaultPriority });
@@ -611,6 +644,7 @@ function CategoryCard({ cat, onUpdate, onDelete, onGripPointerDown, isDragging }
                         onUpdateSla={updateSubcategorySla}
                         onUpdatePriority={updateSubcategoryPriority}
                         onUpdateN1Tips={updateSubcategoryN1Tips}
+                        onUpdateNucleo={updateSubcategoryNucleo}
                         isDragging={subFromIdx === idx}
                         onGripPointerDown={(e) => { e.stopPropagation(); startSubDrag(e, idx); }}
                       />

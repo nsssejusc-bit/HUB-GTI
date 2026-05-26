@@ -7,7 +7,7 @@ import { useAuth } from "../context/AuthContext";
 import {
   CheckCircle2, XCircle, UserCheck, Building2, Shield, Trash2,
   AlertTriangle, Crown, KeyRound, Check as CheckIcon, Phone,
-  Bell, Pencil, X, ChevronRight, Mail, Hash, Briefcase, Users, ShieldCheck,
+  Bell, Pencil, X, ChevronRight, Mail, Hash, Briefcase, Users, ShieldCheck, Ticket, BarChart2,
 } from "lucide-react";
 
 // ── Constantes de label ──────────────────────────────────────────────────────
@@ -518,6 +518,39 @@ function UserDetailPanel({ user, units, me, onUpdate, onDelete, onGrantAdmin, on
             <DataRow icon={<Mail size={13} />}      label="E-mail"       value={user.email || "—"} />
             <DataRow icon={<Phone size={13} />}     label="Telefone"     value={user.telefone || "—"} />
             <DataRow icon={<Users size={13} />}     label="Cadastrado em" value={new Date(user.createdAt).toLocaleDateString("pt-BR")} />
+
+            {/* Métricas de chamados */}
+            {(user._count?.openedTickets > 0 || user._count?.assignedTickets > 0) && (
+              <div className="rounded-xl bg-slate-50 dark:bg-gray-800/60 border border-slate-100 dark:border-gray-700 px-3 py-2.5 space-y-1.5 mt-1">
+                <p className="text-[10px] font-semibold text-slate-400 dark:text-gray-500 uppercase tracking-wider flex items-center gap-1">
+                  <BarChart2 size={10} /> Métricas
+                </p>
+                {(user.role === "TECHNICIAN" || user.role === "ADMIN") && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-slate-500 dark:text-gray-400">Chamados atendidos</span>
+                    <span className="text-sm font-bold text-emerald-700 dark:text-emerald-400">
+                      {user._count?.assignedTickets ?? 0}
+                    </span>
+                  </div>
+                )}
+                {(user.role === "USER" || user.role === "CHEFE_SETOR") && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-slate-500 dark:text-gray-400">Chamados abertos</span>
+                    <span className="text-sm font-bold text-brand-700 dark:text-brand-400">
+                      {user._count?.openedTickets ?? 0}
+                    </span>
+                  </div>
+                )}
+                {(user.role === "TECHNICIAN" || user.role === "ADMIN") && user._count?.openedTickets > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-slate-500 dark:text-gray-400">Chamados abertos</span>
+                    <span className="text-sm font-bold text-brand-700 dark:text-brand-400">
+                      {user._count?.openedTickets ?? 0}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
 
             <button
               onClick={() => setEditing(true)}

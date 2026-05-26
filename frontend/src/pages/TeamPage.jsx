@@ -81,7 +81,7 @@ export default function TeamPage() {
           Gerência de Tecnologia da Informação
         </p>
         <h1 className="text-2xl sm:text-3xl font-bold text-white mb-3">
-          Central de Suporte TI - SEJUSC
+          HUB GTI - SEJUSC
         </h1>
         <p className="text-brand-100 text-sm max-w-xs mx-auto leading-relaxed">
           Desenvolvido pela equipe de Desenvolvimento da<br />
