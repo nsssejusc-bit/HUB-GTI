@@ -8,11 +8,11 @@ import { fileURLToPath } from "url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TEMPLATE_PATH = path.join(__dirname, "../../templates/timbrado.docx");
 
-const NUCLEO_LABEL = { NMT: "NMT – Núcleo de Manutenção Técnica", NIR: "NIR – Núcleo de Infraestrutura e Redes" };
+const NUCLEO_LABEL = { NMT: "NMT – Núcleo de Manutenção Técnica", NIR: "NIR – Núcleo de Infraestrutura e Redes", NSS: "NSS – Núcleo de Suporte e Sistemas" };
 
 const createSchema = z.object({
   title:   z.string().min(2, "Informe o título/evento").max(191),
-  nucleo:  z.enum(["NMT", "NIR"]),
+  nucleo:  z.enum(["NMT", "NIR", "NSS"]),
   note:    z.string().max(1000).nullable().optional(),
   unitIds: z.array(z.number().int().positive()).min(1, "Selecione ao menos 1 unidade"),
 });

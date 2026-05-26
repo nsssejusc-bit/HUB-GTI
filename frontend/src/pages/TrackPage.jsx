@@ -141,6 +141,12 @@ export default function TrackPage() {
                     <Clock size={11} />
                     {formatElapsed(ticket.openedAt, ticket.completedAt, ticket.completedAt ? null : serverNow())}
                   </div>
+                  {ticket.status === "COMPLETED" && ticket.completedAt && (
+                    <div className="flex items-center gap-1 mt-1 text-xs text-emerald-600 dark:text-emerald-400 justify-end">
+                      <CheckCircle2 size={11} />
+                      Concluído há {formatElapsed(ticket.completedAt, null, serverNow())}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

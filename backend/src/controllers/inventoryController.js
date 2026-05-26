@@ -6,7 +6,7 @@ const itemSchema = z.object({
   description: z.string().max(2000).nullable().optional(),
   unitMeasure: z.string().max(50).default("un"),
   category:    z.string().max(191).nullable().optional(),
-  nucleo:      z.enum(["NMT", "NIR"]).nullable().optional(),
+  nucleo:      z.enum(["NMT", "NIR", "NSS"]).nullable().optional(),
 });
 
 const unitSchema = z.object({
@@ -133,7 +133,7 @@ export async function updateInventoryItem(req, res) {
 
   const partial = itemSchema.partial().extend({
     status: z.enum(["ATIVO", "INATIVO"]).optional(),
-    nucleo: z.enum(["NMT", "NIR"]).nullable().optional(),
+    nucleo: z.enum(["NMT", "NIR", "NSS"]).nullable().optional(),
   });
   const parsed = partial.safeParse(req.body);
   if (!parsed.success) {

@@ -7,7 +7,7 @@ import {
   ChevronLeft, ChevronRight, Check, X, Plus, Minus, Search,
 } from "lucide-react";
 
-const NUCLEO_LABELS = { NMT: "NMT", NIR: "NIR" };
+const NUCLEO_LABELS = { NMT: "NMT", NIR: "NIR", NSS: "NSS" };
 
 function fmtDT(v) {
   if (!v) return "—";

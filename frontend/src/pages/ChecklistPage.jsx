@@ -10,8 +10,8 @@ import {
   CheckCircle, Clock, XCircle, AlertTriangle, Package, Trash2,
 } from "lucide-react";
 
-const NUCLEO_LABEL = { NMT: "NMT", NIR: "NIR" };
-const NUCLEO_FULL  = { NMT: "Núcleo de Manutenção Técnica", NIR: "Núcleo de Infraestrutura e Redes" };
+const NUCLEO_LABEL = { NMT: "NMT", NIR: "NIR", NSS: "NSS" };
+const NUCLEO_FULL  = { NMT: "Núcleo de Manutenção Técnica", NIR: "Núcleo de Infraestrutura e Redes", NSS: "Núcleo de Suporte e Sistemas" };
 
 const STATUS_STYLE = {
   PENDENTE:  "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
@@ -107,7 +107,7 @@ function CreateChecklistModal({ onClose, onCreate }) {
               <div>
                 <label className={labelCls}>Núcleo *</label>
                 <div className="flex gap-3">
-                  {["NMT", "NIR"].map((n) => (
+                  {["NMT", "NIR", "NSS"].map((n) => (
                     <button
                       key={n} type="button"
                       onClick={() => set("nucleo", n)}

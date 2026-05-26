@@ -514,7 +514,7 @@ function UserDetailPanel({ user, units, me, onUpdate, onDelete, onGrantAdmin, on
             <DataRow icon={<Hash size={13} />}      label="Matrícula"    value={user.matricula || "—"} />
             <DataRow icon={<Briefcase size={13} />} label="Vínculo"      value={PREFIXO_LABEL[user.prefixo] || "—"} />
             <DataRow icon={<Building2 size={13} />} label="Setor"        value={user.department?.name || "—"} />
-            <DataRow icon={<Shield size={13} />}    label="Unidade TI"   value={user.unit?.name || "—"} />
+            <DataRow icon={<Shield size={13} />}    label="Núcleo"       value={user.unit?.name || "—"} />
             <DataRow icon={<Mail size={13} />}      label="E-mail"       value={user.email || "—"} />
             <DataRow icon={<Phone size={13} />}     label="Telefone"     value={user.telefone || "—"} />
             <DataRow icon={<Users size={13} />}     label="Cadastrado em" value={new Date(user.createdAt).toLocaleDateString("pt-BR")} />
@@ -605,6 +605,7 @@ function UserDetailPanel({ user, units, me, onUpdate, onDelete, onGrantAdmin, on
                 <option value="">Nenhum</option>
                 <option value="NMT">NMT – Manutenção Técnica</option>
                 <option value="NIR">NIR – Infraestrutura e Redes</option>
+                <option value="NSS">NSS – Núcleo de Suporte e Sistemas</option>
               </select>
             </div>
 

@@ -445,6 +445,12 @@ export default function TicketDetailPage() {
                   </span>
                 )}
               </div>
+              {ticket.status === "COMPLETED" && ticket.completedAt && (
+                <div className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">
+                  <CheckCircle2 size={11} />
+                  Concluído há {formatElapsed(ticket.completedAt, null, serverNow())}
+                </div>
+              )}
             </div>
             {ticket.slaDeadline && ticket.status !== "COMPLETED" && (() => {
               const now = new Date();
@@ -981,6 +987,7 @@ export default function TicketDetailPage() {
                         <option value="">— Não definido</option>
                         <option value="NMT">NMT – Manutenção Técnica</option>
                         <option value="NIR">NIR – Infraestrutura e Redes</option>
+                      <option value="NSS">NSS – Núcleo de Suporte e Sistemas</option>
                       </select>
                     </div>
                   </>
@@ -1146,6 +1153,7 @@ function TransferModal({ units, techs, form, setForm, onClose, onConfirm, loadin
               <option value="">— Não definido</option>
               <option value="NMT">NMT – Manutenção Técnica</option>
               <option value="NIR">NIR – Infraestrutura e Redes</option>
+                      <option value="NSS">NSS – Núcleo de Suporte e Sistemas</option>
             </select>
           </div>
         </div>

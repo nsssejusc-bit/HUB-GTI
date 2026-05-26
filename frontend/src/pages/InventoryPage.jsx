@@ -23,7 +23,7 @@ const CHECKLIST_STATUS_STYLE = {
 };
 const CHECKLIST_STATUS_ICON = { PENDENTE: Clock, APROVADO: CheckCircle, REJEITADO: XCircle };
 
-const NUCLEO_FULL = { NMT: "Núcleo de Manutenção Técnica", NIR: "Núcleo de Infraestrutura e Redes" };
+const NUCLEO_FULL = { NMT: "Núcleo de Manutenção Técnica", NIR: "Núcleo de Infraestrutura e Redes", NSS: "Núcleo de Suporte e Sistemas" };
 const UNIT_OPTIONS = ["un", "cx", "par", "rolo", "m", "kg", "L", "pç"];
 
 function fmtDate(d) {
@@ -120,6 +120,7 @@ function CreateItemModal({ onClose, onCreate, categories }) {
               <option value="">Sem núcleo</option>
               <option value="NMT">NMT – Manutenção Técnica</option>
               <option value="NIR">NIR – Infraestrutura e Redes</option>
+              <option value="NSS">NSS – Suporte e Sistemas</option>
             </select>
           </div>
 
@@ -255,7 +256,7 @@ function CreateChecklistModal({ onClose, onCreate }) {
               <div>
                 <label className={labelCls}>Núcleo *</label>
                 <div className="flex gap-3">
-                  {["NMT", "NIR"].map((n) => (
+                  {["NMT", "NIR", "NSS"].map((n) => (
                     <button
                       key={n} type="button"
                       onClick={() => set("nucleo", n)}

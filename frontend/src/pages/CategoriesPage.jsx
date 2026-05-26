@@ -10,9 +10,9 @@ import {
 } from "lucide-react";
 
 const NUCLEO_OPTIONS = [
-  { value: "",    label: "Núcleo" },
   { value: "NMT", label: "NMT" },
   { value: "NIR", label: "NIR" },
+  { value: "NSS", label: "NSS" },
 ];
 
 const PRIORITY_OPTIONS = [
@@ -297,6 +297,7 @@ function SubRow({ sub, catId, onRename, onDelete, onUpdateSla, onUpdatePriority,
               : "border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-slate-400 dark:text-gray-500"
           }`}
         >
+          <option value="" disabled>Núcleo</option>
           {NUCLEO_OPTIONS.map((o) => (
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}

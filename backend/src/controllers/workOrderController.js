@@ -104,7 +104,7 @@ const OS_TIPOS = ["VISITA_TECNICA","TROCA_EQUIPAMENTO","ENTREGA","MANUTENCAO_RED
 export async function createWorkOrder(req, res) {
   const checklistSchema = z.object({
     title:   z.string().min(2).max(300),
-    nucleo:  z.enum(["NMT", "NIR"]),
+    nucleo:  z.enum(["NMT", "NIR", "NSS"]),
     note:    z.string().max(1000).optional().nullable(),
     unitIds: z.array(z.number().int().positive()).min(1),
   });

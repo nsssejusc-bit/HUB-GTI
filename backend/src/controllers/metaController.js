@@ -121,7 +121,7 @@ export async function createSubcategory(req, res) {
   res.status(201).json(sub);
 }
 
-const VALID_NUCLEOS = ["NMT", "NIR"];
+const VALID_NUCLEOS = ["NMT", "NIR", "NSS"];
 
 export async function updateSubcategory(req, res) {
   const subId = Number(req.params.subId);

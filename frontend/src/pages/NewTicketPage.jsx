@@ -185,35 +185,6 @@ function ExtraFields({ formType, fields, setFields, departments }) {
         <label className="field-label">Cargo / Função *</label>
         <input className="field-input" placeholder="Ex: Analista, Assistente..." value={fields.cargo || ""} onChange={(e) => set("cargo", e.target.value)} />
       </div>
-      <div>
-        <label className="field-label mb-2">Sistemas necessários</label>
-        <div className="flex flex-wrap gap-3">
-          {["SIGED", "SAM", "Pastas"].map((sys) => {
-            const checked = (fields.systems || []).includes(sys);
-            return (
-              <label key={sys} className={`flex items-center gap-2 px-4 py-2 rounded-xl border cursor-pointer transition text-sm font-medium ${
-                checked
-                  ? "border-brand-500 bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400"
-                  : "border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-slate-700 dark:text-gray-300 hover:border-brand-300"
-              }`}>
-                <input
-                  type="checkbox"
-                  className="sr-only"
-                  checked={checked}
-                  onChange={() => {
-                    const cur = fields.systems || [];
-                    set("systems", checked ? cur.filter((s) => s !== sys) : [...cur, sys]);
-                  }}
-                />
-                <div className={`h-4 w-4 rounded border-2 flex items-center justify-center ${checked ? "border-brand-500 bg-brand-500" : "border-slate-300 dark:border-gray-600"}`}>
-                  {checked && <CheckIcon size={10} className="text-white" />}
-                </div>
-                {sys}
-              </label>
-            );
-          })}
-        </div>
-      </div>
     </div>
   );
 

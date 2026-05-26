@@ -116,7 +116,7 @@ export async function updateUser(req, res) {
   if (telefone !== undefined) data.telefone = telefone || null;
   if (matricula !== undefined) data.matricula = matricula || null;
   if (nucleoResponsavel !== undefined) {
-    const validNucleos = ["NMT", "NIR"];
+    const validNucleos = ["NMT", "NIR", "NSS"];
     if (nucleoResponsavel && !validNucleos.includes(nucleoResponsavel)) {
       return res.status(400).json({ error: "Núcleo inválido" });
     }
