@@ -444,9 +444,10 @@ export default function DashboardPage() {
     };
   }, [socket, load, addToast]);
 
-  // KPI counts — respeitam deptFilter, dateFilter e priorityFilter
+  // KPI counts — respeitam todos os filtros ativos
   const kpiBase = useMemo(() => {
     let base = tickets;
+    if (categoryFilter) base = base.filter((t) => String(t.category?.id) === categoryFilter);
     if (deptFilter)      base = base.filter((t) => t.department === deptFilter);
     if (dateFilter) {
       const from = new Date(dateFilter + "T00:00:00");
@@ -455,7 +456,7 @@ export default function DashboardPage() {
     }
     if (priorityFilter)  base = base.filter((t) => t.priority === priorityFilter);
     return base;
-  }, [tickets, deptFilter, dateFilter, priorityFilter]);
+  }, [tickets, categoryFilter, deptFilter, dateFilter, priorityFilter]);
   const active    = useMemo(() => kpiBase.filter((t) => ACTIVE_STATUSES.includes(t.status)), [kpiBase]);
   const completed = useMemo(() => kpiBase.filter((t) => t.status === "COMPLETED"), [kpiBase]);
   const noUnit    = useMemo(() => kpiBase.filter((t) => ACTIVE_STATUSES.includes(t.status) && !t.unit), [kpiBase]);
@@ -471,6 +472,7 @@ export default function DashboardPage() {
                : filter === "completed" ? completed
                : filter === "history"   ? history
                : tickets;
+    if (categoryFilter && filter !== "history") result = result.filter((t) => String(t.category?.id) === categoryFilter);
     if (deptFilter && filter !== "history") result = result.filter((t) => t.department === deptFilter);
     if (dateFilter) {
       const from = new Date(dateFilter + "T00:00:00");
@@ -495,7 +497,7 @@ export default function DashboardPage() {
       });
     }
     return result;
-  }, [filter, active, completed, history, tickets, deptFilter, dateFilter, priorityFilter, searchQuery]);
+  }, [filter, active, completed, history, tickets, categoryFilter, deptFilter, dateFilter, priorityFilter, searchQuery]);
 
   // Agrupar por unidade
   const byUnit = useMemo(() => visible.reduce((acc, t) => {
