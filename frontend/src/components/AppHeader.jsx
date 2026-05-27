@@ -2,7 +2,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
-import { useSocketConnected } from "../context/SocketContext";
+import { useSocketConnected, useUnreadCount } from "../context/SocketContext";
 import { api } from "../lib/api";
 import {
   LayoutDashboard, BarChart2, LogOut, Users,
@@ -54,6 +54,7 @@ export default function AppHeader() {
   const configRef = useRef(null);
 
   const socketConnected = useSocketConnected();
+  const unreadCount     = useUnreadCount();
 
   const isStaff     = STAFF_ROLES.includes(user?.role);
   const isFullStaff = FULL_STAFF_ROLES.includes(user?.role);
@@ -138,6 +139,11 @@ export default function AppHeader() {
           {/* Painel — staff completo e chefe de setor */}
           {isStaff && (
             <Link to="/painel" className={navCls(isActive("/painel"))}>
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold animate-pulse">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
               <LayoutDashboard size={15} />
               <span className="hidden sm:inline">Painel</span>
             </Link>

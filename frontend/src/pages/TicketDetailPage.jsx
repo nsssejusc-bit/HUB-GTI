@@ -496,7 +496,12 @@ export default function TicketDetailPage() {
               <InfoItem label="Unidade" value={ticket.unit?.name} />
               <InfoItem label="Técnico" value={ticket.technician?.name} />
               {ticket.nucleoResponsavel && (
-                <InfoItem label="Núcleo" value={ticket.nucleoResponsavel === "NMT" ? "NMT – Manutenção Técnica" : "NIR – Infraestrutura e Redes"} />
+                <InfoItem label="Núcleo" value={
+                  ticket.nucleoResponsavel === "NMT" ? "NMT – Manutenção Técnica" :
+                  ticket.nucleoResponsavel === "NIR" ? "NIR – Infraestrutura e Redes" :
+                  ticket.nucleoResponsavel === "NSS" ? "NSS – Núcleo de Suporte e Sistemas" :
+                  ticket.nucleoResponsavel
+                } />
               )}
             </dl>
 

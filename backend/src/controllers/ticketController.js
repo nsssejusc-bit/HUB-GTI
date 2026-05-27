@@ -136,7 +136,13 @@ export async function createTicket(req, res) {
   const ticketNumber = buildTicketNumber(seq);
   const ticket       = await prisma.ticket.create({ data: { ticketNumber, ...ticketPayload } });
 
-  req.app.get("io")?.emit("ticket:created", { ticketNumber: ticket.ticketNumber });
+  req.app.get("io")?.emit("ticket:created", {
+    ticketNumber:      ticket.ticketNumber,
+    department:        ticket.department,
+    category:          category.name,
+    subcategory:       selectedSub?.name ?? null,
+    nucleoResponsavel: ticket.nucleoResponsavel ?? null,
+  });
 
   res.status(201).json({
     ticketNumber: ticket.ticketNumber,
@@ -240,11 +246,16 @@ export async function listTickets(req, res) {
   } else if (req.user.role === "TECHNICIAN") {
     // Técnico não vê chamados aguardando aprovação
     where.approvalStatus = { not: "PENDING" };
-    const techUser = await prisma.user.findUnique({ where: { id: req.user.id }, select: { unitId: true } });
-    where.OR = [
+    const techUser = await prisma.user.findUnique({ where: { id: req.user.id }, select: { unitId: true, nucleoResponsavel: true } });
+    const orConditions = [
       { assignedTechId: req.user.id },
       { unitId: techUser?.unitId || -1 },
     ];
+    // Técnico com núcleo definido vê todos os chamados do seu núcleo
+    if (techUser?.nucleoResponsavel) {
+      orConditions.push({ nucleoResponsavel: techUser.nucleoResponsavel });
+    }
+    where.OR = orConditions;
   }
   // ADMIN vê tudo (sem filtro adicional)
 
