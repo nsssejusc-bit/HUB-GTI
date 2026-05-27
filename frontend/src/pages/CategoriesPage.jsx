@@ -210,6 +210,7 @@ function DropLine({ show }) {
 
 // ── Subcategory row ───────────────────────────────────────────────────────────
 function SubRow({ sub, catId, onRename, onDelete, onUpdateSla, onUpdatePriority, onUpdateN1Tips, onUpdateNucleo, onGripPointerDown, isDragging }) {
+  const addToast = useToast();
   const [deleteErr,  setDeleteErr]  = useState("");
   const [slaEdit,    setSlaEdit]    = useState(false);
   const [slaDraft,   setSlaDraft]   = useState(sub.slaHours != null ? String(sub.slaHours) : "");
@@ -230,7 +231,7 @@ function SubRow({ sub, catId, onRename, onDelete, onUpdateSla, onUpdatePriority,
     const nucleo = e.target.value;
     api.patch(`/categories/${catId}/subcategories/${sub.id}`, { nucleoResponsavel: nucleo || null })
       .then(() => onUpdateNucleo(sub.id, nucleo || null))
-      .catch(() => {});
+      .catch((err) => addToast({ message: err.response?.data?.error || "Erro ao salvar núcleo", type: "error" }));
   }
 
   function saveTips() {
