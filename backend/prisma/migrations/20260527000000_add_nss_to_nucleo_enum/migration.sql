@@ -13,10 +13,10 @@ ALTER TABLE `InventoryItem`
 ALTER TABLE `InventoryChecklist`
   MODIFY COLUMN `nucleo` ENUM('NMT','NIR','NSS') NOT NULL;
 
--- 4. Adiciona nucleoResponsavel em Subcategory (estava no schema Prisma mas sem migration)
+-- 4. Adiciona nucleoResponsavel em Subcategory (IF NOT EXISTS evita erro se coluna já existe)
 ALTER TABLE `Subcategory`
-  ADD COLUMN `nucleoResponsavel` ENUM('NMT','NIR','NSS') NULL;
+  ADD COLUMN IF NOT EXISTS `nucleoResponsavel` ENUM('NMT','NIR','NSS') NULL;
 
--- 5. Adiciona nucleoResponsavel em Ticket (estava no schema Prisma mas sem migration)
+-- 5. Adiciona nucleoResponsavel em Ticket (IF NOT EXISTS evita erro se coluna já existe)
 ALTER TABLE `Ticket`
-  ADD COLUMN `nucleoResponsavel` ENUM('NMT','NIR','NSS') NULL;
+  ADD COLUMN IF NOT EXISTS `nucleoResponsavel` ENUM('NMT','NIR','NSS') NULL;

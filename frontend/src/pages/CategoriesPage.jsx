@@ -6,7 +6,7 @@ import { useToast } from "../context/ToastContext";
 import {
   GripVertical, ChevronDown, Plus, Trash2, Pencil, Check, X,
   Monitor, Wifi, KeyRound, HelpCircle, MonitorSmartphone, Printer, Server, BookOpen,
-  Tag, ToggleLeft, ToggleRight, Clock, Flame, Lightbulb, Network,
+  Tag, ToggleLeft, ToggleRight, Clock, Flame, Lightbulb, Network, ShieldCheck,
 } from "lucide-react";
 
 const NUCLEO_OPTIONS = [
@@ -209,7 +209,7 @@ function DropLine({ show }) {
 }
 
 // ── Subcategory row ───────────────────────────────────────────────────────────
-function SubRow({ sub, catId, onRename, onDelete, onUpdateSla, onUpdatePriority, onUpdateN1Tips, onUpdateNucleo, onGripPointerDown, isDragging }) {
+function SubRow({ sub, catId, onRename, onDelete, onUpdateSla, onUpdatePriority, onUpdateN1Tips, onUpdateNucleo, onUpdateApproval, onGripPointerDown, isDragging }) {
   const addToast = useToast();
   const [deleteErr,  setDeleteErr]  = useState("");
   const [slaEdit,    setSlaEdit]    = useState(false);
@@ -232,6 +232,13 @@ function SubRow({ sub, catId, onRename, onDelete, onUpdateSla, onUpdatePriority,
     api.patch(`/categories/${catId}/subcategories/${sub.id}`, { nucleoResponsavel: nucleo || null })
       .then(() => onUpdateNucleo(sub.id, nucleo || null))
       .catch((err) => addToast({ message: err.response?.data?.error || "Erro ao salvar núcleo", type: "error" }));
+  }
+
+  function handleApprovalToggle() {
+    const newVal = !sub.requiresApproval;
+    api.patch(`/categories/${catId}/subcategories/${sub.id}`, { requiresApproval: newVal })
+      .then(() => onUpdateApproval(sub.id, newVal))
+      .catch(() => addToast({ message: "Erro ao salvar aprovação", type: "error" }));
   }
 
   function saveTips() {
@@ -315,6 +322,18 @@ function SubRow({ sub, catId, onRename, onDelete, onUpdateSla, onUpdatePriority,
         >
           <Lightbulb size={12} />
           {tipsCount > 0 && <span className="font-semibold">{tipsCount}</span>}
+        </button>
+        {/* Requer aprovação */}
+        <button
+          onClick={handleApprovalToggle}
+          title={sub.requiresApproval ? "Requer aprovação — clique para desativar" : "Clique para exigir aprovação do Chefe de Setor"}
+          className={`flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-lg transition opacity-0 group-hover:opacity-100 ${
+            sub.requiresApproval
+              ? "text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+              : "text-slate-400 dark:text-gray-500 hover:bg-slate-200 dark:hover:bg-gray-700"
+          }`}
+        >
+          <ShieldCheck size={12} />
         </button>
         {/* SLA por subcategoria */}
         <div className="flex items-center gap-1 shrink-0" title="SLA desta subcategoria (horas)">
@@ -497,6 +516,10 @@ function CategoryCard({ cat, onUpdate, onDelete, onGripPointerDown, isDragging }
     setSubcats((prev) => prev.map((s) => s.id === subId ? { ...s, nucleoResponsavel } : s));
   }
 
+  function updateSubcategoryApproval(subId, requiresApproval) {
+    setSubcats((prev) => prev.map((s) => s.id === subId ? { ...s, requiresApproval } : s));
+  }
+
   async function saveCategoryPriority(defaultPriority) {
     try {
       const res = await api.patch(`/categories/${cat.id}`, { defaultPriority });
@@ -647,6 +670,7 @@ function CategoryCard({ cat, onUpdate, onDelete, onGripPointerDown, isDragging }
                         onUpdatePriority={updateSubcategoryPriority}
                         onUpdateN1Tips={updateSubcategoryN1Tips}
                         onUpdateNucleo={updateSubcategoryNucleo}
+                        onUpdateApproval={updateSubcategoryApproval}
                         isDragging={subFromIdx === idx}
                         onGripPointerDown={(e) => { e.stopPropagation(); startSubDrag(e, idx); }}
                       />

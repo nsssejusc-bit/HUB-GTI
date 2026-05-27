@@ -125,7 +125,7 @@ const VALID_NUCLEOS = ["NMT", "NIR", "NSS"];
 
 export async function updateSubcategory(req, res) {
   const subId = Number(req.params.subId);
-  const { name, slaHours, defaultPriority, n1Tips, nucleoResponsavel } = req.body || {};
+  const { name, slaHours, defaultPriority, n1Tips, nucleoResponsavel, requiresApproval } = req.body || {};
   const sub = await prisma.subcategory.findUnique({ where: { id: subId } });
   if (!sub) return res.status(404).json({ error: "Subcategoria não encontrada" });
   const data = {};
@@ -146,6 +146,7 @@ export async function updateSubcategory(req, res) {
       return res.status(400).json({ error: "Núcleo inválido" });
     data.nucleoResponsavel = nucleoResponsavel || null;
   }
+  if (requiresApproval !== undefined) data.requiresApproval = Boolean(requiresApproval);
   const updated = await prisma.subcategory.update({ where: { id: subId }, data });
   res.json(updated);
 }
