@@ -6,7 +6,7 @@ import { Alert, Spinner } from "../components/ui";
 import {
   ArrowLeft, ArrowRight, Monitor, Wifi, Server, FileText,
   CheckCircle2, MonitorSmartphone, Copy, Check as CheckIcon, Printer, LogOut,
-  Lightbulb, AlertTriangle, ShieldCheck, ChevronDown,
+  Lightbulb, AlertTriangle, ShieldCheck, ChevronDown, ChevronRight,
 } from "lucide-react";
 
 // ── Ícones e cores por código de categoria ───────────────────────────────────
@@ -28,15 +28,35 @@ const CATEGORY_COLORS = {
   PRINTER:   "bg-green-50   dark:bg-green-900/30   text-green-600   dark:text-green-400   border-green-200   dark:border-green-700",
 };
 
+// Modelos de impressora e instruções de contador para cada um
+const PRINTER_COUNTER_MODELS = [
+  {
+    id:    "SAMSUNG_M4080FX",
+    label: "Samsung M4080FX",
+    steps: ["CONFIG. DA MAQ", "OUTROS", "RELATORIO", "SISTEMA", "CONTS USO", "IMPRIMIR"],
+  },
+  {
+    id:    "KYOCERA",
+    label: "Kyocera",
+    steps: ["MENU DE SISTEMAS", "RELATORIOS", "IMPRESSÃO DE RELATÓRIOS", "PÁGINA DE STATUS", "OK"],
+  },
+  {
+    id:    "HP",
+    label: "HP",
+    steps: ["RELATÓRIO", "PÁGINA DE CONFIGURAÇÃO/DE ESTADO", "PÁGINA DE UTILIZAÇÃO", "IMPRIMIR"],
+  },
+];
+
 // Subcategorias que têm campos extras (valor = tipo de formulário)
 const EXTRA_FORM_TYPE = {
-  // Impressoras: nome da impressora + bloco
+  // Impressoras genéricas: nome + bloco
   PRINTER_NOT_VISIBLE: "printer",
   PRINTER_OFFLINE:     "printer",
   PRINTER_NO_PRINT:    "printer",
   PRINTER_PAPER_JAM:   "printer",
-  PRINTER_NO_PAPER:    "printer",
-  PRINTER_TONER:       "printer",
+  // Impressoras que precisam do contador: nome + bloco + modelo + instruções
+  PRINTER_NO_PAPER: "printer_counter",
+  PRINTER_TONER:    "printer_counter",
   // Rede/Servidor
   NETSERVER_USER_CREATE:    "net_user_create",
   NETSERVER_USER_DELETE:    "net_user_delete",
@@ -127,6 +147,81 @@ function DeptSelect({ value, onChange, departments, placeholder = "Selecione o s
 // ── Formulários extras por tipo ──────────────────────────────────────────────
 function ExtraFields({ formType, fields, setFields, departments }) {
   const set = (key, val) => setFields((prev) => ({ ...prev, [key]: val }));
+
+  if (formType === "printer_counter") {
+    const selectedModel = PRINTER_COUNTER_MODELS.find((m) => m.id === fields.printerModel);
+    return (
+      <div className="space-y-3 pt-1">
+        <div>
+          <label className="field-label">Bloco / localização *</label>
+          <input
+            className="field-input"
+            placeholder="Ex: Bloco A, 2º andar"
+            value={fields.block || ""}
+            onChange={(e) => set("block", e.target.value)}
+          />
+        </div>
+
+        <div>
+          <label className="field-label">Modelo da impressora *</label>
+          <div className="space-y-2 mt-1">
+            {PRINTER_COUNTER_MODELS.map((m) => (
+              <label
+                key={m.id}
+                className={`flex items-center gap-3 rounded-xl border cursor-pointer p-3 transition ${
+                  fields.printerModel === m.id
+                    ? "border-brand-500 bg-brand-50 dark:bg-brand-900/20 ring-1 ring-brand-500/30"
+                    : "border-slate-200 dark:border-gray-700 hover:border-slate-300 dark:hover:border-gray-600 hover:bg-slate-50 dark:hover:bg-gray-800"
+                }`}
+              >
+                <div className={`h-4 w-4 shrink-0 rounded-full border-2 flex items-center justify-center transition ${
+                  fields.printerModel === m.id ? "border-brand-600 bg-brand-600" : "border-slate-300 dark:border-gray-600"
+                }`}>
+                  {fields.printerModel === m.id && <div className="h-1.5 w-1.5 rounded-full bg-white" />}
+                </div>
+                <input type="radio" name="printerModel" className="sr-only"
+                  checked={fields.printerModel === m.id}
+                  onChange={() => set("printerModel", m.id)} />
+                <span className="text-sm font-medium text-slate-700 dark:text-gray-200">{m.label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* Instruções de contador — aparecem ao selecionar o modelo */}
+        {selectedModel && (
+          <div className="rounded-xl border border-blue-200 dark:border-blue-700/60 bg-blue-50 dark:bg-blue-900/15 px-4 py-3.5 space-y-2.5">
+            <div className="flex items-center gap-2 text-sm font-semibold text-blue-800 dark:text-blue-300">
+              <Printer size={15} />
+              Como imprimir o contador — {selectedModel.label}
+            </div>
+            <p className="text-xs text-blue-700 dark:text-blue-400">
+              No painel da impressora, navegue pelo menu:
+            </p>
+            <div className="flex flex-wrap items-center gap-1">
+              {selectedModel.steps.map((step, i) => (
+                <span key={i} className="flex items-center gap-1">
+                  <span className="rounded-md bg-blue-100 dark:bg-blue-800/50 px-2 py-0.5 text-xs font-semibold text-blue-800 dark:text-blue-200 whitespace-nowrap">
+                    {step}
+                  </span>
+                  {i < selectedModel.steps.length - 1 && (
+                    <ChevronRight size={12} className="text-blue-400 shrink-0" />
+                  )}
+                </span>
+              ))}
+            </div>
+            <div className="flex items-start gap-2 pt-0.5 text-xs text-blue-700 dark:text-blue-400">
+              <span className="shrink-0 text-base leading-none">📸</span>
+              <span>
+                Após abrir o chamado, salve o documento e tire um <strong>screenshot</strong> do relatório e envie pelo chat.
+                Isso permite solicitar a quantidade certa de suprimentos à empresa responsável.
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   if (formType === "printer") return (
     <div className="space-y-3 pt-1">
@@ -303,7 +398,8 @@ function ExtraFields({ formType, fields, setFields, departments }) {
 // ── Valida se os campos extras estão preenchidos ─────────────────────────────
 function isExtraValid(formType, fields) {
   if (!formType || formType === "none") return true;
-  if (formType === "printer")          return !!(fields.printerName?.trim() && fields.block?.trim());
+  if (formType === "printer")         return !!(fields.printerName?.trim() && fields.block?.trim());
+  if (formType === "printer_counter") return !!(fields.block?.trim() && fields.printerModel);
   if (formType === "net_user_create")  return !!(fields.nome?.trim() && fields.cpf?.trim() && fields.setorId && fields.cargo?.trim());
   if (formType === "net_user_delete")  return !!(fields.cpf?.trim() && fields.setorId);
   if (formType === "net_password_reset") return !!(fields.nome?.trim() && fields.cpf?.trim() && fields.setorId);
@@ -321,6 +417,14 @@ function buildPayload(formType, fields) {
   if (formType === "printer") {
     freeTextDescription = `Impressora: ${fields.printerName}\nBloco: ${fields.block}`;
     extraData = { printerName: fields.printerName, block: fields.block };
+  } else if (formType === "printer_counter") {
+    const modelLabel = PRINTER_COUNTER_MODELS.find((m) => m.id === fields.printerModel)?.label || fields.printerModel;
+    freeTextDescription = `Bloco: ${fields.block}\nModelo: ${modelLabel}`;
+    extraData = {
+      block:             fields.block,
+      printerModel:      fields.printerModel,
+      printerModelLabel: modelLabel,
+    };
   } else if (formType === "net_user_create") {
     const systems = (fields.systems || []).join(", ");
     freeTextDescription = `Nome: ${fields.nome}\nCPF: ${fields.cpf}\nE-mail: ${fields.email || "—"}\nSetor: ${fields.setorName}\nCargo: ${fields.cargo}${systems ? `\nSistemas: ${systems}` : ""}`;
@@ -427,7 +531,14 @@ export default function NewTicketPage() {
       }
 
       const { data } = await api.post("/tickets", payload);
-      setCreatedTicket({ ticketNumber: data.ticketNumber, isRemote, approvalStatus: data.approvalStatus });
+      setCreatedTicket({
+        ticketNumber:       data.ticketNumber,
+        isRemote,
+        approvalStatus:     data.approvalStatus,
+        isPrinterCounter:   formType === "printer_counter",
+        printerModel:       formType === "printer_counter" ? extraFields.printerModel : null,
+        subcategoryCode:    subCode || null,
+      });
     } catch (e) {
       setError(e.response?.data?.error || "Falha ao abrir chamado");
     } finally {
@@ -438,6 +549,13 @@ export default function NewTicketPage() {
   // ── Tela de sucesso ──────────────────────────────────────────────────────
   if (createdTicket) {
     if (createdTicket.isRemote) return <RemoteSuccessScreen ticketNumber={createdTicket.ticketNumber} />;
+    if (createdTicket.isPrinterCounter) return (
+      <PrinterCounterSuccessScreen
+        ticketNumber={createdTicket.ticketNumber}
+        printerModel={createdTicket.printerModel}
+        subcategoryCode={createdTicket.subcategoryCode}
+      />
+    );
     if (createdTicket.approvalStatus === "PENDING") return <ApprovalPendingScreen ticketNumber={createdTicket.ticketNumber} />;
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-gray-950 flex items-center justify-center p-4">
@@ -750,6 +868,69 @@ export default function NewTicketPage() {
           )}
         </div>
       </main>
+    </div>
+  );
+}
+
+// ── Tela: chamado de impressora aberto — enviar screenshot do contador ────────
+function PrinterCounterSuccessScreen({ ticketNumber, printerModel, subcategoryCode }) {
+  const model      = PRINTER_COUNTER_MODELS.find((m) => m.id === printerModel);
+  const supplyWord = subcategoryCode === "PRINTER_TONER" ? "toners" : "resmas de papel";
+
+  return (
+    <div className="min-h-screen bg-slate-50 dark:bg-gray-950 flex items-center justify-center p-4">
+      <div className="card w-full max-w-md p-8 space-y-5">
+
+        {/* Cabeçalho */}
+        <div className="text-center space-y-3">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 mx-auto">
+            <CheckCircle2 size={28} />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-gray-100">Chamado aberto!</h2>
+            <p className="font-mono text-sm text-brand-600 dark:text-brand-400 mt-1">{ticketNumber}</p>
+          </div>
+        </div>
+
+        {/* Instruções do modelo selecionado */}
+        {model && (
+          <div className="rounded-xl border border-blue-200 dark:border-blue-700/60 bg-blue-50 dark:bg-blue-900/15 px-4 py-3.5 space-y-2.5">
+            <div className="flex items-center gap-2 text-sm font-semibold text-blue-800 dark:text-blue-300">
+              <Printer size={15} />
+              Imprima o contador agora — {model.label}
+            </div>
+            <p className="text-xs text-blue-700 dark:text-blue-400">No painel da impressora, navegue pelo menu:</p>
+            <div className="flex flex-wrap items-center gap-1">
+              {model.steps.map((step, i) => (
+                <span key={i} className="flex items-center gap-1">
+                  <span className="rounded-md bg-blue-100 dark:bg-blue-800/50 px-2 py-0.5 text-xs font-semibold text-blue-800 dark:text-blue-200 whitespace-nowrap">
+                    {step}
+                  </span>
+                  {i < model.steps.length - 1 && (
+                    <ChevronRight size={12} className="text-blue-400 shrink-0" />
+                  )}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Instrução de envio do screenshot */}
+        <div className="rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 px-4 py-3 flex items-start gap-2 text-xs text-amber-800 dark:text-amber-300">
+          <span className="text-base shrink-0 mt-0.5">📸</span>
+          <span>
+            Tire um <strong>screenshot do relatório de contador</strong> e envie pelo chat do chamado.
+            Isso nos permite solicitar a quantidade certa de <strong>{supplyWord}</strong> à empresa responsável.
+          </span>
+        </div>
+
+        <Link to={`/acompanhar/${ticketNumber}`} className="btn-primary w-full justify-center">
+          Ir para o chat e enviar screenshot <ArrowRight size={16} />
+        </Link>
+        <Link to="/" className="block text-center text-sm text-slate-500 dark:text-gray-400 hover:text-slate-700 dark:hover:text-gray-200 transition">
+          Voltar ao início
+        </Link>
+      </div>
     </div>
   );
 }
