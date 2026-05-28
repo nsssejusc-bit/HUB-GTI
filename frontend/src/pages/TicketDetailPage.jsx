@@ -5,7 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { StatusBadge, InfoItem, Alert, Spinner } from "../components/ui";
 import AppHeader from "../components/AppHeader";
-import { formatElapsed, STATUS_LABEL, STATUS_ORDER, statusIndex } from "../lib/statuses";
+import { formatElapsed, formatRelative, STATUS_LABEL, STATUS_ORDER, statusIndex } from "../lib/statuses";
 import { useServerTick, serverNow } from "../lib/serverTime";
 import { ArrowLeft, Clock, CheckCircle2, Circle, ChevronRight, Trash2, AlertTriangle, MonitorSmartphone, Copy, Check as CheckIcon, ClipboardList, Plus, ExternalLink, Shield, ShieldCheck, ShieldX, ThumbsUp, ThumbsDown, UserCheck, X, MessageSquare, ArrowRight, FileText, RotateCcw, Users2, Send, Timer, ImageIcon } from "lucide-react";
 
@@ -28,6 +28,23 @@ const TRANSITION_COLOR = {
   IN_SERVICE: "bg-violet-600 hover:bg-violet-700 text-white rounded-xl px-4 py-2.5 text-sm font-semibold inline-flex items-center gap-2 transition",
   COMPLETED:  "bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl px-4 py-2.5 text-sm font-semibold inline-flex items-center gap-2 transition",
 };
+
+const PRIORITY_LABEL = { LOW: "Baixa", MEDIUM: "Média", HIGH: "Alta", URGENT: "Urgente" };
+const PRIORITY_COLOR  = {
+  LOW:    "bg-slate-100 dark:bg-gray-700 text-slate-500 dark:text-gray-400",
+  MEDIUM: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400",
+  HIGH:   "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400",
+  URGENT: "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 font-semibold",
+};
+
+// Retorna 1-2 iniciais de um nome completo
+function getInitials(name) {
+  if (!name) return "?";
+  const parts = name.trim().split(/\s+/);
+  return parts.length === 1
+    ? parts[0][0].toUpperCase()
+    : (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
 
 const STATUS_DESC = {
   OPEN:       "Chamado registrado, aguardando análise",
@@ -89,6 +106,14 @@ export default function TicketDetailPage() {
     api.get(`/work-orders?ticketId=${id}`).then((r) => setLinkedOs(r.data));
     api.get(`/tickets/${id}/comments`).then((r) => setComments(r.data)).catch(() => {});
     api.get(`/tickets/${id}/messages`).then((r) => setMessages(r.data)).catch(() => {});
+    // Polling de mensagens a cada 15s para detectar respostas do usuário
+    const tm = setInterval(async () => {
+      try {
+        const { data } = await api.get(`/tickets/${id}/messages`);
+        setMessages(data);
+      } catch (_) {}
+    }, 15000);
+    return () => clearInterval(tm);
   }, [id]);
 
   useEffect(() => {
@@ -489,7 +514,14 @@ export default function TicketDetailPage() {
           {/* Status + tempo */}
           <div className="card px-5 py-4 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <div className="text-lg font-semibold text-slate-900 dark:text-gray-100">{STATUS_LABEL[ticket.status]}</div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="text-lg font-semibold text-slate-900 dark:text-gray-100">{STATUS_LABEL[ticket.status]}</div>
+                {ticket.priority && (
+                  <span className={`text-xs rounded-full px-2 py-0.5 ${PRIORITY_COLOR[ticket.priority] || ""}`}>
+                    {PRIORITY_LABEL[ticket.priority] || ticket.priority}
+                  </span>
+                )}
+              </div>
               <div className="flex items-center gap-1 text-xs text-slate-500 dark:text-gray-400 mt-0.5">
                 <Clock size={11} />
                 Aberto há {formatElapsed(ticket.openedAt, ticket.completedAt, ticket.completedAt ? null : serverNow())}
@@ -861,12 +893,15 @@ export default function TicketDetailPage() {
               <div className="max-h-64 overflow-y-auto space-y-2.5 pr-1">
                 {messages.map((m) => (
                   <div key={m.id} className={`flex gap-2.5 ${m.fromUser ? "" : "flex-row-reverse"}`}>
+                    {/* Avatar com iniciais reais */}
                     <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
                       m.fromUser
                         ? "bg-slate-100 dark:bg-gray-700 text-slate-600 dark:text-gray-300"
                         : "bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-400"
                     }`}>
-                      {m.fromUser ? "U" : (m.author?.name?.charAt(0).toUpperCase() || "T")}
+                      {m.fromUser
+                        ? getInitials(ticket.requesterName)
+                        : getInitials(m.author?.name || "Técnico")}
                     </div>
                     <div className={`flex flex-col ${m.fromUser ? "items-start" : "items-end"} max-w-[85%]`}>
                       <div className={`rounded-xl text-sm overflow-hidden ${
@@ -879,8 +914,16 @@ export default function TicketDetailPage() {
                           ? <img src={m.content} alt="imagem" className="max-w-[260px] max-h-64 rounded-lg object-contain cursor-zoom-in" onClick={() => setLightbox(m.content)} />
                           : m.content}
                       </div>
-                      <div className="text-[10px] text-slate-400 dark:text-gray-500 mt-0.5 px-1">
-                        {m.fromUser ? "Solicitante" : (m.author?.name || "Técnico")} · {new Date(m.createdAt).toLocaleString("pt-BR")}
+                      {/* Timestamp relativo com data completa no hover */}
+                      <div
+                        className="text-[10px] text-slate-400 dark:text-gray-500 mt-0.5 px-1 cursor-default"
+                        title={new Date(m.createdAt).toLocaleString("pt-BR")}
+                      >
+                        {m.fromUser
+                          ? (ticket.requesterName?.split(" ")[0] || "Solicitante")
+                          : (m.author?.name?.split(" ")[0] || "Técnico")}
+                        {" · "}
+                        {formatRelative(m.createdAt)}
                       </div>
                     </div>
                   </div>
@@ -1080,9 +1123,12 @@ export default function TicketDetailPage() {
                         value={form.cause}
                         onChange={(e) => setForm({ ...form, cause: e.target.value })}
                       />
-                      {form.cause && !form.cause.trim() && (
-                        <p className="mt-0.5 text-xs text-red-500 dark:text-red-400">Não pode conter apenas espaços em branco</p>
-                      )}
+                      <div className="flex items-center justify-between mt-0.5">
+                        {form.cause && !form.cause.trim()
+                          ? <p className="text-xs text-red-500 dark:text-red-400">Não pode conter apenas espaços em branco</p>
+                          : <span />}
+                        <span className="text-[11px] text-slate-400 dark:text-gray-500">{form.cause.length} car.</span>
+                      </div>
                     </div>
                     <div>
                       <label className="field-label">Solução aplicada *</label>
@@ -1093,9 +1139,12 @@ export default function TicketDetailPage() {
                         value={form.solution}
                         onChange={(e) => setForm({ ...form, solution: e.target.value })}
                       />
-                      {form.solution && !form.solution.trim() && (
-                        <p className="mt-0.5 text-xs text-red-500 dark:text-red-400">Não pode conter apenas espaços em branco</p>
-                      )}
+                      <div className="flex items-center justify-between mt-0.5">
+                        {form.solution && !form.solution.trim()
+                          ? <p className="text-xs text-red-500 dark:text-red-400">Não pode conter apenas espaços em branco</p>
+                          : <span />}
+                        <span className="text-[11px] text-slate-400 dark:text-gray-500">{form.solution.length} car.</span>
+                      </div>
                     </div>
                   </>
                 )}
@@ -1152,16 +1201,24 @@ export default function TicketDetailPage() {
                     })
                     .map((next) => {
                       const labels = ticket.isRemote ? TRANSITION_LABEL_REMOTE : TRANSITION_LABEL;
+                      const needsCauseSol = next === "COMPLETED" && ticket.requiresCauseSolution !== false;
+                      const missingCauseSol = needsCauseSol && (!form.cause.trim() || !form.solution.trim());
                       return (
-                        <button
-                          key={next}
-                          disabled={loading || (next === "COMPLETED" && ticket.requiresCauseSolution !== false && (!form.cause.trim() || !form.solution.trim()))}
-                          onClick={() => doTransition(next)}
-                          className={`w-full justify-center ${TRANSITION_COLOR[next] || "btn-primary"} disabled:opacity-50 disabled:cursor-not-allowed`}
-                        >
-                          {loading ? <Spinner className="h-4 w-4" /> : <CheckCircle2 size={15} />}
-                          {labels[next] || `→ ${STATUS_LABEL[next]}`}
-                        </button>
+                        <div key={next}>
+                          <button
+                            disabled={loading || missingCauseSol}
+                            onClick={() => doTransition(next)}
+                            className={`w-full justify-center ${TRANSITION_COLOR[next] || "btn-primary"} disabled:opacity-50 disabled:cursor-not-allowed`}
+                          >
+                            {loading ? <Spinner className="h-4 w-4" /> : <CheckCircle2 size={15} />}
+                            {labels[next] || `→ ${STATUS_LABEL[next]}`}
+                          </button>
+                          {missingCauseSol && (
+                            <p className="text-[11px] text-slate-500 dark:text-gray-400 text-center mt-1">
+                              Preencha causa e solução para concluir
+                            </p>
+                          )}
+                        </div>
                       );
                     })}
                 </div>

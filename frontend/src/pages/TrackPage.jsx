@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../lib/api";
-import { STATUS_ORDER, STATUS_LABEL, statusIndex, formatElapsed } from "../lib/statuses";
+import { STATUS_ORDER, STATUS_LABEL, statusIndex, formatElapsed, formatRelative } from "../lib/statuses";
 import { useServerTick, serverNow } from "../lib/serverTime";
 import { StatusBadge, InfoItem, Spinner } from "../components/ui";
-import { Home, Clock, CheckCircle2, Circle, Star, MonitorSmartphone, Wifi, Shield, ShieldCheck, ShieldX, MessageSquare, Send, UserCheck, ImageIcon, X } from "lucide-react";
+import {
+  Home, Clock, CheckCircle2, Circle, Star, MonitorSmartphone, Wifi,
+  Shield, ShieldCheck, ShieldX, MessageSquare, Send, UserCheck,
+  ImageIcon, X, Copy, Check,
+} from "lucide-react";
 
 const STATUS_DESC = {
   OPEN:       "Chamado registrado, aguardando análise",
@@ -14,18 +18,40 @@ const STATUS_DESC = {
   COMPLETED:  "Problema resolvido",
 };
 
+const PRIORITY_LABEL = { LOW: "Baixa", MEDIUM: "Média", HIGH: "Alta", URGENT: "Urgente" };
+const PRIORITY_COLOR  = {
+  LOW:    "bg-slate-100 dark:bg-gray-700 text-slate-500 dark:text-gray-400",
+  MEDIUM: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400",
+  HIGH:   "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400",
+  URGENT: "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 font-semibold",
+};
+
+// Retorna 1-2 iniciais de um nome completo
+function getInitials(name) {
+  if (!name) return "?";
+  const parts = name.trim().split(/\s+/);
+  return parts.length === 1
+    ? parts[0][0].toUpperCase()
+    : (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 export default function TrackPage() {
   const { ticketNumber } = useParams();
-  const [ticket, setTicket] = useState(null);
-  const [error, setError] = useState("");
+  const [ticket,       setTicket]       = useState(null);
+  const [error,        setError]        = useState("");
   useServerTick(60000);
-  const [config, setConfig] = useState({ feedbackEnabled: false });
-  const [messages, setMessages] = useState([]);
-  const [replyText, setReplyText] = useState("");
+  const [config,       setConfig]       = useState({ feedbackEnabled: false });
+  const [messages,     setMessages]     = useState([]);
+  const [replyText,    setReplyText]    = useState("");
   const [replySending, setReplySending] = useState(false);
-  const [replyErr, setReplyErr] = useState("");
-  const [lightbox, setLightbox] = useState(null);
-  const imgInputRef = useRef(null);
+  const [replyErr,     setReplyErr]     = useState("");
+  const [lightbox,     setLightbox]     = useState(null);
+  const [copied,       setCopied]       = useState(false);
+  const [lastUpdated,  setLastUpdated]  = useState(null);
+  const [hasNewMsg,    setHasNewMsg]    = useState(false);
+  const imgInputRef      = useRef(null);
+  const msgEndRef        = useRef(null);
+  const prevMsgCountRef  = useRef(0);
 
   const COUNTER_SUBCATEGORY_CODES = ["PRINTER_NO_PAPER", "PRINTER_TONER"];
   const isCounterTicket = COUNTER_SUBCATEGORY_CODES.includes(ticket?.subcategoryCode);
@@ -36,10 +62,15 @@ export default function TrackPage() {
     api.get("/config").then((r) => setConfig(r.data));
     load();
     loadMessages();
-    const t = setInterval(load, 30000);
-    const tm = setInterval(loadMessages, 30000);
+    const t  = setInterval(load, 30000);
+    const tm = setInterval(loadMessages, 15000); // poll mais rápido
     return () => { clearInterval(t); clearInterval(tm); };
   }, [ticketNumber]);
+
+  // Auto-scroll ao receber novas mensagens
+  useEffect(() => {
+    msgEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   async function load() {
     try {
@@ -54,7 +85,20 @@ export default function TrackPage() {
     try {
       const { data } = await api.get(`/tickets/track/${ticketNumber}/messages`);
       setMessages(data);
+      setLastUpdated(new Date());
+      // Detecta nova mensagem do técnico chegando durante poll
+      if (data.length > prevMsgCountRef.current && prevMsgCountRef.current > 0) {
+        setHasNewMsg(true);
+        setTimeout(() => setHasNewMsg(false), 5000);
+      }
+      prevMsgCountRef.current = data.length;
     } catch (_) {}
+  }
+
+  function copyTicketNumber() {
+    navigator.clipboard.writeText(ticket.ticketNumber);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   }
 
   async function sendReply() {
@@ -145,11 +189,10 @@ export default function TrackPage() {
     );
   }
 
-  const currentIdx  = statusIndex(ticket.status);
+  const currentIdx    = statusIndex(ticket.status);
   const needsApproval = ticket.approvalStatus && ticket.approvalStatus !== "NOT_REQUIRED";
   const isRejected    = ticket.approvalStatus === "REJECTED";
 
-  // Filtra EN_ROUTE para tickets não presenciais
   const visibleStatuses = STATUS_ORDER.filter(
     (s) => s !== "EN_ROUTE" || ticket.presential
   );
@@ -185,18 +228,38 @@ export default function TrackPage() {
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <div className="text-xs text-slate-500 dark:text-gray-400 mb-1">Protocolo</div>
-                  <div className="text-xl font-bold text-slate-900 dark:text-gray-100 font-mono tracking-wide">
-                    {ticket.ticketNumber}
+                  <div className="flex items-center gap-2">
+                    <div className="text-xl font-bold text-slate-900 dark:text-gray-100 font-mono tracking-wide">
+                      {ticket.ticketNumber}
+                    </div>
+                    {/* Botão copiar protocolo */}
+                    <button
+                      onClick={copyTicketNumber}
+                      title="Copiar protocolo"
+                      className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/20 transition"
+                    >
+                      {copied
+                        ? <Check size={14} className="text-emerald-500" />
+                        : <Copy size={14} />}
+                    </button>
                   </div>
                 </div>
-                <div className="text-right">
+                <div className="text-right space-y-1.5">
                   <StatusBadge status={ticket.status} />
-                  <div className="flex items-center gap-1 mt-2 text-xs text-slate-500 dark:text-gray-400 justify-end">
+                  {/* Badge de prioridade */}
+                  {ticket.priority && (
+                    <div className="flex justify-end">
+                      <span className={`text-xs rounded-full px-2 py-0.5 ${PRIORITY_COLOR[ticket.priority] || ""}`}>
+                        Prioridade {PRIORITY_LABEL[ticket.priority] || ticket.priority}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-1 text-xs text-slate-500 dark:text-gray-400 justify-end">
                     <Clock size={11} />
                     {formatElapsed(ticket.openedAt, ticket.completedAt, ticket.completedAt ? null : serverNow())}
                   </div>
                   {ticket.status === "COMPLETED" && ticket.completedAt && (
-                    <div className="flex items-center gap-1 mt-1 text-xs text-emerald-600 dark:text-emerald-400 justify-end">
+                    <div className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 justify-end">
                       <CheckCircle2 size={11} />
                       Concluído há {formatElapsed(ticket.completedAt, null, serverNow())}
                     </div>
@@ -460,9 +523,19 @@ export default function TrackPage() {
                   <h2 className="text-sm font-semibold text-slate-900 dark:text-gray-100 flex-1">
                     {isCounterTicket ? "Envio do contador" : "Mensagens do técnico"}
                   </h2>
+                  {/* Indicador de nova mensagem */}
+                  {hasNewMsg && (
+                    <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" title="Nova mensagem" />
+                  )}
                   {messages.length > 0 && (
                     <span className="rounded-full bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-400 text-[10px] font-bold px-2 py-0.5">
                       {messages.length}
+                    </span>
+                  )}
+                  {/* Horário da última atualização */}
+                  {lastUpdated && (
+                    <span className="text-[10px] text-slate-400 dark:text-gray-500" title="Última atualização">
+                      ↻ {lastUpdated.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
                     </span>
                   )}
                 </div>
@@ -481,12 +554,15 @@ export default function TrackPage() {
                   ) : (
                     messages.map((m) => (
                       <div key={m.id} className={`flex gap-2 ${m.fromUser ? "flex-row-reverse" : ""}`}>
+                        {/* Avatar com iniciais reais */}
                         <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
                           m.fromUser
                             ? "bg-slate-200 dark:bg-gray-700 text-slate-600 dark:text-gray-300"
                             : "bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-400"
                         }`}>
-                          {m.fromUser ? "V" : "T"}
+                          {m.fromUser
+                            ? getInitials(ticket.requesterName)
+                            : getInitials(m.author?.name || "Técnico")}
                         </div>
                         <div className={`flex flex-col max-w-[80%] ${m.fromUser ? "items-end" : "items-start"}`}>
                           <div className={`rounded-xl text-sm leading-relaxed overflow-hidden ${
@@ -499,13 +575,23 @@ export default function TrackPage() {
                               ? <img src={m.content} alt="imagem" className="max-w-[220px] max-h-60 rounded-lg object-contain cursor-zoom-in" onClick={() => setLightbox(m.content)} />
                               : m.content}
                           </div>
-                          <div className="text-[10px] text-slate-400 dark:text-gray-500 mt-0.5 px-1">
-                            {m.fromUser ? "Você" : (m.author?.name || "Técnico GTI")} · {new Date(m.createdAt).toLocaleString("pt-BR")}
+                          {/* Timestamp relativo com data completa no hover */}
+                          <div
+                            className="text-[10px] text-slate-400 dark:text-gray-500 mt-0.5 px-1 cursor-default"
+                            title={new Date(m.createdAt).toLocaleString("pt-BR")}
+                          >
+                            {m.fromUser
+                              ? ticket.requesterName.split(" ")[0]
+                              : (m.author?.name?.split(" ")[0] || "Técnico GTI")}
+                            {" · "}
+                            {formatRelative(m.createdAt)}
                           </div>
                         </div>
                       </div>
                     ))
                   )}
+                  {/* Âncora para auto-scroll */}
+                  <div ref={msgEndRef} />
                 </div>
 
                 {/* Rodapé — resposta */}
@@ -551,6 +637,10 @@ export default function TrackPage() {
                       </div>
                     </div>
                     {replyErr && <p className="text-xs text-red-500 dark:text-red-400">{replyErr}</p>}
+                    {/* Dica de atalho */}
+                    <p className="text-[10px] text-slate-400 dark:text-gray-500">
+                      Ctrl+Enter para enviar · Cole imagens com Ctrl+V
+                    </p>
                   </div>
                 )}
               </div>
@@ -597,11 +687,11 @@ export default function TrackPage() {
 }
 
 function FeedbackForm({ ticketNumber, onSaved }) {
-  const [rating, setRating] = useState(0);
-  const [hover, setHover] = useState(0);
+  const [rating,  setRating]  = useState(0);
+  const [hover,   setHover]   = useState(0);
   const [comment, setComment] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [err, setErr] = useState("");
+  const [saving,  setSaving]  = useState(false);
+  const [err,     setErr]     = useState("");
 
   async function submit() {
     setErr("");

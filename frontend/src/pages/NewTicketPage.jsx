@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
@@ -480,10 +480,36 @@ export default function NewTicketPage() {
   const [submitting,   setSubmitting]   = useState(false);
   const [createdTicket, setCreatedTicket] = useState(null);
 
+  const continueRef = useRef(null); // botão "Continuar" na tela 1
+  const extraRef    = useRef(null); // bloco de campos extras na tela 2
+
   useEffect(() => {
     api.get("/categories").then((r)   => setCategories(r.data));
     api.get("/departments").then((r)  => setDepartments(r.data)).catch(() => {});
   }, []);
+
+  // Rola até o botão "Continuar" ao selecionar uma categoria
+  useEffect(() => {
+    if (!form.categoryId) return;
+    const id = setTimeout(() => {
+      if (!continueRef.current) return;
+      const rect = continueRef.current.getBoundingClientRect();
+      const offset = rect.bottom - window.innerHeight;
+      if (offset > 0) {
+        window.scrollBy({ top: offset + 16, behavior: "smooth" });
+      }
+    }, 80);
+    return () => clearTimeout(id);
+  }, [form.categoryId]);
+
+  // Rola até os campos extras ao selecionar uma subcategoria
+  useEffect(() => {
+    if (!form.subcategoryId) return;
+    const id = setTimeout(() => {
+      extraRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
+    return () => clearTimeout(id);
+  }, [form.subcategoryId]);
 
   const selectedCategory    = categories.find((c) => c.id === form.categoryId);
   const isRemote            = selectedCategory?.code === "REMOTE";
@@ -735,6 +761,7 @@ export default function NewTicketPage() {
               </div>
 
               <button
+                ref={continueRef}
                 disabled={!form.categoryId}
                 onClick={() => setScreen("details")}
                 className="btn-primary w-full py-3"
@@ -829,22 +856,23 @@ export default function NewTicketPage() {
                     );
                   })}
 
-                  {/* Dicas N1 da subcategoria selecionada */}
-                  {form.subcategoryId && subN1Tips.length > 0 && (
-                    <N1TipsBox tips={subN1Tips} title={selectedSubcategory.name} />
-                  )}
+                  {/* Dicas N1 + campos extras da subcategoria selecionada */}
+                  <div ref={extraRef}>
+                    {form.subcategoryId && subN1Tips.length > 0 && (
+                      <N1TipsBox tips={subN1Tips} title={selectedSubcategory.name} />
+                    )}
 
-                  {/* Campos extras da subcategoria selecionada */}
-                  {form.subcategoryId && formType && formType !== "none" && (
-                    <div className="rounded-xl border border-slate-200 dark:border-gray-700 p-4 space-y-1 mt-1">
-                      <ExtraFields
-                        formType={formType}
-                        fields={extraFields}
-                        setFields={setExtraFields}
-                        departments={departments}
-                      />
-                    </div>
-                  )}
+                    {form.subcategoryId && formType && formType !== "none" && (
+                      <div className="rounded-xl border border-slate-200 dark:border-gray-700 p-4 space-y-1 mt-1">
+                        <ExtraFields
+                          formType={formType}
+                          fields={extraFields}
+                          setFields={setExtraFields}
+                          departments={departments}
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 

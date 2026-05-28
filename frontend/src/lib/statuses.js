@@ -12,6 +12,15 @@ export function statusIndex(s) {
   return STATUS_ORDER.indexOf(s);
 }
 
+// Timestamp relativo: "agora", "há 5 min", "há 2h", ou data curta
+export function formatRelative(isoDate) {
+  const diff = Math.floor((Date.now() - new Date(isoDate).getTime()) / 1000);
+  if (diff < 60)    return "agora";
+  if (diff < 3600)  return `há ${Math.floor(diff / 60)} min`;
+  if (diff < 86400) return `há ${Math.floor(diff / 3600)}h`;
+  return new Date(isoDate).toLocaleDateString("pt-BR");
+}
+
 export function formatElapsed(fromIso, toIso = null, nowMs = null) {
   const start = new Date(fromIso).getTime();
   // nowMs pode ser passado pelo chamador (usando serverNow()); fallback para Date.now()

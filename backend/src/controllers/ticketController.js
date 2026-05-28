@@ -195,6 +195,7 @@ export async function getTicketPublic(req, res) {
     enRouteAt:           ticket.enRouteAt,
     inServiceAt:         ticket.inServiceAt,
     completedAt:         ticket.completedAt,
+    priority:            ticket.priority,
     hasFeedback:         !!ticket.feedback,
   });
 }
