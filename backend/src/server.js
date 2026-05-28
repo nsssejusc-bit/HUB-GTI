@@ -51,7 +51,7 @@ app.use(cors({
   credentials: true,
 }));
 app.use(cookieParser());
-app.use(express.json({ limit: "1mb" }));
+app.use(express.json({ limit: "5mb" }));
 
 app.get("/api/health", (_, res) => res.json({ ok: true, service: "helpdesk-sejusc" }));
 app.use("/api", routes);

@@ -260,7 +260,7 @@ model TicketMessage {
   authorId  Int?
   author    User?    @relation("MessageAuthor", fields: [authorId], references: [id])
   fromUser  Boolean  @default(false)
-  content   String   @db.Text
+  content   String   @db.LongText
   createdAt DateTime @default(now())
 
   @@index([ticketId])

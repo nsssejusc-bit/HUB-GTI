@@ -182,6 +182,7 @@ export async function getTicketPublic(req, res) {
     department:          ticket.department,
     category:            ticket.category?.name,
     subcategory:         ticket.subcategory?.name,
+    subcategoryCode:     ticket.subcategory?.code ?? null,
     freeTextDescription: ticket.freeTextDescription,
     anyDeskCode:         ticket.anyDeskCode || null,
     isRemote:            !!(ticket.anyDeskCode),
@@ -739,10 +740,15 @@ export async function listMessages(req, res) {
 }
 
 // POST /tickets/:id/messages — staff envia mensagem ao solicitante
+const MAX_IMG_B64 = 4 * 1024 * 1024; // 4 MB base64 ≈ 3 MB de arquivo
+
 export async function sendMessage(req, res) {
   const id = Number(req.params.id);
   const { content } = req.body || {};
   if (!content?.trim()) return res.status(400).json({ error: "Mensagem vazia" });
+  if (content.startsWith("data:image/") && content.length > MAX_IMG_B64) {
+    return res.status(400).json({ error: "Imagem muito grande. Máximo 3 MB." });
+  }
 
   const ticket = await prisma.ticket.findUnique({ where: { id }, select: { id: true } });
   if (!ticket) return res.status(404).json({ error: "Chamado não encontrado" });
@@ -776,24 +782,34 @@ export async function listMessagesPublic(req, res) {
   res.json(msgs);
 }
 
-// POST /tickets/track/:ticketNumber/messages — solicitante responde (só se técnico enviou primeiro)
+// Subcategorias que permitem o solicitante enviar a primeira mensagem
+const COUNTER_SUBCATEGORY_CODES = ["PRINTER_NO_PAPER", "PRINTER_TONER"];
+
+// POST /tickets/track/:ticketNumber/messages — solicitante responde (ou inicia, para subcategorias de contador)
 export async function sendMessagePublic(req, res) {
   const { ticketNumber } = req.params;
   const { content } = req.body || {};
   if (!content?.trim()) return res.status(400).json({ error: "Mensagem vazia" });
+  if (content.startsWith("data:image/") && content.length > MAX_IMG_B64) {
+    return res.status(400).json({ error: "Imagem muito grande. Máximo 3 MB." });
+  }
 
   const ticket = await prisma.ticket.findUnique({
     where: { ticketNumber },
-    select: { id: true },
+    select: { id: true, subcategory: { select: { code: true } } },
   });
   if (!ticket) return res.status(404).json({ error: "Chamado não encontrado" });
 
-  // Só permite resposta se o técnico já enviou ao menos uma mensagem
-  const techMsg = await prisma.ticketMessage.findFirst({
-    where: { ticketId: ticket.id, fromUser: false },
-  });
-  if (!techMsg) {
-    return res.status(403).json({ error: "Aguarde o técnico enviar uma mensagem primeiro" });
+  const isCounterTicket = COUNTER_SUBCATEGORY_CODES.includes(ticket.subcategory?.code);
+
+  if (!isCounterTicket) {
+    // Para os demais tickets, só permite resposta se o técnico já enviou ao menos uma mensagem
+    const techMsg = await prisma.ticketMessage.findFirst({
+      where: { ticketId: ticket.id, fromUser: false },
+    });
+    if (!techMsg) {
+      return res.status(403).json({ error: "Aguarde o técnico enviar uma mensagem primeiro" });
+    }
   }
 
   const msg = await prisma.ticketMessage.create({

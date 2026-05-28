@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { STATUS_ORDER, STATUS_LABEL, statusIndex, formatElapsed } from "../lib/statuses";
 import { useServerTick, serverNow } from "../lib/serverTime";
 import { StatusBadge, InfoItem, Spinner } from "../components/ui";
-import { Home, Clock, CheckCircle2, Circle, Star, MonitorSmartphone, Wifi, Shield, ShieldCheck, ShieldX, MessageSquare, Send, UserCheck } from "lucide-react";
+import { Home, Clock, CheckCircle2, Circle, Star, MonitorSmartphone, Wifi, Shield, ShieldCheck, ShieldX, MessageSquare, Send, UserCheck, ImageIcon, X } from "lucide-react";
 
 const STATUS_DESC = {
   OPEN:       "Chamado registrado, aguardando análise",
@@ -24,9 +24,13 @@ export default function TrackPage() {
   const [replyText, setReplyText] = useState("");
   const [replySending, setReplySending] = useState(false);
   const [replyErr, setReplyErr] = useState("");
+  const [lightbox, setLightbox] = useState(null);
+  const imgInputRef = useRef(null);
 
+  const COUNTER_SUBCATEGORY_CODES = ["PRINTER_NO_PAPER", "PRINTER_TONER"];
+  const isCounterTicket = COUNTER_SUBCATEGORY_CODES.includes(ticket?.subcategoryCode);
   const techMessages = messages.filter((m) => !m.fromUser);
-  const canReply = techMessages.length > 0;
+  const canReply = isCounterTicket || techMessages.length > 0;
 
   useEffect(() => {
     api.get("/config").then((r) => setConfig(r.data));
@@ -66,6 +70,56 @@ export default function TrackPage() {
     } finally {
       setReplySending(false);
     }
+  }
+
+  function handlePaste(e) {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith("image/")) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (!file) return;
+        if (file.size > 3 * 1024 * 1024) { setReplyErr("Imagem muito grande. Máximo 3 MB."); return; }
+        const reader = new FileReader();
+        reader.onload = async (ev) => {
+          setReplySending(true); setReplyErr("");
+          try {
+            const { data } = await api.post(`/tickets/track/${ticketNumber}/messages`, { content: ev.target.result });
+            setMessages((prev) => [...prev, data]);
+          } catch (err) {
+            setReplyErr(err.response?.data?.error || "Erro ao enviar imagem");
+          } finally { setReplySending(false); }
+        };
+        reader.readAsDataURL(file);
+        return;
+      }
+    }
+  }
+
+  function handleImageSelect(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 3 * 1024 * 1024) {
+      setReplyErr("Imagem muito grande. Máximo 3 MB.");
+      e.target.value = "";
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      setReplySending(true);
+      setReplyErr("");
+      try {
+        const { data } = await api.post(`/tickets/track/${ticketNumber}/messages`, { content: ev.target.result });
+        setMessages((prev) => [...prev, data]);
+      } catch (err) {
+        setReplyErr(err.response?.data?.error || "Erro ao enviar imagem");
+      } finally {
+        setReplySending(false);
+        e.target.value = "";
+      }
+    };
+    reader.readAsDataURL(file);
   }
 
   if (error) {
@@ -404,7 +458,7 @@ export default function TrackPage() {
                 <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-100 dark:border-gray-700/60 shrink-0">
                   <MessageSquare size={14} className="text-brand-600 dark:text-brand-400" />
                   <h2 className="text-sm font-semibold text-slate-900 dark:text-gray-100 flex-1">
-                    Mensagens do técnico
+                    {isCounterTicket ? "Envio do contador" : "Mensagens do técnico"}
                   </h2>
                   {messages.length > 0 && (
                     <span className="rounded-full bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-400 text-[10px] font-bold px-2 py-0.5">
@@ -419,7 +473,9 @@ export default function TrackPage() {
                     <div className="flex flex-col items-center justify-center h-full py-8 text-center gap-2">
                       <MessageSquare size={28} className="text-slate-200 dark:text-gray-700" />
                       <p className="text-xs text-slate-400 dark:text-gray-500 leading-relaxed max-w-[180px]">
-                        O técnico pode enviar atualizações por aqui durante o atendimento.
+                        {isCounterTicket
+                          ? "Envie o screenshot do contador da impressora pelo campo abaixo."
+                          : "O técnico pode enviar atualizações por aqui durante o atendimento."}
                       </p>
                     </div>
                   ) : (
@@ -433,12 +489,15 @@ export default function TrackPage() {
                           {m.fromUser ? "V" : "T"}
                         </div>
                         <div className={`flex flex-col max-w-[80%] ${m.fromUser ? "items-end" : "items-start"}`}>
-                          <div className={`rounded-xl px-3 py-2 text-sm leading-relaxed ${
+                          <div className={`rounded-xl text-sm leading-relaxed overflow-hidden ${
+                            m.content.startsWith("data:image/") ? "p-1" :
                             m.fromUser
-                              ? "bg-slate-100 dark:bg-gray-800 text-slate-800 dark:text-gray-200"
-                              : "bg-brand-50 dark:bg-brand-900/20 text-brand-900 dark:text-brand-100"
+                              ? "bg-slate-100 dark:bg-gray-800 text-slate-800 dark:text-gray-200 px-3 py-2"
+                              : "bg-brand-50 dark:bg-brand-900/20 text-brand-900 dark:text-brand-100 px-3 py-2"
                           }`}>
-                            {m.content}
+                            {m.content.startsWith("data:image/")
+                              ? <img src={m.content} alt="imagem" className="max-w-[220px] max-h-60 rounded-lg object-contain cursor-zoom-in" onClick={() => setLightbox(m.content)} />
+                              : m.content}
                           </div>
                           <div className="text-[10px] text-slate-400 dark:text-gray-500 mt-0.5 px-1">
                             {m.fromUser ? "Você" : (m.author?.name || "Técnico GTI")} · {new Date(m.createdAt).toLocaleString("pt-BR")}
@@ -452,25 +511,44 @@ export default function TrackPage() {
                 {/* Rodapé — resposta */}
                 {canReply && (
                   <div className="shrink-0 border-t border-slate-100 dark:border-gray-700/60 px-4 py-3 space-y-2">
+                    <input
+                      ref={imgInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="sr-only"
+                      onChange={handleImageSelect}
+                    />
                     <div className="flex gap-2">
                       <textarea
                         rows={2}
                         className="flex-1 rounded-xl border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-slate-800 dark:text-gray-100 placeholder-slate-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
-                        placeholder="Responder ao técnico..."
+                        placeholder={isCounterTicket && techMessages.length === 0 ? "Descreva e envie o screenshot do contador..." : "Responder ao técnico..."}
                         value={replyText}
                         onChange={(e) => setReplyText(e.target.value)}
                         onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) sendReply(); }}
+                        onPaste={handlePaste}
                       />
-                      <button
-                        onClick={sendReply}
-                        disabled={!replyText.trim() || replySending}
-                        className="flex h-10 w-10 shrink-0 self-end items-center justify-center rounded-xl bg-brand-600 hover:bg-brand-700 text-white disabled:opacity-50 transition"
-                        title="Enviar (Ctrl+Enter)"
-                      >
-                        {replySending
-                          ? <div className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                          : <Send size={15} />}
-                      </button>
+                      <div className="flex flex-col gap-1.5 self-end">
+                        <button
+                          type="button"
+                          onClick={() => imgInputRef.current?.click()}
+                          disabled={replySending}
+                          className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400 hover:bg-slate-50 dark:hover:bg-gray-700 disabled:opacity-50 transition"
+                          title="Enviar imagem (máx. 3 MB)"
+                        >
+                          <ImageIcon size={15} />
+                        </button>
+                        <button
+                          onClick={sendReply}
+                          disabled={!replyText.trim() || replySending}
+                          className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 hover:bg-brand-700 text-white disabled:opacity-50 transition"
+                          title="Enviar (Ctrl+Enter)"
+                        >
+                          {replySending
+                            ? <div className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                            : <Send size={15} />}
+                        </button>
+                      </div>
                     </div>
                     {replyErr && <p className="text-xs text-red-500 dark:text-red-400">{replyErr}</p>}
                   </div>
@@ -493,6 +571,27 @@ export default function TrackPage() {
 
         </div>
       </main>
+
+      {/* Lightbox */}
+      {lightbox && (
+        <div
+          className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4"
+          onClick={() => setLightbox(null)}
+        >
+          <button
+            className="absolute top-4 right-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition"
+            onClick={() => setLightbox(null)}
+          >
+            <X size={18} />
+          </button>
+          <img
+            src={lightbox}
+            alt="imagem ampliada"
+            className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 }

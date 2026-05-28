@@ -7,7 +7,7 @@ import { StatusBadge, InfoItem, Alert, Spinner } from "../components/ui";
 import AppHeader from "../components/AppHeader";
 import { formatElapsed, STATUS_LABEL, STATUS_ORDER, statusIndex } from "../lib/statuses";
 import { useServerTick, serverNow } from "../lib/serverTime";
-import { ArrowLeft, Clock, CheckCircle2, Circle, ChevronRight, Trash2, AlertTriangle, MonitorSmartphone, Copy, Check as CheckIcon, ClipboardList, Plus, ExternalLink, Shield, ShieldCheck, ShieldX, ThumbsUp, ThumbsDown, UserCheck, X, MessageSquare, ArrowRight, FileText, RotateCcw, Users2, Send, Timer } from "lucide-react";
+import { ArrowLeft, Clock, CheckCircle2, Circle, ChevronRight, Trash2, AlertTriangle, MonitorSmartphone, Copy, Check as CheckIcon, ClipboardList, Plus, ExternalLink, Shield, ShieldCheck, ShieldX, ThumbsUp, ThumbsDown, UserCheck, X, MessageSquare, ArrowRight, FileText, RotateCcw, Users2, Send, Timer, ImageIcon } from "lucide-react";
 
 const TRANSITION_LABEL = {
   VIEWED:     "Marcar como Visualizado",
@@ -63,7 +63,10 @@ export default function TicketDetailPage() {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
   const [msgSending, setMsgSending] = useState(false);
+  const [msgErr, setMsgErr] = useState("");
+  const [lightbox, setLightbox] = useState(null);
   const msgEndRef = useRef(null);
+  const msgImgRef = useRef(null);
   const [deleting, setDeleting] = useState(false);
   const [showReopenModal,  setShowReopenModal]  = useState(false);
   const [reopenReason,     setReopenReason]     = useState("");
@@ -190,15 +193,66 @@ export default function TicketDetailPage() {
   async function doSendMessage() {
     if (!newMessage.trim()) return;
     setMsgSending(true);
+    setMsgErr("");
     try {
       const { data } = await api.post(`/tickets/${id}/messages`, { content: newMessage });
       setMessages((prev) => [...prev, data]);
       setNewMessage("");
     } catch (e) {
-      setErr(e.response?.data?.error || "Erro ao enviar mensagem");
+      setMsgErr(e.response?.data?.error || "Erro ao enviar mensagem");
     } finally {
       setMsgSending(false);
     }
+  }
+
+  function handleMsgPaste(e) {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith("image/")) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (!file) return;
+        if (file.size > 3 * 1024 * 1024) { setMsgErr("Imagem muito grande. Máximo 3 MB."); return; }
+        const reader = new FileReader();
+        reader.onload = async (ev) => {
+          setMsgSending(true); setMsgErr("");
+          try {
+            const { data } = await api.post(`/tickets/${id}/messages`, { content: ev.target.result });
+            setMessages((prev) => [...prev, data]);
+          } catch (err) {
+            setMsgErr(err.response?.data?.error || "Erro ao enviar imagem");
+          } finally { setMsgSending(false); }
+        };
+        reader.readAsDataURL(file);
+        return;
+      }
+    }
+  }
+
+  function handleMsgImage(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 3 * 1024 * 1024) {
+      setMsgErr("Imagem muito grande. Máximo 3 MB.");
+      e.target.value = "";
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      setMsgSending(true);
+      setMsgErr("");
+      try {
+        const { data } = await api.post(`/tickets/${id}/messages`, { content: ev.target.result });
+        setMessages((prev) => [...prev, data]);
+      } catch (err) {
+        setMsgErr(err.response?.data?.error || "Erro ao enviar imagem");
+      } finally {
+        setMsgSending(false);
+        e.target.value = "";
+      }
+    };
+    reader.readAsDataURL(file);
   }
 
   async function doAddComment() {
@@ -815,12 +869,15 @@ export default function TicketDetailPage() {
                       {m.fromUser ? "U" : (m.author?.name?.charAt(0).toUpperCase() || "T")}
                     </div>
                     <div className={`flex flex-col ${m.fromUser ? "items-start" : "items-end"} max-w-[85%]`}>
-                      <div className={`rounded-xl px-3 py-2 text-sm ${
+                      <div className={`rounded-xl text-sm overflow-hidden ${
+                        m.content.startsWith("data:image/") ? "p-1" :
                         m.fromUser
-                          ? "bg-slate-100 dark:bg-gray-800 text-slate-800 dark:text-gray-200"
-                          : "bg-brand-50 dark:bg-brand-900/20 text-brand-900 dark:text-brand-100"
+                          ? "bg-slate-100 dark:bg-gray-800 text-slate-800 dark:text-gray-200 px-3 py-2"
+                          : "bg-brand-50 dark:bg-brand-900/20 text-brand-900 dark:text-brand-100 px-3 py-2"
                       }`}>
-                        {m.content}
+                        {m.content.startsWith("data:image/")
+                          ? <img src={m.content} alt="imagem" className="max-w-[260px] max-h-64 rounded-lg object-contain cursor-zoom-in" onClick={() => setLightbox(m.content)} />
+                          : m.content}
                       </div>
                       <div className="text-[10px] text-slate-400 dark:text-gray-500 mt-0.5 px-1">
                         {m.fromUser ? "Solicitante" : (m.author?.name || "Técnico")} · {new Date(m.createdAt).toLocaleString("pt-BR")}
@@ -832,6 +889,7 @@ export default function TicketDetailPage() {
               </div>
             )}
 
+            <input ref={msgImgRef} type="file" accept="image/*" className="sr-only" onChange={handleMsgImage} />
             <div className="flex gap-2 pt-1">
               <textarea
                 rows={2}
@@ -840,16 +898,29 @@ export default function TicketDetailPage() {
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); doSendMessage(); } }}
+                onPaste={handleMsgPaste}
               />
-              <button
-                onClick={doSendMessage}
-                disabled={!newMessage.trim() || msgSending}
-                className="flex h-10 w-10 shrink-0 self-end items-center justify-center rounded-xl bg-brand-600 hover:bg-brand-700 text-white disabled:opacity-50 transition"
-                title="Enviar (Enter)"
-              >
-                {msgSending ? <Spinner className="h-4 w-4" /> : <Send size={15} />}
-              </button>
+              <div className="flex flex-col gap-1.5 self-end">
+                <button
+                  type="button"
+                  onClick={() => msgImgRef.current?.click()}
+                  disabled={msgSending}
+                  className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400 hover:bg-slate-50 dark:hover:bg-gray-700 disabled:opacity-50 transition"
+                  title="Enviar imagem (máx. 3 MB)"
+                >
+                  <ImageIcon size={15} />
+                </button>
+                <button
+                  onClick={doSendMessage}
+                  disabled={!newMessage.trim() || msgSending}
+                  className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 hover:bg-brand-700 text-white disabled:opacity-50 transition"
+                  title="Enviar (Enter)"
+                >
+                  {msgSending ? <Spinner className="h-4 w-4" /> : <Send size={15} />}
+                </button>
+              </div>
             </div>
+            {msgErr && <p className="text-xs text-red-500 dark:text-red-400">{msgErr}</p>}
             <p className="text-[10px] text-slate-400 dark:text-gray-500">Enter para enviar · Shift+Enter para nova linha</p>
           </div>
 
@@ -1099,6 +1170,27 @@ export default function TicketDetailPage() {
           </div>
         </aside>
       </main>
+
+      {/* Lightbox */}
+      {lightbox && (
+        <div
+          className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4"
+          onClick={() => setLightbox(null)}
+        >
+          <button
+            className="absolute top-4 right-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition"
+            onClick={() => setLightbox(null)}
+          >
+            <X size={18} />
+          </button>
+          <img
+            src={lightbox}
+            alt="imagem ampliada"
+            className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 }
