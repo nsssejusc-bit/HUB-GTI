@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
+import { maskCpf } from "../lib/cpf";
 import { Alert, Spinner } from "../components/ui";
 import {
   ArrowLeft, ArrowRight, Monitor, Wifi, Server, FileText,
@@ -75,6 +76,8 @@ const EXTRA_FORM_TYPE = {
   // Computador / Internet (descri livre só para "Outro")
   HARDWARE_OTHER: "freetext",
 };
+
+const PERSONAL_DATA_FORMS = new Set(["net_user_create", "net_user_delete", "net_password_reset", "siged_sector_move", "siged_user_delete"]);
 
 // ── Componente select de departamento com busca ──────────────────────────────
 function DeptSelect({ value, onChange, departments, placeholder = "Selecione o setor..." }) {
@@ -261,7 +264,7 @@ function ExtraFields({ formType, fields, setFields, departments }) {
         <input className="field-input" placeholder="000.000.000-00" value={fields.cpf || ""} onChange={(e) => set("cpf", e.target.value)} />
       </div>
       <div>
-        <label className="field-label">E-mail institucional</label>
+        <label className="field-label">E-mail</label>
         <input className="field-input" type="email" placeholder="usuario@sejusc.am.gov.br" value={fields.email || ""} onChange={(e) => set("email", e.target.value)} />
       </div>
       <div>
@@ -476,6 +479,7 @@ export default function NewTicketPage() {
   const [screen,       setScreen]       = useState("category");
   const [form,         setForm]         = useState({ categoryId: null, subcategoryId: null, anyDeskCode: "", freeTextDescription: "" });
   const [extraFields,  setExtraFields]  = useState({});
+  const [dataConfirmed, setDataConfirmed] = useState(false);
   const [error,        setError]        = useState("");
   const [submitting,   setSubmitting]   = useState(false);
   const [createdTicket, setCreatedTicket] = useState(null);
@@ -527,12 +531,31 @@ export default function NewTicketPage() {
   function selectSub(subId) {
     setForm((f) => ({ ...f, subcategoryId: subId, freeTextDescription: "" }));
     setExtraFields({});
+    setDataConfirmed(false);
   }
+
+  // Pré-preenche campos pessoais com dados do usuário logado
+  useEffect(() => {
+    if (!formType || !PERSONAL_DATA_FORMS.has(formType) || !user) return;
+    const dept = user.department;
+    const cpf  = maskCpf(user.cpf || "");
+    let prefill = { cpf };
+    if (formType === "net_user_create") {
+      prefill = { nome: user.name ?? "", cpf, email: user.email ?? "", setorId: dept?.id ?? null, setorName: dept?.name ?? "" };
+    } else if (formType === "net_password_reset") {
+      prefill = { nome: user.name ?? "", cpf, setorId: dept?.id ?? null, setorName: dept?.name ?? "" };
+    } else if (formType === "net_user_delete") {
+      prefill = { cpf, setorId: dept?.id ?? null, setorName: dept?.name ?? "" };
+    }
+    setExtraFields(prefill);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.subcategoryId]);
 
   function canSubmit() {
     if (isRemote) return form.anyDeskCode.trim().length >= 3;
     if (selectedCategory?.allowsFreeText) return form.freeTextDescription.trim().length >= 5;
     if (!form.subcategoryId) return false;
+    if (PERSONAL_DATA_FORMS.has(formType) && !dataConfirmed) return false;
     return isExtraValid(formType, extraFields);
   }
 
@@ -870,6 +893,19 @@ export default function NewTicketPage() {
                           setFields={setExtraFields}
                           departments={departments}
                         />
+                        {PERSONAL_DATA_FORMS.has(formType) && (
+                          <label className="flex items-start gap-2.5 cursor-pointer pt-3 mt-2 border-t border-slate-100 dark:border-gray-700">
+                            <input
+                              type="checkbox"
+                              className="mt-0.5 h-4 w-4 shrink-0 rounded accent-brand-600 cursor-pointer"
+                              checked={dataConfirmed}
+                              onChange={(e) => setDataConfirmed(e.target.checked)}
+                            />
+                            <span className="text-xs text-slate-600 dark:text-gray-400 select-none">
+                              Confirmo que os dados acima são corretos para esta solicitação.
+                            </span>
+                          </label>
+                        )}
                       </div>
                     )}
                   </div>
