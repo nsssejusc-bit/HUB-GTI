@@ -13,10 +13,10 @@ ALTER TABLE `InventoryItem`
 ALTER TABLE `InventoryChecklist`
   MODIFY COLUMN `nucleo` ENUM('NMT','NIR','NSS') NOT NULL;
 
--- 4. Adiciona nucleoResponsavel em Subcategory (IF NOT EXISTS evita erro se coluna já existe)
+-- 4. Adiciona nucleoResponsavel em Subcategory
 ALTER TABLE `Subcategory`
-  ADD COLUMN IF NOT EXISTS `nucleoResponsavel` ENUM('NMT','NIR','NSS') NULL;
+  ADD COLUMN `nucleoResponsavel` ENUM('NMT','NIR','NSS') NULL;
 
--- 5. Adiciona nucleoResponsavel em Ticket (IF NOT EXISTS evita erro se coluna já existe)
+-- 5. Adiciona nucleoResponsavel em Ticket
 ALTER TABLE `Ticket`
-  ADD COLUMN IF NOT EXISTS `nucleoResponsavel` ENUM('NMT','NIR','NSS') NULL;
+  ADD COLUMN `nucleoResponsavel` ENUM('NMT','NIR','NSS') NULL;

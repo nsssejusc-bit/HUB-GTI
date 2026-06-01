@@ -68,7 +68,7 @@ const EXTRA_FORM_TYPE = {
   NETSERVER_VPN:            "freetext",
   NETSERVER_TRUST_FAIL:     "none",
   // SIGED
-  SIGED_USER_CREATE:    "net_user_create",
+  SIGED_USER_CREATE:    "siged_user_create",
   SIGED_SECTOR_MOVE:    "siged_sector_move",
   SIGED_USER_DELETE:    "siged_user_delete",
   SIGED_PASSWORD_RESET: "freetext",
@@ -77,7 +77,7 @@ const EXTRA_FORM_TYPE = {
   HARDWARE_OTHER: "freetext",
 };
 
-const PERSONAL_DATA_FORMS = new Set(["net_user_create", "net_user_delete", "net_password_reset", "siged_sector_move", "siged_user_delete"]);
+const PERSONAL_DATA_FORMS = new Set(["net_user_create", "net_user_delete", "net_password_reset", "siged_user_create", "siged_sector_move", "siged_user_delete"]);
 
 // ── Componente select de departamento com busca ──────────────────────────────
 function DeptSelect({ value, onChange, departments, placeholder = "Selecione o setor..." }) {
@@ -336,6 +336,27 @@ function ExtraFields({ formType, fields, setFields, departments }) {
     </div>
   );
 
+  if (formType === "siged_user_create") return (
+    <div className="space-y-3 pt-1">
+      <div>
+        <label className="field-label">Nome completo *</label>
+        <input className="field-input" placeholder="Nome completo" value={fields.nome || ""} onChange={(e) => set("nome", e.target.value)} />
+      </div>
+      <div>
+        <label className="field-label">CPF *</label>
+        <input className="field-input" placeholder="000.000.000-00" value={fields.cpf || ""} onChange={(e) => set("cpf", e.target.value)} />
+      </div>
+      <div>
+        <label className="field-label">E-mail</label>
+        <input className="field-input" type="email" placeholder="usuario@sejusc.am.gov.br" value={fields.email || ""} onChange={(e) => set("email", e.target.value)} />
+      </div>
+      <div>
+        <label className="field-label">Matrícula</label>
+        <input className="field-input" placeholder="Ex: 123456" value={fields.matricula || ""} onChange={(e) => set("matricula", e.target.value)} />
+      </div>
+    </div>
+  );
+
   if (formType === "siged_sector_move") return (
     <div className="space-y-3 pt-1">
       <div className="rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 px-4 py-3 flex items-start gap-2 text-xs text-amber-800 dark:text-amber-300">
@@ -403,7 +424,8 @@ function isExtraValid(formType, fields) {
   if (!formType || formType === "none") return true;
   if (formType === "printer")         return !!(fields.printerName?.trim() && fields.block?.trim());
   if (formType === "printer_counter") return !!(fields.block?.trim() && fields.printerModel);
-  if (formType === "net_user_create")  return !!(fields.nome?.trim() && fields.cpf?.trim() && fields.setorId && fields.cargo?.trim());
+  if (formType === "net_user_create")   return !!(fields.nome?.trim() && fields.cpf?.trim() && fields.setorId && fields.cargo?.trim());
+  if (formType === "siged_user_create") return !!(fields.nome?.trim() && fields.cpf?.trim());
   if (formType === "net_user_delete")  return !!(fields.cpf?.trim() && fields.setorId);
   if (formType === "net_password_reset") return !!(fields.nome?.trim() && fields.cpf?.trim() && fields.setorId);
   if (formType === "siged_sector_move")  return !!(fields.cpf?.trim() && fields.targetDeptId);
@@ -432,6 +454,8 @@ function buildPayload(formType, fields) {
     const systems = (fields.systems || []).join(", ");
     freeTextDescription = `Nome: ${fields.nome}\nCPF: ${fields.cpf}\nE-mail: ${fields.email || "—"}\nSetor: ${fields.setorName}\nCargo: ${fields.cargo}${systems ? `\nSistemas: ${systems}` : ""}`;
     extraData = { systems: fields.systems || [] };
+  } else if (formType === "siged_user_create") {
+    freeTextDescription = `Nome: ${fields.nome}\nCPF: ${fields.cpf}${fields.email ? `\nE-mail: ${fields.email}` : ""}${fields.matricula ? `\nMatrícula: ${fields.matricula}` : ""}`;
   } else if (formType === "net_user_delete") {
     freeTextDescription = `CPF: ${fields.cpf}\nSetor: ${fields.setorName}${fields.obs ? `\nObservações: ${fields.obs}` : ""}`;
   } else if (formType === "net_password_reset") {
@@ -542,6 +566,8 @@ export default function NewTicketPage() {
     let prefill = { cpf };
     if (formType === "net_user_create") {
       prefill = { nome: user.name ?? "", cpf, email: user.email ?? "", setorId: dept?.id ?? null, setorName: dept?.name ?? "" };
+    } else if (formType === "siged_user_create") {
+      prefill = { nome: user.name ?? "", cpf, email: user.email ?? "", matricula: user.matricula ?? "" };
     } else if (formType === "net_password_reset") {
       prefill = { nome: user.name ?? "", cpf, setorId: dept?.id ?? null, setorName: dept?.name ?? "" };
     } else if (formType === "net_user_delete") {

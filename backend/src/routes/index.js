@@ -44,38 +44,39 @@ import {
 } from "../controllers/checklistController.js";
 import { authRequired, optionalAuth, requireRole } from "../middleware/auth.js";
 
-// 10 tentativas por IP a cada 15 minutos nos endpoints de autenticação
+const isTest = () => process.env.NODE_ENV === "test";
+
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
+  skip: isTest,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Muitas tentativas. Tente novamente em 15 minutos." },
 });
 
-// 5 solicitações por IP a cada hora no forgot-password (evita spam)
 const forgotLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 5,
+  skip: isTest,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Muitas solicitações. Tente novamente em 1 hora." },
 });
 
-// 200 consultas por IP a cada 5 minutos — endpoints públicos de rastreamento/feedback
-// (polls automáticos de status + mensagens justificam limite maior)
 const publicTicketLimiter = rateLimit({
   windowMs: 5 * 60 * 1000,
   max: 200,
+  skip: isTest,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Muitas consultas. Tente novamente em alguns minutos." },
 });
 
-// 300 requisições por IP por minuto — proteção geral contra abuso/DoS
 const generalLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 300,
+  skip: isTest,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Muitas requisições. Tente novamente em breve." },
