@@ -265,7 +265,7 @@ function ExtraFields({ formType, fields, setFields, departments }) {
       </div>
       <div>
         <label className="field-label">E-mail</label>
-        <input className="field-input" type="email" placeholder="usuario@sejusc.am.gov.br" value={fields.email || ""} onChange={(e) => set("email", e.target.value)} />
+        <input className="field-input" type="email" placeholder="usuario@gma il.com" value={fields.email || ""} onChange={(e) => set("email", e.target.value)} />
       </div>
       <div>
         <label className="field-label">Setor *</label>

@@ -1,12 +1,73 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
-  Eye, EyeOff, Sun, Moon, CheckCircle2, ChevronDown,
+  Eye, EyeOff, Sun, Moon, CheckCircle2, ChevronDown, Check,
   AlertTriangle, User, Hash, Briefcase, Mail, Phone, Shield, ArrowLeft,
 } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import { maskCpf, stripCpf, isValidCpf } from "../lib/cpf";
 import { api } from "../lib/api";
+
+// ── Termo de Responsabilidade SEJUSC ─────────────────────────────────────────
+function TermoContent() {
+  const cl = "font-semibold text-gray-700 dark:text-gray-200 mt-3 mb-1 block";
+  const p  = "text-gray-600 dark:text-gray-400 leading-relaxed";
+  const li = "ml-4 text-gray-600 dark:text-gray-400 leading-relaxed";
+  return (
+    <div className="text-xs space-y-1">
+      <span className="font-bold text-gray-700 dark:text-gray-200 block text-center leading-snug mb-2">
+        TERMO DE RESPONSABILIDADE, SIGILO, CONFIDENCIALIDADE E USO DOS RECURSOS DE TECNOLOGIA DA INFORMAÇÃO DA SEJUSC
+      </span>
+      <p className={p}>Pelo presente instrumento, o(a) servidor(a), empregado(a) público(a), colaborador(a), estagiário(a), terceirizado(a) ou qualquer usuário autorizado, doravante denominado(a) COMPROMISSÁRIO(A), em razão do acesso concedido aos recursos de Tecnologia da Informação da Secretaria de Estado de Justiça, Direitos Humanos e Cidadania – SEJUSC, declara ciência e concordância com as disposições deste Termo, comprometendo-se a observá-las integralmente.</p>
+
+      <span className={cl}>CLÁUSULA PRIMEIRA – DO OBJETO</span>
+      <p className={p}>O presente Termo tem por objeto assegurar a confidencialidade, integridade, disponibilidade, rastreabilidade e uso adequado das informações institucionais, sistemas corporativos, documentos eletrônicos, dados pessoais, recursos computacionais e demais ativos de Tecnologia da Informação disponibilizados pela SEJUSC.</p>
+      <p className={p}>Para fins deste Termo, consideram-se recursos de Tecnologia da Informação, entre outros:</p>
+      {["I – Sistema Integrado de Gestão Eletrônica de Documentos – SIGED;","II – Serviços de diretório e autenticação (Active Directory);","III – Pastas compartilhadas e servidores de arquivos;","IV – Correio eletrônico institucional;","V – Sistemas corporativos internos e externos;","VI – Redes cabeadas e sem fio da SEJUSC;","VII – VPN e demais mecanismos de acesso remoto;","VIII – Equipamentos de informática disponibilizados pela instituição;","IX – Quaisquer outros sistemas, aplicações, bancos de dados ou recursos tecnológicos administrados ou disponibilizados pela Gerência de Tecnologia da Informação – GTI."].map((t, i) => <p key={i} className={li}>{t}</p>)}
+
+      <span className={cl}>CLÁUSULA SEGUNDA – DA CONCESSÃO DE ACESSO</span>
+      <p className={p}>A criação de contas de usuário, concessão de credenciais, permissões de acesso e utilização dos recursos tecnológicos da SEJUSC está condicionada à aceitação deste Termo.</p>
+      <p className={p}><strong>Parágrafo único.</strong> A recusa em aceitar as condições aqui estabelecidas poderá impedir a criação ou manutenção dos acessos solicitados.</p>
+
+      <span className={cl}>CLÁUSULA TERCEIRA – DAS OBRIGAÇÕES DO(A) COMPROMISSÁRIO(A)</span>
+      <p className={p}>O(A) COMPROMISSÁRIO(A) obriga-se a:</p>
+      {["I – Utilizar os recursos de Tecnologia da Informação exclusivamente para fins institucionais e no exercício de suas atribuições funcionais;","II – Manter absoluto sigilo sobre quaisquer informações, documentos, processos administrativos, dados pessoais, dados sensíveis, pareceres, relatórios, comunicações internas ou quaisquer conteúdos acessados em razão das permissões concedidas;","III – Não divulgar, compartilhar, reproduzir, encaminhar, transmitir, copiar, fotografar ou permitir acesso de terceiros às informações institucionais sem autorização expressa da autoridade competente;","IV – Não utilizar informações institucionais para benefício próprio ou de terceiros;","V – Zelar pela guarda e segurança de suas credenciais de acesso, responsabilizando-se integralmente pelo uso de seu login, senha, certificado digital, token ou qualquer outro mecanismo de autenticação;","VI – Comunicar imediatamente à GTI qualquer suspeita de acesso indevido, vazamento de informações, perda de credenciais, comprometimento de senha ou incidente de segurança;","VII – Observar as normas de segurança da informação, proteção de dados pessoais e demais regulamentos internos vigentes;","VIII – Não realizar download, armazenamento externo, impressão, captura de tela, cópia local ou qualquer forma de extração de documentos e informações para finalidades não autorizadas;","IX – Manter bloqueada sua estação de trabalho sempre que se ausentar do ambiente de trabalho, ainda que temporariamente;","X – Zelar pela integridade dos equipamentos e sistemas disponibilizados pela instituição;","XI – Utilizar apenas softwares autorizados pela GTI nos equipamentos institucionais;","XII – Comunicar imediatamente à GTI qualquer irregularidade identificada nos sistemas ou equipamentos sob sua responsabilidade."].map((t, i) => <p key={i} className={li}>{t}</p>)}
+
+      <span className={cl}>CLÁUSULA QUARTA – DAS VEDAÇÕES</span>
+      <p className={p}>É expressamente vedado ao(à) COMPROMISSÁRIO(A):</p>
+      {["I – Compartilhar credenciais de acesso com terceiros, inclusive colegas de trabalho, estagiários, terceirizados, prestadores de serviço ou superiores hierárquicos;","II – Utilizar credenciais pertencentes a outro usuário;","III – Alterar, excluir, ocultar, modificar ou destruir documentos, registros ou informações institucionais sem autorização ou competência funcional;","IV – Tentar burlar mecanismos de segurança, autenticação, monitoramento ou auditoria;","V – Instalar softwares, aplicativos ou ferramentas sem autorização da GTI;","VI – Utilizar os recursos tecnológicos para atividades ilícitas, incompatíveis com as atribuições institucionais ou que possam comprometer a segurança da informação;","VII – Promover acesso não autorizado a sistemas, bancos de dados, equipamentos ou informações institucionais."].map((t, i) => <p key={i} className={li}>{t}</p>)}
+
+      <span className={cl}>CLÁUSULA QUINTA – DA PROTEÇÃO DE DADOS PESSOAIS</span>
+      <p className={p}>O(A) COMPROMISSÁRIO(A) declara ciência de que poderá ter acesso a dados pessoais e, eventualmente, dados pessoais sensíveis tratados pela SEJUSC.</p>
+      <p className={p}><strong>Parágrafo primeiro.</strong> O tratamento dessas informações deverá ocorrer exclusivamente para finalidades institucionais e em conformidade com a Lei Federal nº 13.709/2018 – Lei Geral de Proteção de Dados Pessoais (LGPD).</p>
+      <p className={p}><strong>Parágrafo segundo.</strong> É vedada qualquer utilização, compartilhamento, divulgação ou tratamento de dados pessoais para finalidade diversa daquela relacionada às atribuições funcionais do usuário.</p>
+
+      <span className={cl}>CLÁUSULA SEXTA – DO CONTROLE E RASTREABILIDADE</span>
+      <p className={p}>O(A) COMPROMISSÁRIO(A) declara ciência de que todos os acessos realizados nos recursos tecnológicos da SEJUSC poderão ser registrados, monitorados, auditados e armazenados para fins de segurança, conformidade, investigação de incidentes e atendimento a determinações legais ou administrativas.</p>
+      <p className={p}><strong>Parágrafo primeiro.</strong> Poderão ser registrados, entre outros:</p>
+      {["I – Data e hora dos acessos;","II – Endereço IP utilizado;","III – Equipamento utilizado;","IV – Operações realizadas nos sistemas;","V – Alterações efetuadas em documentos e registros;","VI – Logs de autenticação e utilização dos sistemas."].map((t, i) => <p key={i} className={li}>{t}</p>)}
+      <p className={p}><strong>Parágrafo segundo.</strong> O compartilhamento de credenciais ou qualquer tentativa de ocultar a autoria de ações realizadas nos sistemas será considerada falta grave.</p>
+
+      <span className={cl}>CLÁUSULA SÉTIMA – DA RESPONSABILIZAÇÃO</span>
+      <p className={p}>O descumprimento das disposições previstas neste Termo poderá ensejar:</p>
+      {["I – Suspensão ou revogação imediata dos acessos concedidos;","II – Comunicação à chefia imediata e à unidade de lotação do usuário;","III – Instauração de procedimentos administrativos cabíveis;","IV – Responsabilização civil, administrativa e penal, nos termos da legislação vigente;","V – Comunicação aos órgãos de controle competentes, quando aplicável."].map((t, i) => <p key={i} className={li}>{t}</p>)}
+
+      <span className={cl}>CLÁUSULA OITAVA – DA VIGÊNCIA</span>
+      <p className={p}>As obrigações de sigilo, confidencialidade e proteção das informações permanecerão vigentes mesmo após o desligamento, transferência, exoneração, término do contrato, encerramento do vínculo ou revogação dos acessos concedidos.</p>
+
+      <span className={cl}>CLÁUSULA NONA – DA ACEITAÇÃO ELETRÔNICA</span>
+      <p className={p}>A aceitação deste Termo por meio eletrônico, no âmbito do HUB GTI ou de qualquer outro sistema institucional disponibilizado pela SEJUSC, produzirá os mesmos efeitos legais da assinatura física.</p>
+      <p className={p}><strong>Parágrafo primeiro.</strong> A manifestação de concordância ficará vinculada ao usuário autenticado e poderá ser registrada juntamente com informações de auditoria, incluindo data, horário, endereço IP, identificador do usuário e versão do Termo aceito.</p>
+      <p className={p}><strong>Parágrafo segundo.</strong> O registro eletrônico de aceite constituirá prova de ciência e concordância integral com todas as disposições aqui estabelecidas.</p>
+
+      <span className={cl}>CLÁUSULA DÉCIMA – DAS DISPOSIÇÕES FINAIS</span>
+      <p className={p}>O(A) COMPROMISSÁRIO(A) declara ter lido, compreendido e aceitado integralmente as disposições deste Termo, assumindo total responsabilidade pela utilização adequada dos recursos tecnológicos e das informações institucionais disponibilizadas pela SEJUSC.</p>
+      <p className={`${p} mt-3 text-center italic`}>Manaus/AM, na data do aceite eletrônico registrado pelo sistema.</p>
+      <p className={`${p} text-center font-semibold`}>SECRETARIA DE ESTADO DE JUSTIÇA, DIREITOS HUMANOS E CIDADANIA – SEJUSC</p>
+      <p className={`${p} text-center font-semibold`}>GERÊNCIA DE TECNOLOGIA DA INFORMAÇÃO – GTI</p>
+    </div>
+  );
+}
 
 const PREFIXOS = [
   { value: "GOVERNO",      label: "Servidor do Governo" },
@@ -106,6 +167,9 @@ export default function RegisterPage() {
   const [showPwd,      setShowPwd]      = useState(false);
   const [showConf,     setShowConf]     = useState(false);
   const [isChefe,      setIsChefe]      = useState(false);
+  const [termoLido,    setTermoLido]    = useState(false);
+  const [declaracao1,  setDeclaracao1]  = useState(false);
+  const [declaracao2,  setDeclaracao2]  = useState(false);
 
   useEffect(() => {
     api.get("/departments").then(({ data }) => setDepartments(data)).catch(() => {});
@@ -125,8 +189,17 @@ export default function RegisterPage() {
     emailValid &&
     phoneValid &&
     password.length >= 6 &&
-    pwdMatch
+    pwdMatch &&
+    termoLido &&
+    declaracao1 &&
+    declaracao2
   );
+
+  function handleTermScroll(e) {
+    if (termoLido) return;
+    const el = e.target;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 40) setTermoLido(true);
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -429,6 +502,58 @@ export default function RegisterPage() {
               {confirm && !pwdMatch && (
                 <p className="text-xs text-red-500 mt-1">As senhas não coincidem</p>
               )}
+            </div>
+          </div>
+
+          {/* Termo de Responsabilidade */}
+          <div className="border-t border-gray-100 dark:border-gray-800 pt-4 space-y-3">
+            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              Termo de Responsabilidade
+            </p>
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="field-label mb-0 text-xs">Leia o termo antes de prosseguir</label>
+                <span className={`text-xs flex items-center gap-1 font-medium transition-colors ${
+                  termoLido ? "text-green-600 dark:text-green-400" : "text-amber-600 dark:text-amber-400"
+                }`}>
+                  {termoLido
+                    ? <><Check className="h-3 w-3" /> Lido</>
+                    : <><ChevronDown className="h-3 w-3 animate-bounce" /> Role até o final</>}
+                </span>
+              </div>
+              <div
+                onScroll={handleTermScroll}
+                className="h-56 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-xl p-4 bg-gray-50 dark:bg-gray-900/50"
+              >
+                <TermoContent />
+              </div>
+            </div>
+
+            <div className={`space-y-3 transition-opacity duration-200 ${
+              termoLido ? "opacity-100" : "opacity-40 pointer-events-none select-none"
+            }`}>
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 h-4 w-4 shrink-0 rounded accent-brand-600 cursor-pointer"
+                  checked={declaracao1}
+                  onChange={(e) => setDeclaracao1(e.target.checked)}
+                />
+                <span className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
+                  Declaro que li integralmente o Termo de Responsabilidade, Sigilo, Confidencialidade e Uso dos Recursos de Tecnologia da Informação da SEJUSC e concordo com todas as suas disposições.
+                </span>
+              </label>
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 h-4 w-4 shrink-0 rounded accent-brand-600 cursor-pointer"
+                  checked={declaracao2}
+                  onChange={(e) => setDeclaracao2(e.target.checked)}
+                />
+                <span className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
+                  Declaro estar ciente de que meus acessos poderão ser registrados e auditados pela GTI para fins de segurança da informação e conformidade institucional.
+                </span>
+              </label>
             </div>
           </div>
 
