@@ -256,11 +256,11 @@ function ExtraFields({ formType, fields, setFields, departments }) {
         <span>Este chamado será enviado para <strong>aprovação do seu Chefe de Setor</strong> antes de ser processado pela GTI.</span>
       </div>
       <div>
-        <label className="field-label">Nome completo do novo usuário *</label>
+        <label className="field-label">Nome completo *</label>
         <input className="field-input" placeholder="Nome completo" value={fields.nome || ""} onChange={(e) => set("nome", e.target.value)} />
       </div>
       <div>
-        <label className="field-label">CPF do novo usuário *</label>
+        <label className="field-label">CPF *</label>
         <input className="field-input" placeholder="000.000.000-00" value={fields.cpf || ""} onChange={(e) => set("cpf", e.target.value)} />
       </div>
       <div>
