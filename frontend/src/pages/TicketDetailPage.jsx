@@ -1201,12 +1201,14 @@ export default function TicketDetailPage() {
                     })
                     .map((next) => {
                       const labels = ticket.isRemote ? TRANSITION_LABEL_REMOTE : TRANSITION_LABEL;
-                      const needsCauseSol = next === "COMPLETED" && ticket.requiresCauseSolution !== false;
-                      const missingCauseSol = needsCauseSol && (!form.cause.trim() || !form.solution.trim());
+                      const needsCauseSol    = next === "COMPLETED" && ticket.requiresCauseSolution !== false;
+                      const missingCauseSol  = needsCauseSol && (!form.cause.trim() || !form.solution.trim());
+                      const needsAssignment  = next === "VIEWED";
+                      const missingAssignment = needsAssignment && (!form.unitId || !form.assignedTechId);
                       return (
                         <div key={next}>
                           <button
-                            disabled={loading || missingCauseSol}
+                            disabled={loading || missingCauseSol || missingAssignment}
                             onClick={() => doTransition(next)}
                             className={`w-full justify-center ${TRANSITION_COLOR[next] || "btn-primary"} disabled:opacity-50 disabled:cursor-not-allowed`}
                           >
@@ -1216,6 +1218,11 @@ export default function TicketDetailPage() {
                           {missingCauseSol && (
                             <p className="text-[11px] text-slate-500 dark:text-gray-400 text-center mt-1">
                               Preencha causa e solução para concluir
+                            </p>
+                          )}
+                          {missingAssignment && (
+                            <p className="text-[11px] text-slate-500 dark:text-gray-400 text-center mt-1">
+                              Selecione unidade e técnico para visualizar
                             </p>
                           )}
                         </div>
