@@ -11,8 +11,8 @@ import { api } from "../lib/api";
 // ── Termo de Responsabilidade SEJUSC ─────────────────────────────────────────
 function TermoContent() {
   const cl = "font-semibold text-gray-700 dark:text-gray-200 mt-3 mb-1 block";
-  const p  = "text-gray-600 dark:text-gray-400 leading-relaxed";
-  const li = "ml-4 text-gray-600 dark:text-gray-400 leading-relaxed";
+  const p  = "text-gray-600 dark:text-gray-400 leading-relaxed text-justify";
+  const li = "ml-4 text-gray-600 dark:text-gray-400 leading-relaxed text-justify";
   return (
     <div className="text-xs space-y-1">
       <span className="font-bold text-gray-700 dark:text-gray-200 block text-center leading-snug mb-2">
