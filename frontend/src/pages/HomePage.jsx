@@ -8,7 +8,7 @@ import { Alert, Spinner, StatusBadge } from "../components/ui";
 import {
   Headset, Sun, Moon, LogIn, UserPlus, PlusCircle,
   LogOut, Clock, ChevronRight, Ticket, KeyRound, Search,
-  BookOpen, X,
+  BookOpen, X, AlertTriangle,
 } from "lucide-react";
 
 const STAFF_ROLES = ["TECHNICIAN", "ADMIN"];
@@ -25,12 +25,17 @@ export default function HomePage() {
   const [loggingIn, setLoggingIn] = useState(false);
 
   const [trackNum, setTrackNum] = useState("");
+  const [alertMessage, setAlertMessage] = useState("");
 
   const [tickets, setTickets]           = useState([]);
   const [loadingTickets, setLoadingTickets] = useState(false);
   const [showManualModal, setShowManualModal] = useState(false);
 
   const next = searchParams.get("next");
+
+  useEffect(() => {
+    api.get("/config").then((r) => setAlertMessage(r.data.homeAlertMessage || "")).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -148,6 +153,15 @@ export default function HomePage() {
           </button>
         </div>
       </header>
+
+      {alertMessage && (
+        <div className="bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-700/50 px-4 py-2.5">
+          <div className="max-w-md mx-auto flex items-start gap-2 text-sm text-amber-800 dark:text-amber-300">
+            <AlertTriangle size={15} className="shrink-0 mt-0.5" />
+            <span>{alertMessage}</span>
+          </div>
+        </div>
+      )}
 
       <main className="flex flex-1 flex-col items-center justify-start px-4 py-10 pb-12">
         <div className="w-full max-w-md">

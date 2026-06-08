@@ -21,6 +21,7 @@ import {
   updateDepartment, deleteDepartment,
 } from "../controllers/departmentController.js";
 import { listAuditLogs } from "../controllers/auditController.js";
+import { getAdminFlags, setAdminFlags } from "../controllers/configController.js";
 import {
   ticketsByUnit, ticketsByTechnician, ticketsByDepartment,
   ticketsByCategory, avgResolutionByCategory, avgResolutionByUnit, otherReclassified,
@@ -185,6 +186,10 @@ router.delete("/inventory/units/:unitId",                 ...staffAccess, delete
 
 // ── Auditoria ──────────────────────────────────────────────────────────────────
 router.get("/audit-logs", authRequired, requireRole("ADMIN"), listAuditLogs);
+
+// ── Configurações do sistema (ADMIN) ───────────────────────────────────────────
+router.get("/admin/config-flags", authRequired, requireRole("ADMIN"), getAdminFlags);
+router.put("/admin/config-flags", authRequired, requireRole("ADMIN"), setAdminFlags);
 
 // ── Analytics ──────────────────────────────────────────────────────────────────
 const analyticsAccess = [authRequired, requireRole("TECHNICIAN", "ADMIN")];

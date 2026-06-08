@@ -38,10 +38,11 @@ const ChecklistDetailPage     = lazy(() => import("./pages/ChecklistDetailPage")
 const AnalyticsPage = lazy(() => import("./pages/AnalyticsPage"));
 
 // Admin only
-const UsersPage       = lazy(() => import("./pages/UsersPage"));
-const DepartmentsPage = lazy(() => import("./pages/DepartmentsPage"));
-const CategoriesPage  = lazy(() => import("./pages/CategoriesPage"));
-const AuditPage       = lazy(() => import("./pages/AuditPage"));
+const UsersPage         = lazy(() => import("./pages/UsersPage"));
+const DepartmentsPage   = lazy(() => import("./pages/DepartmentsPage"));
+const CategoriesPage    = lazy(() => import("./pages/CategoriesPage"));
+const AuditPage         = lazy(() => import("./pages/AuditPage"));
+const SystemConfigPage  = lazy(() => import("./pages/SystemConfigPage"));
 
 // ── Hierarquia de roles ───────────────────────────────────────────────────────
 const STAFF_ROLES      = ["TECHNICIAN", "ADMIN", "CHEFE_SETOR"];
@@ -141,6 +142,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
                       <Route path="/painel/setores"    element={<Protected adminOnly><DepartmentsPage /></Protected>} />
                       <Route path="/painel/categorias" element={<Protected adminOnly><CategoriesPage /></Protected>} />
                       <Route path="/painel/auditoria"  element={<Protected adminOnly><AuditPage /></Protected>} />
+                      <Route path="/painel/sistema"    element={<Protected adminOnly><SystemConfigPage /></Protected>} />
 
                       <Route path="/manual"  element={<ManualPage />} />
                       <Route path="/equipe" element={<TeamPage />} />

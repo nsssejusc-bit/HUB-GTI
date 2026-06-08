@@ -1,10 +1,14 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
+import { api } from "../lib/api";
 import {
   ArrowLeft, Sun, Moon, PlusCircle, Search, Clock,
   CheckCircle2, Eye, Navigation, Wrench, AlertTriangle,
   BookOpen, MessageSquare, Ticket, Info,
 } from "lucide-react";
+
+const DEFAULT_EMERGENCY = "Em caso de falha crítica que impossibilite o trabalho, entre em contato diretamente com a GTI pelo WhatsApp ou dirija-se pessoalmente à equipe de suporte. O chamado no sistema deve ser aberto mesmo assim para fins de registro.";
 
 const STATUS_STEPS = [
   { icon: Ticket,       color: "text-slate-500  bg-slate-100  dark:bg-gray-800  dark:text-gray-400",  label: "Aberto",             desc: "Chamado registrado. A equipe de TI foi notificada e irá atender em breve." },
@@ -47,6 +51,13 @@ function Section({ icon: Icon, title, children }) {
 
 export default function ManualPage() {
   const { dark, toggle } = useTheme();
+  const [emergencyContact, setEmergencyContact] = useState(DEFAULT_EMERGENCY);
+
+  useEffect(() => {
+    api.get("/config").then((r) => {
+      if (r.data.emergencyContact) setEmergencyContact(r.data.emergencyContact);
+    }).catch(() => {});
+  }, []);
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-gray-950">
@@ -204,9 +215,7 @@ export default function ManualPage() {
         <div className="rounded-xl border border-amber-200 dark:border-amber-700/50 bg-amber-50 dark:bg-amber-900/15 px-5 py-4 flex gap-3">
           <AlertTriangle size={18} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
           <div className="text-sm text-amber-800 dark:text-amber-300 leading-relaxed">
-            <strong>Emergências:</strong> Em caso de falha crítica que impossibilite o trabalho,
-            entre em contato diretamente com a GTI pelo WhatsApp ou dirija-se pessoalmente à equipe de suporte.
-            O chamado no sistema deve ser aberto mesmo assim para fins de registro.
+            <strong>Emergências:</strong> {emergencyContact}
           </div>
         </div>
 

@@ -6,7 +6,7 @@ import { useSocketConnected, useUnreadCount } from "../context/SocketContext";
 import { api } from "../lib/api";
 import {
   LayoutDashboard, BarChart2, LogOut, Users,
-  Crown, Sun, Moon, Building2, ChevronDown, UserCircle, Ticket, KeyRound, ClipboardList, Settings, Tag, Shield, Package,
+  Crown, Sun, Moon, Building2, ChevronDown, UserCircle, Ticket, KeyRound, ClipboardList, Settings, Tag, Shield, Package, SlidersHorizontal,
 } from "lucide-react";
 
 // Slot da logo — quando /logo.png existir, a imagem aparece automaticamente;
@@ -103,7 +103,7 @@ export default function AppHeader() {
 
   const isActive = (path) => loc.pathname === path;
   const isActiveSearch = (path, search) => loc.pathname === path && loc.search.includes(search);
-  const configActive = isActive("/painel/setores") || isActive("/painel/categorias") || isActive("/painel/auditoria") || isActiveSearch("/painel/usuarios", "tab=resets");
+  const configActive = isActive("/painel/setores") || isActive("/painel/categorias") || isActive("/painel/auditoria") || isActive("/painel/sistema") || isActiveSearch("/painel/usuarios", "tab=resets");
 
   const navCls = (active) =>
     `relative flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg transition whitespace-nowrap ${
@@ -205,6 +205,19 @@ export default function AppHeader() {
                   ? "opacity-100 scale-100 translate-y-0 pointer-events-auto"
                   : "opacity-0 scale-95 -translate-y-1 pointer-events-none"
               }`}>
+                  <Link
+                    to="/painel/sistema"
+                    onClick={() => setConfigOpen(false)}
+                    className={`flex items-center gap-2.5 px-3.5 py-2.5 text-sm transition ${
+                      isActive("/painel/sistema")
+                        ? "bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-400 font-medium"
+                        : "text-slate-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-800"
+                    }`}
+                  >
+                    <SlidersHorizontal size={15} />
+                    Sistema
+                  </Link>
+                  <div className="h-px bg-slate-100 dark:bg-gray-700/60" />
                   <Link
                     to="/painel/setores"
                     onClick={() => setConfigOpen(false)}

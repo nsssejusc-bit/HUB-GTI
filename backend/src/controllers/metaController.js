@@ -24,8 +24,16 @@ export async function listTechnicians(req, res) {
 }
 
 export async function getPublicConfig(req, res) {
+  const keys = ["FEEDBACK_ENABLED", "HOME_ALERT_MESSAGE", "EMERGENCY_CONTACT"];
+  const flags = await prisma.configFlag.findMany({ where: { key: { in: keys } } });
+  const map = Object.fromEntries(flags.map((f) => [f.key, f.value]));
+
   res.json({
-    feedbackEnabled: process.env.FEEDBACK_ENABLED === "true",
+    feedbackEnabled:  map.FEEDBACK_ENABLED !== undefined
+      ? map.FEEDBACK_ENABLED === "true"
+      : process.env.FEEDBACK_ENABLED === "true",
+    homeAlertMessage: map.HOME_ALERT_MESSAGE || "",
+    emergencyContact: map.EMERGENCY_CONTACT  || "",
   });
 }
 
