@@ -10,6 +10,15 @@ import {
 
 const DEFAULT_EMERGENCY = "Em caso de falha crítica que impossibilite o trabalho, entre em contato diretamente com a GTI pelo WhatsApp ou dirija-se pessoalmente à equipe de suporte. O chamado no sistema deve ser aberto mesmo assim para fins de registro.";
 
+const DEFAULT_TIPS = [
+  "Descreva o problema com o máximo de detalhes possível.",
+  "Informe a localização exata do equipamento (bloco, sala, andar).",
+  "Não abra chamados duplicados para o mesmo problema — aguarde o retorno.",
+  "Se o problema for urgente, informe no campo de descrição.",
+  "Fique disponível no local após abrir o chamado para agilizar o atendimento presencial.",
+  "Em caso de dúvida sobre o status, acesse a página de acompanhamento pelo protocolo.",
+];
+
 const STATUS_STEPS = [
   { icon: Ticket,       color: "text-slate-500  bg-slate-100  dark:bg-gray-800  dark:text-gray-400",  label: "Aberto",             desc: "Chamado registrado. A equipe de TI foi notificada e irá atender em breve." },
   { icon: Eye,          color: "text-blue-600   bg-blue-50    dark:bg-blue-900/30  dark:text-blue-400", label: "Visualizado",         desc: "Um técnico visualizou o chamado e está organizando o atendimento." },
@@ -52,10 +61,18 @@ function Section({ icon: Icon, title, children }) {
 export default function ManualPage() {
   const { dark, toggle } = useTheme();
   const [emergencyContact, setEmergencyContact] = useState(DEFAULT_EMERGENCY);
+  const [tips,             setTips]             = useState(DEFAULT_TIPS);
 
   useEffect(() => {
     api.get("/config").then((r) => {
       if (r.data.emergencyContact) setEmergencyContact(r.data.emergencyContact);
+      if (r.data.manualTips) {
+        const parsed = r.data.manualTips
+          .split("\n")
+          .map((l) => l.trim())
+          .filter(Boolean);
+        if (parsed.length > 0) setTips(parsed);
+      }
     }).catch(() => {});
   }, []);
 
@@ -195,14 +212,7 @@ export default function ManualPage() {
         {/* Dicas */}
         <Section icon={Info} title="Dicas para um atendimento mais rápido">
           <div className="card p-5 space-y-3">
-            {[
-              "Descreva o problema com o máximo de detalhes possível.",
-              "Informe a localização exata do equipamento (bloco, sala, andar).",
-              "Não abra chamados duplicados para o mesmo problema — aguarde o retorno.",
-              "Se o problema for urgente, informe no campo de descrição.",
-              "Fique disponível no local após abrir o chamado para agilizar o atendimento presencial.",
-              "Em caso de dúvida sobre o status, acesse a página de acompanhamento pelo protocolo.",
-            ].map((tip, i) => (
+            {tips.map((tip, i) => (
               <div key={i} className="flex items-start gap-2.5">
                 <CheckCircle2 size={15} className="text-green-500 shrink-0 mt-0.5" />
                 <p className="text-sm text-slate-600 dark:text-gray-400 leading-relaxed">{tip}</p>

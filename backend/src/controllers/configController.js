@@ -1,6 +1,6 @@
 import { prisma } from "../config/prisma.js";
 
-const ALLOWED_FLAGS = ["HOME_ALERT_MESSAGE", "FEEDBACK_ENABLED", "EMERGENCY_CONTACT"];
+const ALLOWED_FLAGS = ["HOME_ALERT_MESSAGE", "FEEDBACK_ENABLED", "EMERGENCY_CONTACT", "MANUAL_TIPS"];
 
 export async function getAdminFlags(req, res) {
   const flags = await prisma.configFlag.findMany({ orderBy: { key: "asc" } });
@@ -11,6 +11,7 @@ export async function getAdminFlags(req, res) {
     HOME_ALERT_MESSAGE: db.HOME_ALERT_MESSAGE ?? "",
     FEEDBACK_ENABLED:   db.FEEDBACK_ENABLED   ?? (process.env.FEEDBACK_ENABLED === "true" ? "true" : "false"),
     EMERGENCY_CONTACT:  db.EMERGENCY_CONTACT  ?? "",
+    MANUAL_TIPS:        db.MANUAL_TIPS        ?? "",
   });
 }
 

@@ -24,7 +24,7 @@ export async function listTechnicians(req, res) {
 }
 
 export async function getPublicConfig(req, res) {
-  const keys = ["FEEDBACK_ENABLED", "HOME_ALERT_MESSAGE", "EMERGENCY_CONTACT"];
+  const keys = ["FEEDBACK_ENABLED", "HOME_ALERT_MESSAGE", "EMERGENCY_CONTACT", "MANUAL_TIPS"];
   const flags = await prisma.configFlag.findMany({ where: { key: { in: keys } } });
   const map = Object.fromEntries(flags.map((f) => [f.key, f.value]));
 
@@ -34,6 +34,7 @@ export async function getPublicConfig(req, res) {
       : process.env.FEEDBACK_ENABLED === "true",
     homeAlertMessage: map.HOME_ALERT_MESSAGE || "",
     emergencyContact: map.EMERGENCY_CONTACT  || "",
+    manualTips:       map.MANUAL_TIPS        || "",
   });
 }
 

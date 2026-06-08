@@ -8,6 +8,7 @@ const DEFAULTS = {
   HOME_ALERT_MESSAGE: "",
   FEEDBACK_ENABLED:  "false",
   EMERGENCY_CONTACT: "",
+  MANUAL_TIPS:       "",
 };
 
 export default function SystemConfigPage() {
@@ -104,6 +105,25 @@ export default function SystemConfigPage() {
           {/* Manual */}
           <div className="card p-5 space-y-4">
             <h2 className="text-sm font-semibold text-slate-700 dark:text-gray-200 uppercase tracking-wide">Manual do usuário</h2>
+
+            <div className="space-y-1">
+              <label className="field-label">Dicas para um atendimento mais rápido</label>
+              <textarea
+                className="field-input resize-none font-mono text-xs"
+                rows={8}
+                value={draft.MANUAL_TIPS}
+                onChange={(e) => set("MANUAL_TIPS", e.target.value)}
+                placeholder={[
+                  "Descreva o problema com o máximo de detalhes possível.",
+                  "Informe a localização exata do equipamento (bloco, sala, andar).",
+                  "Não abra chamados duplicados para o mesmo problema — aguarde o retorno.",
+                ].join("\n")}
+                maxLength={2000}
+              />
+              <p className="text-xs text-slate-400 dark:text-gray-500">
+                Uma dica por linha. Deixe vazio para usar as dicas padrão do sistema.
+              </p>
+            </div>
 
             <div className="space-y-1">
               <label className="field-label">Contato de emergência</label>
