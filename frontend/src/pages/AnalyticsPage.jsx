@@ -692,30 +692,34 @@ export default function AnalyticsPage() {
 
         {/* Filtro de período + PDF */}
         <div className="card px-5 py-4 flex flex-wrap items-end gap-4">
-          <div className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-gray-200">
-            <Calendar size={16} className="text-brand-600" />
-            Período
-          </div>
-          <div className="flex items-center gap-2">
-            <div>
-              <label className="field-label text-xs">De</label>
-              <DateInput
-                value={range.from}
-                max={range.to}
-                onChange={(v) => v && setRange({ ...range, from: v })}
-                className="w-36"
-              />
-            </div>
-            <div>
-              <label className="field-label text-xs">Até</label>
-              <DateInput
-                value={range.to}
-                min={range.from}
-                onChange={(v) => v && setRange({ ...range, to: v })}
-                className="w-36"
-              />
-            </div>
-          </div>
+          {panel !== "avaliacoes" && (
+            <>
+              <div className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-gray-200">
+                <Calendar size={16} className="text-brand-600" />
+                Período
+              </div>
+              <div className="flex items-center gap-2">
+                <div>
+                  <label className="field-label text-xs">De</label>
+                  <DateInput
+                    value={range.from}
+                    max={range.to}
+                    onChange={(v) => v && setRange({ ...range, from: v })}
+                    className="w-36"
+                  />
+                </div>
+                <div>
+                  <label className="field-label text-xs">Até</label>
+                  <DateInput
+                    value={range.to}
+                    min={range.from}
+                    onChange={(v) => v && setRange({ ...range, to: v })}
+                    className="w-36"
+                  />
+                </div>
+              </div>
+            </>
+          )}
 
           <div className="ml-auto flex items-center gap-2 flex-wrap justify-end">
             {pdfErr && panel !== "avaliacoes" && <span className="text-xs text-red-600 dark:text-red-400">{pdfErr}</span>}
