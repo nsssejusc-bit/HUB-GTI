@@ -19,6 +19,11 @@ import DateInput from "../components/DateInput";
 // ── Month helpers ─────────────────────────────────────────────────────────────
 const MONTH_NAMES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 
+// Data local de Manaus (UTC-4, sem horário de verão) em formato YYYY-MM-DD
+function localDateStr(ms = Date.now()) {
+  return new Date(ms).toLocaleDateString("sv-SE", { timeZone: "America/Manaus" });
+}
+
 function fmtMonth(ym) {
   if (!ym) return "";
   const [y, m] = ym.split("-");
@@ -504,8 +509,10 @@ function MonthlyChart({ data, loading, title = "Volume mensal de chamados" }) {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function AnalyticsPage() {
-  const today     = new Date().toISOString().slice(0, 10);
-  const thirtyAgo = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+  const today     = localDateStr();
+  const thirtyAgo = localDateStr(Date.now() - 30 * 86400000);
+  const MIN_FB_MONTH = `${Number(today.slice(0, 4)) - 1}-01`; // janeiro do ano anterior
+  const MIN_FB_YEAR  = 2025;
 
   const socket = useSocket();
   const { user } = useAuth();
@@ -834,6 +841,7 @@ export default function AnalyticsPage() {
 
           // Navegar meses
           const prevMonth = () => {
+            if (fbMonth <= MIN_FB_MONTH) return;
             const [y, m] = fbMonth.split("-").map(Number);
             const d = new Date(y, m - 2);
             setFbMonth(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`);
@@ -852,7 +860,7 @@ export default function AnalyticsPage() {
                 {fbAnnual ? (
                   <>
                     <div className="flex items-center gap-1">
-                      <button onClick={() => setFbYear(y => y - 1)} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-gray-800 text-slate-500 dark:text-gray-400 transition"><ChevronLeft size={16}/></button>
+                      <button onClick={() => setFbYear(y => y - 1)} disabled={fbYear <= MIN_FB_YEAR} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-gray-800 text-slate-500 dark:text-gray-400 disabled:opacity-30 transition"><ChevronLeft size={16}/></button>
                       <span className="text-sm font-semibold text-slate-700 dark:text-gray-200 w-16 text-center">{fbYear}</span>
                       <button onClick={() => setFbYear(y => Math.min(y + 1, Number(today.slice(0,4))))} disabled={fbYear >= Number(today.slice(0,4))} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-gray-800 text-slate-500 dark:text-gray-400 disabled:opacity-30 transition"><ChevronRight size={16}/></button>
                     </div>
@@ -863,7 +871,7 @@ export default function AnalyticsPage() {
                 ) : (
                   <>
                     <div className="flex items-center gap-1">
-                      <button onClick={prevMonth} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-gray-800 text-slate-500 dark:text-gray-400 transition"><ChevronLeft size={16}/></button>
+                      <button onClick={prevMonth} disabled={fbMonth <= MIN_FB_MONTH} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-gray-800 text-slate-500 dark:text-gray-400 disabled:opacity-30 transition"><ChevronLeft size={16}/></button>
                       <span className="text-sm font-semibold text-slate-700 dark:text-gray-200 w-40 text-center capitalize">
                         {fmtMonthLong(fbMonth)}
                       </span>
