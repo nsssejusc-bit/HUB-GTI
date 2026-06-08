@@ -4,13 +4,14 @@ import AppHeader from "../components/AppHeader";
 import { Spinner } from "../components/ui";
 import { useTheme } from "../context/ThemeContext";
 import { useSocket } from "../context/SocketContext";
+import { useAuth } from "../context/AuthContext";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell,
   PieChart, Pie, Legend, AreaChart, Area,
 } from "recharts";
 import {
   Calendar, BarChart2, PieChart as PieChartIcon, TrendingUp,
-  FileText, Ticket, ClipboardList, Layers,
+  FileText, Ticket, ClipboardList, Layers, Star,
 } from "lucide-react";
 import DateInput from "../components/DateInput";
 
@@ -506,8 +507,10 @@ export default function AnalyticsPage() {
   const thirtyAgo = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
 
   const socket = useSocket();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "ADMIN";
 
-  const [panel,    setPanel]   = useState("chamados"); // "chamados" | "os"
+  const [panel,    setPanel]   = useState("chamados"); // "chamados" | "os" | "avaliacoes"
   const [range,    setRange]   = useState({ from: thirtyAgo, to: today });
 
   // Ticket data
@@ -522,6 +525,12 @@ export default function AnalyticsPage() {
   const [osMonthly, setOsMonthly] = useState([]);
   const [osLoading, setOsLoading] = useState(false);
   const [osLoaded,  setOsLoaded]  = useState(false);
+
+  // Feedback data
+  const [fbData,    setFbData]    = useState(null);
+  const [fbLoading, setFbLoading] = useState(false);
+  const [fbLoaded,  setFbLoaded]  = useState(false);
+  const [fbError,   setFbError]   = useState("");
 
   // PDF
   const [pdfBusy,  setPdfBusy]  = useState(false);
@@ -627,9 +636,30 @@ export default function AnalyticsPage() {
     finally { setPdfBusy(false); }
   }
 
+  const loadFeedback = useCallback(() => {
+    setFbLoading(true);
+    setFbError("");
+    Promise.all([
+      api.get("/analytics/feedback/summary"),
+      api.get("/analytics/feedback/by-technician"),
+      api.get("/analytics/feedback/by-category"),
+      api.get("/analytics/feedback/by-department"),
+    ]).then(([s, t, c, d]) => {
+      setFbData({ summary: s.data, byTech: t.data, byCat: c.data, byDept: d.data });
+      setFbLoaded(true);
+    }).catch(() => {
+      setFbError("Não foi possível carregar os dados de avaliação.");
+    }).finally(() => setFbLoading(false));
+  }, []);
+
+  useEffect(() => {
+    if (panel === "avaliacoes" && isAdmin && !fbLoaded) loadFeedback();
+  }, [panel, isAdmin, fbLoaded, loadFeedback]);
+
   const tabs = [
-    { key: "chamados", label: "Chamados",          Icon: Ticket        },
-    { key: "os",       label: "Ordens de Serviço", Icon: ClipboardList },
+    { key: "chamados",   label: "Chamados",          Icon: Ticket        },
+    { key: "os",         label: "Ordens de Serviço", Icon: ClipboardList },
+    ...(isAdmin ? [{ key: "avaliacoes", label: "Avaliações", Icon: Star }] : []),
   ];
 
   return (
@@ -666,23 +696,27 @@ export default function AnalyticsPage() {
           </div>
 
           <div className="ml-auto flex items-center gap-2 flex-wrap justify-end">
-            {pdfErr && <span className="text-xs text-red-600 dark:text-red-400">{pdfErr}</span>}
-            <button
-              onClick={handlePdf}
-              disabled={(panel === "chamados" ? loading : osLoading) || pdfBusy}
-              className="flex items-center gap-2 rounded-xl border border-brand-200 dark:border-brand-800 bg-brand-50 dark:bg-brand-900/30 px-3.5 py-2 text-sm font-medium text-brand-700 dark:text-brand-300 hover:bg-brand-100 dark:hover:bg-brand-900/50 disabled:opacity-40 transition"
-            >
-              <FileText size={14} />
-              {pdfBusy ? "Gerando…" : "Exportar PDF"}
-            </button>
-            <button
-              onClick={handleCombinedPdf}
-              disabled={loading || pdfBusy}
-              className="flex items-center gap-2 rounded-xl border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3.5 py-2 text-sm font-medium text-slate-600 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-800 disabled:opacity-40 transition"
-            >
-              <Layers size={14} />
-              {pdfBusy ? "Gerando…" : "Exportar Tudo"}
-            </button>
+            {pdfErr && panel !== "avaliacoes" && <span className="text-xs text-red-600 dark:text-red-400">{pdfErr}</span>}
+            {panel !== "avaliacoes" && (
+              <>
+                <button
+                  onClick={handlePdf}
+                  disabled={(panel === "chamados" ? loading : osLoading) || pdfBusy}
+                  className="flex items-center gap-2 rounded-xl border border-brand-200 dark:border-brand-800 bg-brand-50 dark:bg-brand-900/30 px-3.5 py-2 text-sm font-medium text-brand-700 dark:text-brand-300 hover:bg-brand-100 dark:hover:bg-brand-900/50 disabled:opacity-40 transition"
+                >
+                  <FileText size={14} />
+                  {pdfBusy ? "Gerando…" : "Exportar PDF"}
+                </button>
+                <button
+                  onClick={handleCombinedPdf}
+                  disabled={loading || pdfBusy}
+                  className="flex items-center gap-2 rounded-xl border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3.5 py-2 text-sm font-medium text-slate-600 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-800 disabled:opacity-40 transition"
+                >
+                  <Layers size={14} />
+                  {pdfBusy ? "Gerando…" : "Exportar Tudo"}
+                </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -762,6 +796,187 @@ export default function AnalyticsPage() {
               <ChartCard title="OS por Núcleo"    data={osData.byUnit    || []} xKey="unit"    loading={osLoading} />
               <ChartCard title="OS por Técnico"   data={osData.byTecnico || []} xKey="tecnico" loading={osLoading} />
             </div>
+          </>
+        )}
+
+        {/* ── AVALIAÇÕES panel (admin only) ── */}
+        {panel === "avaliacoes" && isAdmin && (
+          <>
+            {fbLoading && (
+              <div className="flex items-center justify-center py-20">
+                <Spinner className="h-7 w-7" />
+              </div>
+            )}
+
+            {fbError && !fbLoading && (
+              <div className="flex items-center justify-center py-20">
+                <div className="text-center space-y-3">
+                  <p className="text-sm text-slate-500 dark:text-gray-400">{fbError}</p>
+                  <button onClick={loadFeedback} className="text-sm text-brand-600 dark:text-brand-400 hover:underline">
+                    Tentar novamente
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {!fbLoading && fbData && (
+              <>
+                {/* Resumo geral */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="card p-4 text-center">
+                    <div className="text-2xl font-bold text-brand-600 dark:text-brand-400">
+                      {fbData.summary.total}
+                    </div>
+                    <div className="text-xs text-slate-500 dark:text-gray-400 mt-1">Avaliações recebidas</div>
+                  </div>
+                  <div className="card p-4 text-center">
+                    <div className="flex items-center justify-center gap-1.5">
+                      <span className="text-2xl font-bold text-amber-500">
+                        {fbData.summary.avgRating.toFixed(1)}
+                      </span>
+                      <Star size={18} className="fill-amber-400 text-amber-400" />
+                    </div>
+                    <div className="text-xs text-slate-500 dark:text-gray-400 mt-1">Média geral</div>
+                  </div>
+                  <div className="card p-4 text-center col-span-2">
+                    <div className="text-xs font-semibold text-slate-600 dark:text-gray-300 mb-2">Distribuição de notas</div>
+                    <div className="space-y-1">
+                      {[...fbData.summary.dist].reverse().map(({ star, count }) => {
+                        const pct = fbData.summary.total > 0 ? Math.round((count / fbData.summary.total) * 100) : 0;
+                        return (
+                          <div key={star} className="flex items-center gap-2 text-xs">
+                            <span className="w-5 text-right text-slate-500 dark:text-gray-400 shrink-0">{star}★</span>
+                            <div className="flex-1 h-2 rounded-full bg-slate-100 dark:bg-gray-800 overflow-hidden">
+                              <div
+                                className="h-full rounded-full bg-amber-400 transition-all"
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                            <span className="w-8 text-slate-500 dark:text-gray-400 shrink-0">{count}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tabelas */}
+                <div className="grid md:grid-cols-2 gap-5">
+
+                  {/* Por técnico */}
+                  <div className="card p-5">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Star size={14} className="text-amber-500" />
+                      <h3 className="text-sm font-semibold text-slate-800 dark:text-gray-100">Média por técnico</h3>
+                    </div>
+                    {fbData.byTech.length === 0 ? (
+                      <p className="text-sm text-slate-400 dark:text-gray-500 text-center py-6">Sem dados</p>
+                    ) : (
+                      <div className="divide-y divide-slate-100 dark:divide-gray-700/60">
+                        {fbData.byTech.map((r) => (
+                          <div key={r.technicianId} className="flex items-center gap-3 py-2.5">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-slate-700 dark:text-gray-200 truncate">{r.technician}</p>
+                              <p className="text-xs text-slate-400 dark:text-gray-500">{r.total} avaliação{r.total !== 1 ? "ões" : ""}</p>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <span className={`text-sm font-bold ${r.avgRating >= 4 ? "text-green-600 dark:text-green-400" : r.avgRating >= 3 ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400"}`}>
+                                {r.avgRating.toFixed(1)}
+                              </span>
+                              <Star size={13} className="fill-amber-400 text-amber-400" />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Por categoria */}
+                  <div className="card p-5">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Star size={14} className="text-amber-500" />
+                      <h3 className="text-sm font-semibold text-slate-800 dark:text-gray-100">Média por categoria</h3>
+                    </div>
+                    {fbData.byCat.length === 0 ? (
+                      <p className="text-sm text-slate-400 dark:text-gray-500 text-center py-6">Sem dados</p>
+                    ) : (
+                      <div className="divide-y divide-slate-100 dark:divide-gray-700/60">
+                        {fbData.byCat.map((r) => (
+                          <div key={r.categoryId} className="flex items-center gap-3 py-2.5">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-slate-700 dark:text-gray-200 truncate">{r.category}</p>
+                              <p className="text-xs text-slate-400 dark:text-gray-500">{r.total} avaliação{r.total !== 1 ? "ões" : ""}</p>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <span className={`text-sm font-bold ${r.avgRating >= 4 ? "text-green-600 dark:text-green-400" : r.avgRating >= 3 ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400"}`}>
+                                {r.avgRating.toFixed(1)}
+                              </span>
+                              <Star size={13} className="fill-amber-400 text-amber-400" />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                </div>
+
+                {/* Por setor — tabela larga */}
+                <div className="card p-5">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Star size={14} className="text-amber-500" />
+                    <h3 className="text-sm font-semibold text-slate-800 dark:text-gray-100">Média por setor solicitante</h3>
+                  </div>
+                  {fbData.byDept.length === 0 ? (
+                    <p className="text-sm text-slate-400 dark:text-gray-500 text-center py-6">Sem dados</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-slate-100 dark:border-gray-700">
+                            <th className="text-left py-2 text-xs font-semibold text-slate-500 dark:text-gray-400">Setor</th>
+                            <th className="text-right py-2 text-xs font-semibold text-slate-500 dark:text-gray-400 w-28">Avaliações</th>
+                            <th className="text-right py-2 text-xs font-semibold text-slate-500 dark:text-gray-400 w-28">Média</th>
+                            <th className="py-2 w-32 pl-3">Nota</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50 dark:divide-gray-800">
+                          {fbData.byDept.map((r) => (
+                            <tr key={r.department} className="hover:bg-slate-50 dark:hover:bg-gray-800/40 transition">
+                              <td className="py-2.5 font-medium text-slate-700 dark:text-gray-200 truncate max-w-[180px]">{r.department}</td>
+                              <td className="py-2.5 text-right text-slate-500 dark:text-gray-400">{r.total}</td>
+                              <td className="py-2.5 text-right">
+                                <span className={`font-bold ${r.avgRating >= 4 ? "text-green-600 dark:text-green-400" : r.avgRating >= 3 ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400"}`}>
+                                  {r.avgRating.toFixed(1)}
+                                </span>
+                              </td>
+                              <td className="py-2.5 pl-3">
+                                <div className="flex gap-0.5">
+                                  {[1,2,3,4,5].map((n) => (
+                                    <Star key={n} size={11}
+                                      className={n <= Math.round(r.avgRating) ? "fill-amber-400 text-amber-400" : "text-slate-200 dark:text-gray-700"}
+                                    />
+                                  ))}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    onClick={loadFeedback}
+                    className="text-xs text-slate-400 dark:text-gray-500 hover:text-brand-600 dark:hover:text-brand-400 transition"
+                  >
+                    Atualizar dados
+                  </button>
+                </div>
+              </>
+            )}
           </>
         )}
 

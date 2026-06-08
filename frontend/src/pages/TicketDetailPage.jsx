@@ -574,9 +574,22 @@ export default function TicketDetailPage() {
           <div className="card p-5">
             <h3 className="text-sm font-semibold text-slate-900 dark:text-gray-100 mb-4">Dados do chamado</h3>
             <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
-              <InfoItem label="Solicitante" value={ticket.requesterName} />
-              <InfoItem label="CPF" value={ticket.requesterCpf} />
-              <InfoItem label="Departamento" value={ticket.department} />
+              {ticket.beneficiaryName ? (
+                <>
+                  <InfoItem label="Para (solicitante)" value={ticket.beneficiaryName} />
+                  <InfoItem label="Matrícula"          value={ticket.beneficiaryMatricula || "—"} />
+                  <InfoItem label="E-mail"             value={ticket.beneficiaryEmail     || "—"} />
+                  <InfoItem label="Setor"              value={ticket.beneficiaryDept || ticket.department} />
+                  <InfoItem label="Aberto por"         value={ticket.requesterName} />
+                </>
+              ) : (
+                <>
+                  <InfoItem label="Solicitante"  value={ticket.requesterName} />
+                  <InfoItem label="Matrícula"    value={ticket.requesterMatricula || "—"} />
+                  <InfoItem label="E-mail"       value={ticket.requesterEmail     || "—"} />
+                  <InfoItem label="Departamento" value={ticket.department} />
+                </>
+              )}
               <InfoItem label="Categoria" value={ticket.category?.name} />
               <InfoItem label="Subcategoria" value={ticket.subcategory?.name} />
               <InfoItem label="Unidade" value={ticket.unit?.name} />

@@ -319,6 +319,86 @@ export async function otherReclassified(req, res) {
   res.json(tickets);
 }
 
+// ── Feedback Analytics (ADMIN only) ──────────────────────────────────────────
+
+export async function feedbackSummary(req, res) {
+  const rows = await prisma.$queryRaw`
+    SELECT
+      COUNT(*)               AS total,
+      ROUND(AVG(rating), 2)  AS avgRating,
+      SUM(rating = 1)        AS star1,
+      SUM(rating = 2)        AS star2,
+      SUM(rating = 3)        AS star3,
+      SUM(rating = 4)        AS star4,
+      SUM(rating = 5)        AS star5
+    FROM Feedback`;
+  const r = rows[0];
+  res.json({
+    total:     Number(r.total),
+    avgRating: Number(r.avgRating) || 0,
+    dist: [1, 2, 3, 4, 5].map((n) => ({ star: n, count: Number(r[`star${n}`]) || 0 })),
+  });
+}
+
+export async function feedbackByTechnician(req, res) {
+  const rows = await prisma.$queryRaw`
+    SELECT
+      t.assignedTechId,
+      u.name              AS techName,
+      ROUND(AVG(f.rating), 2) AS avgRating,
+      COUNT(*)            AS total
+    FROM Feedback f
+    JOIN Ticket t ON t.id = f.ticketId
+    LEFT JOIN User u ON u.id = t.assignedTechId
+    WHERE t.assignedTechId IS NOT NULL
+    GROUP BY t.assignedTechId, u.name
+    ORDER BY avgRating DESC`;
+  res.json(rows.map((r) => ({
+    technicianId: r.assignedTechId ? Number(r.assignedTechId) : null,
+    technician:   r.techName || "—",
+    avgRating:    Number(r.avgRating) || 0,
+    total:        Number(r.total),
+  })));
+}
+
+export async function feedbackByCategory(req, res) {
+  const rows = await prisma.$queryRaw`
+    SELECT
+      t.categoryId,
+      c.name              AS categoryName,
+      ROUND(AVG(f.rating), 2) AS avgRating,
+      COUNT(*)            AS total
+    FROM Feedback f
+    JOIN Ticket t ON t.id = f.ticketId
+    JOIN Category c ON c.id = t.categoryId
+    GROUP BY t.categoryId, c.name
+    ORDER BY avgRating DESC`;
+  res.json(rows.map((r) => ({
+    categoryId: Number(r.categoryId),
+    category:   r.categoryName || "—",
+    avgRating:  Number(r.avgRating) || 0,
+    total:      Number(r.total),
+  })));
+}
+
+export async function feedbackByDepartment(req, res) {
+  const rows = await prisma.$queryRaw`
+    SELECT
+      t.department,
+      ROUND(AVG(f.rating), 2) AS avgRating,
+      COUNT(*)            AS total
+    FROM Feedback f
+    JOIN Ticket t ON t.id = f.ticketId
+    WHERE t.department IS NOT NULL AND t.department != ''
+    GROUP BY t.department
+    ORDER BY avgRating DESC`;
+  res.json(rows.map((r) => ({
+    department: r.department || "—",
+    avgRating:  Number(r.avgRating) || 0,
+    total:      Number(r.total),
+  })));
+}
+
 // ── OS Analytics ──────────────────────────────────────────────────────────────
 
 function parseOsRange(q) {

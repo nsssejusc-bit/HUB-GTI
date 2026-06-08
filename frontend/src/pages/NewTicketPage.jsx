@@ -7,7 +7,7 @@ import { Alert, Spinner } from "../components/ui";
 import {
   ArrowLeft, ArrowRight, Monitor, Wifi, Server, FileText,
   CheckCircle2, MonitorSmartphone, Copy, Check as CheckIcon, Printer, LogOut,
-  Lightbulb, AlertTriangle, ShieldCheck, ChevronDown, ChevronRight,
+  Lightbulb, AlertTriangle, ShieldCheck, ChevronDown, ChevronRight, UserPlus,
 } from "lucide-react";
 
 // ── Ícones e cores por código de categoria ───────────────────────────────────
@@ -504,6 +504,8 @@ export default function NewTicketPage() {
   const [form,         setForm]         = useState({ categoryId: null, subcategoryId: null, anyDeskCode: "", freeTextDescription: "" });
   const [extraFields,  setExtraFields]  = useState({});
   const [dataConfirmed, setDataConfirmed] = useState(false);
+  const [forOther,     setForOther]     = useState(false);
+  const [beneficiary,  setBeneficiary]  = useState({ name: "", matricula: "", email: "", dept: "", deptId: null });
   const [error,        setError]        = useState("");
   const [submitting,   setSubmitting]   = useState(false);
   const [createdTicket, setCreatedTicket] = useState(null);
@@ -578,6 +580,7 @@ export default function NewTicketPage() {
   }, [form.subcategoryId]);
 
   function canSubmit() {
+    if (forOther && (!beneficiary.name.trim() || !beneficiary.deptId)) return false;
     if (isRemote) return form.anyDeskCode.trim().length >= 3;
     if (selectedCategory?.allowsFreeText) return form.freeTextDescription.trim().length >= 5;
     if (!form.subcategoryId) return false;
@@ -603,6 +606,13 @@ export default function NewTicketPage() {
         const built = buildPayload(formType, extraFields);
         payload.freeTextDescription = built.freeTextDescription;
         payload.extraData           = built.extraData;
+      }
+
+      if (forOther && beneficiary.name.trim()) {
+        payload.beneficiaryName      = beneficiary.name.trim();
+        payload.beneficiaryMatricula = beneficiary.matricula.trim() || null;
+        payload.beneficiaryEmail     = beneficiary.email.trim()     || null;
+        payload.beneficiaryDept      = beneficiary.dept             || null;
       }
 
       const { data } = await api.post("/tickets", payload);
@@ -937,6 +947,74 @@ export default function NewTicketPage() {
                   </div>
                 </div>
               )}
+
+              {/* ── Abrir para outra pessoa ── */}
+              <div className="rounded-xl border border-slate-200 dark:border-gray-700 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => { setForOther((v) => !v); setBeneficiary({ name: "", matricula: "", email: "", dept: "", deptId: null }); }}
+                  className="w-full flex items-center justify-between px-4 py-3 text-left bg-slate-50 dark:bg-gray-800/50 hover:bg-slate-100 dark:hover:bg-gray-800 transition"
+                >
+                  <div className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-gray-200">
+                    <UserPlus size={15} className={forOther ? "text-brand-600 dark:text-brand-400" : "text-slate-400"} />
+                    Este chamado é para outra pessoa?
+                  </div>
+                  <div className={`w-9 h-5 rounded-full transition-colors relative shrink-0 ${forOther ? "bg-brand-600" : "bg-slate-200 dark:bg-gray-600"}`}>
+                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${forOther ? "translate-x-4" : "translate-x-0.5"}`} />
+                  </div>
+                </button>
+
+                {forOther && (
+                  <div className="p-4 space-y-3 border-t border-slate-100 dark:border-gray-700 bg-white dark:bg-gray-900">
+                    <p className="text-xs text-slate-500 dark:text-gray-400">
+                      Preencha os dados de quem tem o problema. Você será registrado como responsável pela abertura.
+                    </p>
+                    <div>
+                      <label className="field-label">Nome do solicitante *</label>
+                      <input
+                        className="field-input"
+                        placeholder="Nome completo"
+                        value={beneficiary.name}
+                        onChange={(e) => setBeneficiary({ ...beneficiary, name: e.target.value })}
+                        autoFocus
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="field-label">Matrícula</label>
+                        <input
+                          className="field-input"
+                          placeholder="Ex: 123456"
+                          value={beneficiary.matricula}
+                          onChange={(e) => setBeneficiary({ ...beneficiary, matricula: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <label className="field-label">E-mail</label>
+                        <input
+                          className="field-input"
+                          type="email"
+                          placeholder="email@sejusc.am.gov.br"
+                          value={beneficiary.email}
+                          onChange={(e) => setBeneficiary({ ...beneficiary, email: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="field-label">Setor *</label>
+                      <DeptSelect
+                        value={beneficiary.deptId}
+                        onChange={(id) => {
+                          const d = departments.find((dep) => dep.id === id);
+                          setBeneficiary({ ...beneficiary, deptId: id, dept: d?.name || "" });
+                        }}
+                        departments={departments}
+                        placeholder="Selecione o setor..."
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
 
               <Alert message={error} />
 

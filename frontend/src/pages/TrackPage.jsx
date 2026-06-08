@@ -355,7 +355,7 @@ export default function TrackPage() {
             <div className="card p-5">
               <h2 className="text-sm font-semibold text-slate-900 dark:text-gray-100 mb-4">Informações</h2>
               <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
-                <InfoItem label="Solicitante" value={ticket.requesterName} />
+                <InfoItem label="Solicitante" value={ticket.beneficiaryName || ticket.requesterName} />
                 <InfoItem label="Departamento" value={ticket.department} />
                 <InfoItem label="Categoria" value={ticket.category} />
                 <InfoItem label="Subcategoria" value={ticket.subcategory} />

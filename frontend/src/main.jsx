@@ -16,6 +16,7 @@ const TrackPage          = lazy(() => import("./pages/TrackPage"));
 const RegisterPage       = lazy(() => import("./pages/RegisterPage"));
 const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
 const TeamPage           = lazy(() => import("./pages/TeamPage"));
+const ManualPage         = lazy(() => import("./pages/ManualPage"));
 
 // Usuário logado
 const NewTicketPage      = lazy(() => import("./pages/NewTicketPage"));
@@ -141,6 +142,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
                       <Route path="/painel/categorias" element={<Protected adminOnly><CategoriesPage /></Protected>} />
                       <Route path="/painel/auditoria"  element={<Protected adminOnly><AuditPage /></Protected>} />
 
+                      <Route path="/manual"  element={<ManualPage />} />
                       <Route path="/equipe" element={<TeamPage />} />
                       <Route path="*"       element={<Navigate to="/" replace />} />
                     </Routes>

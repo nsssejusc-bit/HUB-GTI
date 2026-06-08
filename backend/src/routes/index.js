@@ -26,6 +26,7 @@ import {
   ticketsByCategory, avgResolutionByCategory, avgResolutionByUnit, otherReclassified,
   topRequesters, ticketsByDay, ticketsByMonth,
   osByStatus, osByTipo, osByUnit, osByTecnico, osByMonth,
+  feedbackSummary, feedbackByTechnician, feedbackByCategory, feedbackByDepartment,
 } from "../controllers/analyticsController.js";
 import {
   createWorkOrder, listWorkOrders, getWorkOrder, updateWorkOrder,
@@ -203,5 +204,12 @@ router.get("/analytics/os/by-tipo",    ...analyticsAccess, osByTipo);
 router.get("/analytics/os/by-unit",    ...analyticsAccess, osByUnit);
 router.get("/analytics/os/by-tecnico", ...analyticsAccess, osByTecnico);
 router.get("/analytics/os/by-month",   ...analyticsAccess, osByMonth);
+
+// ── Feedback analytics (ADMIN only) ────────────────────────────────────────────
+const feedbackAccess = [authRequired, requireRole("ADMIN")];
+router.get("/analytics/feedback/summary",       ...feedbackAccess, feedbackSummary);
+router.get("/analytics/feedback/by-technician", ...feedbackAccess, feedbackByTechnician);
+router.get("/analytics/feedback/by-category",   ...feedbackAccess, feedbackByCategory);
+router.get("/analytics/feedback/by-department", ...feedbackAccess, feedbackByDepartment);
 
 export default router;

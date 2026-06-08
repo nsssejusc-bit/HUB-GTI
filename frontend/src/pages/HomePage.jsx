@@ -8,6 +8,7 @@ import { Alert, Spinner, StatusBadge } from "../components/ui";
 import {
   Headset, Sun, Moon, LogIn, UserPlus, PlusCircle,
   LogOut, Clock, ChevronRight, Ticket, KeyRound, Search,
+  BookOpen, X,
 } from "lucide-react";
 
 const STAFF_ROLES = ["TECHNICIAN", "ADMIN"];
@@ -27,6 +28,7 @@ export default function HomePage() {
 
   const [tickets, setTickets]           = useState([]);
   const [loadingTickets, setLoadingTickets] = useState(false);
+  const [showManualModal, setShowManualModal] = useState(false);
 
   const next = searchParams.get("next");
 
@@ -42,8 +44,19 @@ export default function HomePage() {
       api.get("/users/me/tickets")
         .then((r) => setTickets(r.data))
         .finally(() => setLoadingTickets(false));
+
+      // Exibe modal do manual apenas no primeiro login (por dispositivo)
+      const key = `manual_seen_${user.id}`;
+      if (!localStorage.getItem(key)) {
+        setTimeout(() => setShowManualModal(true), 600);
+      }
     }
   }, [user]);
+
+  function dismissManualModal() {
+    if (user?.id) localStorage.setItem(`manual_seen_${user.id}`, "1");
+    setShowManualModal(false);
+  }
 
   async function handleLogin(e) {
     e.preventDefault();
@@ -70,6 +83,45 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
+
+      {/* ── Modal de boas-vindas (primeiro login) ── */}
+      {showManualModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-100 dark:bg-brand-900/40 text-brand-600 dark:text-brand-400">
+                <BookOpen size={22} />
+              </div>
+              <button onClick={dismissManualModal} className="text-slate-400 hover:text-slate-600 dark:hover:text-gray-200 transition mt-0.5">
+                <X size={18} />
+              </button>
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-gray-100">
+                Olá, {user?.name?.split(" ")[0]}! 👋
+              </h2>
+              <p className="text-sm text-slate-500 dark:text-gray-400 mt-1.5 leading-relaxed">
+                Preparamos um <strong className="text-slate-700 dark:text-gray-200">Manual do Usuário</strong> com o passo a passo para abrir chamados e acompanhar o atendimento da GTI.
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 pt-1">
+              <Link
+                to="/manual"
+                onClick={dismissManualModal}
+                className="btn-primary w-full justify-center gap-2"
+              >
+                <BookOpen size={15} /> Ver o manual
+              </Link>
+              <button
+                onClick={dismissManualModal}
+                className="text-sm text-slate-500 dark:text-gray-400 hover:text-slate-700 dark:hover:text-gray-200 transition py-1.5"
+              >
+                Agora não
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Barra institucional */}
       <header className="bg-white dark:bg-gray-900 border-b border-slate-200 dark:border-gray-700 px-4 py-3">
@@ -221,6 +273,21 @@ export default function HomePage() {
                   <div className="text-xs text-slate-500 dark:text-gray-400 mt-0.5">Solicite suporte técnico</div>
                 </div>
                 <ChevronRight size={18} className="text-slate-300 dark:text-gray-600 group-hover:text-brand-500 transition" />
+              </Link>
+
+              {/* Link para o manual */}
+              <Link
+                to="/manual"
+                className="group flex items-center gap-4 w-full card px-5 py-4 hover:shadow-card-md hover:-translate-y-0.5 transition duration-200"
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white group-hover:bg-amber-600 transition">
+                  <BookOpen size={20} />
+                </span>
+                <div className="flex-1 text-left">
+                  <div className="font-semibold text-slate-800 dark:text-gray-100">Manual do usuário</div>
+                  <div className="text-xs text-slate-500 dark:text-gray-400 mt-0.5">Como abrir e acompanhar chamados</div>
+                </div>
+                <ChevronRight size={18} className="text-slate-300 dark:text-gray-600 group-hover:text-amber-500 transition" />
               </Link>
 
               {/* Lista de chamados */}

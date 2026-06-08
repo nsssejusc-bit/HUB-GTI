@@ -200,6 +200,12 @@ model Ticket {
   ticketNumber        String       @unique
   requesterName       String
   requesterCpf        String
+  requesterMatricula  String?
+  requesterEmail      String?
+  beneficiaryName     String?
+  beneficiaryMatricula String?
+  beneficiaryEmail    String?
+  beneficiaryDept     String?
   department          String
   departmentId        Int?
   departmentRef       Department?  @relation(fields: [departmentId], references: [id])
