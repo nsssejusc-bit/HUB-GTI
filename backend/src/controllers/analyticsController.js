@@ -321,7 +321,13 @@ export async function otherReclassified(req, res) {
 
 // ── Feedback Analytics (ADMIN only) ──────────────────────────────────────────
 
+function currentMonth() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
 export async function feedbackSummary(req, res) {
+  const month = req.query.month || currentMonth();
   const rows = await prisma.$queryRaw`
     SELECT
       COUNT(*)               AS total,
@@ -331,7 +337,8 @@ export async function feedbackSummary(req, res) {
       SUM(rating = 3)        AS star3,
       SUM(rating = 4)        AS star4,
       SUM(rating = 5)        AS star5
-    FROM Feedback`;
+    FROM Feedback
+    WHERE DATE_FORMAT(createdAt, '%Y-%m') = ${month}`;
   const r = rows[0];
   res.json({
     total:     Number(r.total),
@@ -341,6 +348,7 @@ export async function feedbackSummary(req, res) {
 }
 
 export async function feedbackByTechnician(req, res) {
+  const month = req.query.month || currentMonth();
   const rows = await prisma.$queryRaw`
     SELECT
       t.assignedTechId,
@@ -351,6 +359,7 @@ export async function feedbackByTechnician(req, res) {
     JOIN Ticket t ON t.id = f.ticketId
     LEFT JOIN User u ON u.id = t.assignedTechId
     WHERE t.assignedTechId IS NOT NULL
+      AND DATE_FORMAT(f.createdAt, '%Y-%m') = ${month}
     GROUP BY t.assignedTechId, u.name
     ORDER BY avgRating DESC`;
   res.json(rows.map((r) => ({
@@ -362,6 +371,7 @@ export async function feedbackByTechnician(req, res) {
 }
 
 export async function feedbackByCategory(req, res) {
+  const month = req.query.month || currentMonth();
   const rows = await prisma.$queryRaw`
     SELECT
       t.categoryId,
@@ -371,6 +381,7 @@ export async function feedbackByCategory(req, res) {
     FROM Feedback f
     JOIN Ticket t ON t.id = f.ticketId
     JOIN Category c ON c.id = t.categoryId
+    WHERE DATE_FORMAT(f.createdAt, '%Y-%m') = ${month}
     GROUP BY t.categoryId, c.name
     ORDER BY avgRating DESC`;
   res.json(rows.map((r) => ({
@@ -382,6 +393,7 @@ export async function feedbackByCategory(req, res) {
 }
 
 export async function feedbackByDepartment(req, res) {
+  const month = req.query.month || currentMonth();
   const rows = await prisma.$queryRaw`
     SELECT
       t.department,
@@ -390,12 +402,31 @@ export async function feedbackByDepartment(req, res) {
     FROM Feedback f
     JOIN Ticket t ON t.id = f.ticketId
     WHERE t.department IS NOT NULL AND t.department != ''
+      AND DATE_FORMAT(f.createdAt, '%Y-%m') = ${month}
     GROUP BY t.department
     ORDER BY avgRating DESC`;
   res.json(rows.map((r) => ({
     department: r.department || "—",
     avgRating:  Number(r.avgRating) || 0,
     total:      Number(r.total),
+  })));
+}
+
+export async function feedbackByMonth(req, res) {
+  const year = Number(req.query.year) || new Date().getFullYear();
+  const rows = await prisma.$queryRaw`
+    SELECT
+      DATE_FORMAT(createdAt, '%Y-%m') AS month,
+      ROUND(AVG(rating), 2)           AS avgRating,
+      COUNT(*)                        AS total
+    FROM Feedback
+    WHERE YEAR(createdAt) = ${year}
+    GROUP BY DATE_FORMAT(createdAt, '%Y-%m')
+    ORDER BY month ASC`;
+  res.json(rows.map((r) => ({
+    month:     r.month,
+    avgRating: Number(r.avgRating) || 0,
+    total:     Number(r.total),
   })));
 }
 

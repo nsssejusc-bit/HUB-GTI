@@ -26,7 +26,7 @@ import {
   ticketsByCategory, avgResolutionByCategory, avgResolutionByUnit, otherReclassified,
   topRequesters, ticketsByDay, ticketsByMonth,
   osByStatus, osByTipo, osByUnit, osByTecnico, osByMonth,
-  feedbackSummary, feedbackByTechnician, feedbackByCategory, feedbackByDepartment,
+  feedbackSummary, feedbackByTechnician, feedbackByCategory, feedbackByDepartment, feedbackByMonth,
 } from "../controllers/analyticsController.js";
 import {
   createWorkOrder, listWorkOrders, getWorkOrder, updateWorkOrder,
@@ -211,5 +211,6 @@ router.get("/analytics/feedback/summary",       ...feedbackAccess, feedbackSumma
 router.get("/analytics/feedback/by-technician", ...feedbackAccess, feedbackByTechnician);
 router.get("/analytics/feedback/by-category",   ...feedbackAccess, feedbackByCategory);
 router.get("/analytics/feedback/by-department", ...feedbackAccess, feedbackByDepartment);
+router.get("/analytics/feedback/by-month",      ...feedbackAccess, feedbackByMonth);
 
 export default router;

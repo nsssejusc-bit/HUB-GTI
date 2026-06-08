@@ -949,11 +949,11 @@ export default function NewTicketPage() {
               )}
 
               {/* ── Abrir para outra pessoa ── */}
-              <div className="rounded-xl border border-slate-200 dark:border-gray-700 overflow-hidden">
+              <div className="rounded-xl border border-slate-200 dark:border-gray-700">
                 <button
                   type="button"
                   onClick={() => { setForOther((v) => !v); setBeneficiary({ name: "", matricula: "", email: "", dept: "", deptId: null }); }}
-                  className="w-full flex items-center justify-between px-4 py-3 text-left bg-slate-50 dark:bg-gray-800/50 hover:bg-slate-100 dark:hover:bg-gray-800 transition"
+                  className={`w-full flex items-center justify-between px-4 py-3 text-left bg-slate-50 dark:bg-gray-800/50 hover:bg-slate-100 dark:hover:bg-gray-800 transition ${forOther ? "rounded-t-xl" : "rounded-xl"}`}
                 >
                   <div className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-gray-200">
                     <UserPlus size={15} className={forOther ? "text-brand-600 dark:text-brand-400" : "text-slate-400"} />

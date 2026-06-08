@@ -12,6 +12,7 @@ import {
 import {
   Calendar, BarChart2, PieChart as PieChartIcon, TrendingUp,
   FileText, Ticket, ClipboardList, Layers, Star,
+  ChevronLeft, ChevronRight,
 } from "lucide-react";
 import DateInput from "../components/DateInput";
 
@@ -509,6 +510,7 @@ export default function AnalyticsPage() {
   const socket = useSocket();
   const { user } = useAuth();
   const isAdmin = user?.role === "ADMIN";
+  const chartTheme = useChartTheme();
 
   const [panel,    setPanel]   = useState("chamados"); // "chamados" | "os" | "avaliacoes"
   const [range,    setRange]   = useState({ from: thirtyAgo, to: today });
@@ -527,10 +529,15 @@ export default function AnalyticsPage() {
   const [osLoaded,  setOsLoaded]  = useState(false);
 
   // Feedback data
-  const [fbData,    setFbData]    = useState(null);
-  const [fbLoading, setFbLoading] = useState(false);
-  const [fbLoaded,  setFbLoaded]  = useState(false);
-  const [fbError,   setFbError]   = useState("");
+  const [fbData,          setFbData]          = useState(null);
+  const [fbLoading,       setFbLoading]       = useState(false);
+  const [fbLoaded,        setFbLoaded]        = useState(false);
+  const [fbError,         setFbError]         = useState("");
+  const [fbMonth,         setFbMonth]         = useState(today.slice(0, 7));
+  const [fbAnnual,        setFbAnnual]        = useState(false);
+  const [fbYear,          setFbYear]          = useState(Number(today.slice(0, 4)));
+  const [fbAnnualData,    setFbAnnualData]    = useState([]);
+  const [fbAnnualLoading, setFbAnnualLoading] = useState(false);
 
   // PDF
   const [pdfBusy,  setPdfBusy]  = useState(false);
@@ -636,14 +643,15 @@ export default function AnalyticsPage() {
     finally { setPdfBusy(false); }
   }
 
-  const loadFeedback = useCallback(() => {
+  const loadFeedback = useCallback((month) => {
     setFbLoading(true);
     setFbError("");
+    const q = `?month=${month}`;
     Promise.all([
-      api.get("/analytics/feedback/summary"),
-      api.get("/analytics/feedback/by-technician"),
-      api.get("/analytics/feedback/by-category"),
-      api.get("/analytics/feedback/by-department"),
+      api.get(`/analytics/feedback/summary${q}`),
+      api.get(`/analytics/feedback/by-technician${q}`),
+      api.get(`/analytics/feedback/by-category${q}`),
+      api.get(`/analytics/feedback/by-department${q}`),
     ]).then(([s, t, c, d]) => {
       setFbData({ summary: s.data, byTech: t.data, byCat: c.data, byDept: d.data });
       setFbLoaded(true);
@@ -652,9 +660,23 @@ export default function AnalyticsPage() {
     }).finally(() => setFbLoading(false));
   }, []);
 
+  const loadFbAnnual = useCallback((year) => {
+    setFbAnnualLoading(true);
+    api.get(`/analytics/feedback/by-month?year=${year}`)
+      .then((r) => setFbAnnualData(r.data))
+      .catch(() => setFbAnnualData([]))
+      .finally(() => setFbAnnualLoading(false));
+  }, []);
+
   useEffect(() => {
-    if (panel === "avaliacoes" && isAdmin && !fbLoaded) loadFeedback();
-  }, [panel, isAdmin, fbLoaded, loadFeedback]);
+    if (panel !== "avaliacoes" || !isAdmin) return;
+    if (fbAnnual) {
+      loadFbAnnual(fbYear);
+    } else {
+      loadFeedback(fbMonth);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [panel, isAdmin, fbMonth, fbAnnual, fbYear]);
 
   const tabs = [
     { key: "chamados",   label: "Chamados",          Icon: Ticket        },
@@ -800,185 +822,237 @@ export default function AnalyticsPage() {
         )}
 
         {/* ── AVALIAÇÕES panel (admin only) ── */}
-        {panel === "avaliacoes" && isAdmin && (
-          <>
-            {fbLoading && (
-              <div className="flex items-center justify-center py-20">
-                <Spinner className="h-7 w-7" />
-              </div>
-            )}
+        {panel === "avaliacoes" && isAdmin && (() => {
+          const ratingColor = (v) => v >= 4 ? "text-green-600 dark:text-green-400" : v >= 3 ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400";
+          const stars = (avg) => [1,2,3,4,5].map((n) => (
+            <Star key={n} size={11} className={n <= Math.round(avg) ? "fill-amber-400 text-amber-400" : "text-slate-200 dark:text-gray-700"} />
+          ));
 
-            {fbError && !fbLoading && (
-              <div className="flex items-center justify-center py-20">
-                <div className="text-center space-y-3">
-                  <p className="text-sm text-slate-500 dark:text-gray-400">{fbError}</p>
-                  <button onClick={loadFeedback} className="text-sm text-brand-600 dark:text-brand-400 hover:underline">
-                    Tentar novamente
-                  </button>
-                </div>
-              </div>
-            )}
+          // Navegar meses
+          const prevMonth = () => {
+            const [y, m] = fbMonth.split("-").map(Number);
+            const d = new Date(y, m - 2);
+            setFbMonth(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`);
+          };
+          const nextMonth = () => {
+            if (fbMonth >= today.slice(0,7)) return;
+            const [y, m] = fbMonth.split("-").map(Number);
+            const d = new Date(y, m);
+            setFbMonth(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`);
+          };
 
-            {!fbLoading && fbData && (
-              <>
-                {/* Resumo geral */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="card p-4 text-center">
-                    <div className="text-2xl font-bold text-brand-600 dark:text-brand-400">
-                      {fbData.summary.total}
+          return (
+            <>
+              {/* Cabeçalho com navegação */}
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                {fbAnnual ? (
+                  <>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => setFbYear(y => y - 1)} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-gray-800 text-slate-500 dark:text-gray-400 transition"><ChevronLeft size={16}/></button>
+                      <span className="text-sm font-semibold text-slate-700 dark:text-gray-200 w-16 text-center">{fbYear}</span>
+                      <button onClick={() => setFbYear(y => Math.min(y + 1, Number(today.slice(0,4))))} disabled={fbYear >= Number(today.slice(0,4))} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-gray-800 text-slate-500 dark:text-gray-400 disabled:opacity-30 transition"><ChevronRight size={16}/></button>
                     </div>
-                    <div className="text-xs text-slate-500 dark:text-gray-400 mt-1">Avaliações recebidas</div>
-                  </div>
-                  <div className="card p-4 text-center">
-                    <div className="flex items-center justify-center gap-1.5">
-                      <span className="text-2xl font-bold text-amber-500">
-                        {fbData.summary.avgRating.toFixed(1)}
+                    <button onClick={() => setFbAnnual(false)} className="flex items-center gap-1.5 text-xs text-brand-600 dark:text-brand-400 hover:underline">
+                      ← Voltar ao mês
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-1">
+                      <button onClick={prevMonth} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-gray-800 text-slate-500 dark:text-gray-400 transition"><ChevronLeft size={16}/></button>
+                      <span className="text-sm font-semibold text-slate-700 dark:text-gray-200 w-40 text-center capitalize">
+                        {fmtMonthLong(fbMonth)}
                       </span>
-                      <Star size={18} className="fill-amber-400 text-amber-400" />
+                      <button onClick={nextMonth} disabled={fbMonth >= today.slice(0,7)} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-gray-800 text-slate-500 dark:text-gray-400 disabled:opacity-30 transition"><ChevronRight size={16}/></button>
                     </div>
-                    <div className="text-xs text-slate-500 dark:text-gray-400 mt-1">Média geral</div>
-                  </div>
-                  <div className="card p-4 text-center col-span-2">
-                    <div className="text-xs font-semibold text-slate-600 dark:text-gray-300 mb-2">Distribuição de notas</div>
-                    <div className="space-y-1">
-                      {[...fbData.summary.dist].reverse().map(({ star, count }) => {
-                        const pct = fbData.summary.total > 0 ? Math.round((count / fbData.summary.total) * 100) : 0;
-                        return (
-                          <div key={star} className="flex items-center gap-2 text-xs">
-                            <span className="w-5 text-right text-slate-500 dark:text-gray-400 shrink-0">{star}★</span>
-                            <div className="flex-1 h-2 rounded-full bg-slate-100 dark:bg-gray-800 overflow-hidden">
-                              <div
-                                className="h-full rounded-full bg-amber-400 transition-all"
-                                style={{ width: `${pct}%` }}
-                              />
-                            </div>
-                            <span className="w-8 text-slate-500 dark:text-gray-400 shrink-0">{count}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
+                    <button onClick={() => setFbAnnual(true)} className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-gray-400 hover:text-brand-600 dark:hover:text-brand-400 transition">
+                      <BarChart2 size={13}/> Relatório anual
+                    </button>
+                  </>
+                )}
+              </div>
+
+              {/* Loading */}
+              {(fbLoading || fbAnnualLoading) && (
+                <div className="flex items-center justify-center py-20">
+                  <Spinner className="h-7 w-7" />
+                </div>
+              )}
+
+              {/* Erro */}
+              {fbError && !fbLoading && !fbAnnual && (
+                <div className="flex items-center justify-center py-20">
+                  <div className="text-center space-y-3">
+                    <p className="text-sm text-slate-500 dark:text-gray-400">{fbError}</p>
+                    <button onClick={() => loadFeedback(fbMonth)} className="text-sm text-brand-600 dark:text-brand-400 hover:underline">Tentar novamente</button>
                   </div>
                 </div>
+              )}
 
-                {/* Tabelas */}
-                <div className="grid md:grid-cols-2 gap-5">
-
-                  {/* Por técnico */}
+              {/* ── RELATÓRIO ANUAL ── */}
+              {fbAnnual && !fbAnnualLoading && (
+                <>
                   <div className="card p-5">
                     <div className="flex items-center gap-2 mb-4">
-                      <Star size={14} className="text-amber-500" />
-                      <h3 className="text-sm font-semibold text-slate-800 dark:text-gray-100">Média por técnico</h3>
+                      <BarChart2 size={14} className="text-amber-500" />
+                      <h3 className="text-sm font-semibold text-slate-800 dark:text-gray-100">Média mensal de avaliações — {fbYear}</h3>
                     </div>
-                    {fbData.byTech.length === 0 ? (
-                      <p className="text-sm text-slate-400 dark:text-gray-500 text-center py-6">Sem dados</p>
+                    {fbAnnualData.length === 0 ? (
+                      <p className="text-sm text-slate-400 dark:text-gray-500 text-center py-8">Sem avaliações em {fbYear}</p>
                     ) : (
-                      <div className="divide-y divide-slate-100 dark:divide-gray-700/60">
-                        {fbData.byTech.map((r) => (
-                          <div key={r.technicianId} className="flex items-center gap-3 py-2.5">
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-slate-700 dark:text-gray-200 truncate">{r.technician}</p>
-                              <p className="text-xs text-slate-400 dark:text-gray-500">{r.total} avaliação{r.total !== 1 ? "ões" : ""}</p>
-                            </div>
-                            <div className="flex items-center gap-1 shrink-0">
-                              <span className={`text-sm font-bold ${r.avgRating >= 4 ? "text-green-600 dark:text-green-400" : r.avgRating >= 3 ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400"}`}>
-                                {r.avgRating.toFixed(1)}
-                              </span>
-                              <Star size={13} className="fill-amber-400 text-amber-400" />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                      <>
+                        <ResponsiveContainer width="100%" height={220}>
+                          <BarChart data={fbAnnualData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} />
+                            <XAxis dataKey="month" tickFormatter={fmtMonth} tick={{ fontSize: 11, fill: chartTheme.tick }} tickLine={false} axisLine={false} />
+                            <YAxis domain={[0, 5]} ticks={[1,2,3,4,5]} tick={{ fontSize: 11, fill: chartTheme.tick }} tickLine={false} axisLine={false} />
+                            <Tooltip
+                              contentStyle={chartTheme.tooltip}
+                              cursor={false}
+                              labelFormatter={fmtMonthLong}
+                              formatter={(v, _, { payload }) => [`${Number(v).toFixed(1)} ★ (${payload.total} aval.)`, "Média"]}
+                            />
+                            <Bar dataKey="avgRating" radius={[4,4,0,0]} maxBarSize={36}>
+                              {fbAnnualData.map((r, i) => (
+                                <Cell key={i} fill={r.avgRating >= 4 ? "#22c55e" : r.avgRating >= 3 ? "#f59e0b" : "#ef4444"} />
+                              ))}
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                        <div className="overflow-x-auto mt-4">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-slate-100 dark:border-gray-700">
+                                <th className="text-left py-2 text-xs font-semibold text-slate-500 dark:text-gray-400">Mês</th>
+                                <th className="text-right py-2 text-xs font-semibold text-slate-500 dark:text-gray-400 w-28">Avaliações</th>
+                                <th className="text-right py-2 text-xs font-semibold text-slate-500 dark:text-gray-400 w-24">Média</th>
+                                <th className="py-2 w-28 pl-3">Nota</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-50 dark:divide-gray-800">
+                              {fbAnnualData.map((r) => (
+                                <tr key={r.month} className="hover:bg-slate-50 dark:hover:bg-gray-800/40 transition">
+                                  <td className="py-2.5 font-medium text-slate-700 dark:text-gray-200 capitalize">{fmtMonthLong(r.month)}</td>
+                                  <td className="py-2.5 text-right text-slate-500 dark:text-gray-400">{r.total}</td>
+                                  <td className="py-2.5 text-right"><span className={`font-bold ${ratingColor(r.avgRating)}`}>{r.avgRating.toFixed(1)}</span></td>
+                                  <td className="py-2.5 pl-3"><div className="flex gap-0.5">{stars(r.avgRating)}</div></td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </>
                     )}
                   </div>
+                </>
+              )}
 
-                  {/* Por categoria */}
-                  <div className="card p-5">
-                    <div className="flex items-center gap-2 mb-4">
-                      <Star size={14} className="text-amber-500" />
-                      <h3 className="text-sm font-semibold text-slate-800 dark:text-gray-100">Média por categoria</h3>
+              {/* ── VISÃO MENSAL ── */}
+              {!fbAnnual && !fbLoading && fbData && (
+                <>
+                  {/* Resumo */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="card p-4 text-center">
+                      <div className="text-2xl font-bold text-brand-600 dark:text-brand-400">{fbData.summary.total}</div>
+                      <div className="text-xs text-slate-500 dark:text-gray-400 mt-1">Avaliações no mês</div>
                     </div>
-                    {fbData.byCat.length === 0 ? (
-                      <p className="text-sm text-slate-400 dark:text-gray-500 text-center py-6">Sem dados</p>
-                    ) : (
-                      <div className="divide-y divide-slate-100 dark:divide-gray-700/60">
-                        {fbData.byCat.map((r) => (
-                          <div key={r.categoryId} className="flex items-center gap-3 py-2.5">
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-slate-700 dark:text-gray-200 truncate">{r.category}</p>
-                              <p className="text-xs text-slate-400 dark:text-gray-500">{r.total} avaliação{r.total !== 1 ? "ões" : ""}</p>
-                            </div>
-                            <div className="flex items-center gap-1 shrink-0">
-                              <span className={`text-sm font-bold ${r.avgRating >= 4 ? "text-green-600 dark:text-green-400" : r.avgRating >= 3 ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400"}`}>
-                                {r.avgRating.toFixed(1)}
-                              </span>
-                              <Star size={13} className="fill-amber-400 text-amber-400" />
-                            </div>
-                          </div>
-                        ))}
+                    <div className="card p-4 text-center">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <span className="text-2xl font-bold text-amber-500">{fbData.summary.avgRating.toFixed(1)}</span>
+                        <Star size={18} className="fill-amber-400 text-amber-400" />
                       </div>
-                    )}
+                      <div className="text-xs text-slate-500 dark:text-gray-400 mt-1">Média do mês</div>
+                    </div>
+                    <div className="card p-4 col-span-2">
+                      <div className="text-xs font-semibold text-slate-600 dark:text-gray-300 mb-2">Distribuição</div>
+                      <div className="space-y-1">
+                        {[...fbData.summary.dist].reverse().map(({ star, count }) => {
+                          const pct = fbData.summary.total > 0 ? Math.round((count / fbData.summary.total) * 100) : 0;
+                          return (
+                            <div key={star} className="flex items-center gap-2 text-xs">
+                              <span className="w-5 text-right text-slate-500 dark:text-gray-400 shrink-0">{star}★</span>
+                              <div className="flex-1 h-2 rounded-full bg-slate-100 dark:bg-gray-800 overflow-hidden">
+                                <div className="h-full rounded-full bg-amber-400 transition-all" style={{ width: `${pct}%` }} />
+                              </div>
+                              <span className="w-8 text-slate-500 dark:text-gray-400 shrink-0">{count}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
 
-                </div>
-
-                {/* Por setor — tabela larga */}
-                <div className="card p-5">
-                  <div className="flex items-center gap-2 mb-4">
-                    <Star size={14} className="text-amber-500" />
-                    <h3 className="text-sm font-semibold text-slate-800 dark:text-gray-100">Média por setor solicitante</h3>
-                  </div>
-                  {fbData.byDept.length === 0 ? (
-                    <p className="text-sm text-slate-400 dark:text-gray-500 text-center py-6">Sem dados</p>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b border-slate-100 dark:border-gray-700">
-                            <th className="text-left py-2 text-xs font-semibold text-slate-500 dark:text-gray-400">Setor</th>
-                            <th className="text-right py-2 text-xs font-semibold text-slate-500 dark:text-gray-400 w-28">Avaliações</th>
-                            <th className="text-right py-2 text-xs font-semibold text-slate-500 dark:text-gray-400 w-28">Média</th>
-                            <th className="py-2 w-32 pl-3">Nota</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-50 dark:divide-gray-800">
-                          {fbData.byDept.map((r) => (
-                            <tr key={r.department} className="hover:bg-slate-50 dark:hover:bg-gray-800/40 transition">
-                              <td className="py-2.5 font-medium text-slate-700 dark:text-gray-200 truncate max-w-[180px]">{r.department}</td>
-                              <td className="py-2.5 text-right text-slate-500 dark:text-gray-400">{r.total}</td>
-                              <td className="py-2.5 text-right">
-                                <span className={`font-bold ${r.avgRating >= 4 ? "text-green-600 dark:text-green-400" : r.avgRating >= 3 ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400"}`}>
-                                  {r.avgRating.toFixed(1)}
-                                </span>
-                              </td>
-                              <td className="py-2.5 pl-3">
-                                <div className="flex gap-0.5">
-                                  {[1,2,3,4,5].map((n) => (
-                                    <Star key={n} size={11}
-                                      className={n <= Math.round(r.avgRating) ? "fill-amber-400 text-amber-400" : "text-slate-200 dark:text-gray-700"}
-                                    />
-                                  ))}
+                  {/* Tabelas por técnico e categoria */}
+                  <div className="grid md:grid-cols-2 gap-5">
+                    {[
+                      { title: "Média por técnico",   items: fbData.byTech, keyProp: "technicianId", nameProp: "technician" },
+                      { title: "Média por categoria", items: fbData.byCat,  keyProp: "categoryId",   nameProp: "category" },
+                    ].map(({ title, items, keyProp, nameProp }) => (
+                      <div key={title} className="card p-5">
+                        <div className="flex items-center gap-2 mb-4">
+                          <Star size={14} className="text-amber-500" />
+                          <h3 className="text-sm font-semibold text-slate-800 dark:text-gray-100">{title}</h3>
+                        </div>
+                        {items.length === 0 ? (
+                          <p className="text-sm text-slate-400 dark:text-gray-500 text-center py-6">Sem dados no mês</p>
+                        ) : (
+                          <div className="divide-y divide-slate-100 dark:divide-gray-700/60">
+                            {items.map((r) => (
+                              <div key={r[keyProp]} className="flex items-center gap-3 py-2.5">
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-slate-700 dark:text-gray-200 truncate">{r[nameProp]}</p>
+                                  <p className="text-xs text-slate-400 dark:text-gray-500">{r.total} aval.</p>
                                 </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <span className={`text-sm font-bold ${ratingColor(r.avgRating)}`}>{r.avgRating.toFixed(1)}</span>
+                                  <Star size={13} className="fill-amber-400 text-amber-400" />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
 
-                <div className="flex justify-end">
-                  <button
-                    onClick={loadFeedback}
-                    className="text-xs text-slate-400 dark:text-gray-500 hover:text-brand-600 dark:hover:text-brand-400 transition"
-                  >
-                    Atualizar dados
-                  </button>
-                </div>
-              </>
-            )}
-          </>
-        )}
+                  {/* Por setor */}
+                  <div className="card p-5">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Star size={14} className="text-amber-500" />
+                      <h3 className="text-sm font-semibold text-slate-800 dark:text-gray-100">Média por setor solicitante</h3>
+                    </div>
+                    {fbData.byDept.length === 0 ? (
+                      <p className="text-sm text-slate-400 dark:text-gray-500 text-center py-6">Sem dados no mês</p>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-slate-100 dark:border-gray-700">
+                              <th className="text-left py-2 text-xs font-semibold text-slate-500 dark:text-gray-400">Setor</th>
+                              <th className="text-right py-2 text-xs font-semibold text-slate-500 dark:text-gray-400 w-28">Aval.</th>
+                              <th className="text-right py-2 text-xs font-semibold text-slate-500 dark:text-gray-400 w-24">Média</th>
+                              <th className="py-2 w-28 pl-3">Nota</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-50 dark:divide-gray-800">
+                            {fbData.byDept.map((r) => (
+                              <tr key={r.department} className="hover:bg-slate-50 dark:hover:bg-gray-800/40 transition">
+                                <td className="py-2.5 font-medium text-slate-700 dark:text-gray-200 truncate max-w-[180px]">{r.department}</td>
+                                <td className="py-2.5 text-right text-slate-500 dark:text-gray-400">{r.total}</td>
+                                <td className="py-2.5 text-right"><span className={`font-bold ${ratingColor(r.avgRating)}`}>{r.avgRating.toFixed(1)}</span></td>
+                                <td className="py-2.5 pl-3"><div className="flex gap-0.5">{stars(r.avgRating)}</div></td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </>
+          );
+        })()}
 
       </main>
     </div>
