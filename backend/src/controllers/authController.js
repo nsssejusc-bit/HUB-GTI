@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import { prisma } from "../config/prisma.js";
 import { stripCpf, isValidCpf, maskCpf } from "../utils/cpf.js";
 import { RESET_STATUS } from "../constants/index.js";
+import { setAuthCookie } from "../utils/authCookie.js";
 
 const normalize = (s) => s.trim().toLowerCase().replace(/\s+/g, " ");
 
@@ -36,14 +37,7 @@ export async function login(req, res) {
     { expiresIn }
   );
 
-  // secure=true só quando HTTPS estiver configurado
-  const secure = process.env.COOKIE_SECURE === "true";
-  res.cookie("hd_token", token, {
-    httpOnly: true,
-    secure,
-    sameSite: "strict",
-    maxAge: 8 * 60 * 60 * 1000, // 8h em ms
-  });
+  setAuthCookie(res, token);
 
   res.json({
     user: {

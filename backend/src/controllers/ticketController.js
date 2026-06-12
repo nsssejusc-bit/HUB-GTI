@@ -226,14 +226,18 @@ export async function listTickets(req, res) {
     if (from) where.openedAt.gte = new Date(from);
     if (to)   where.openedAt.lte = new Date(to);
   }
+  // Busca e filtro de role geram ORs independentes — combinados via AND no final
+  const andClauses = [];
   if (search) {
     const q = search.trim();
-    where.OR = [
-      { ticketNumber:        { contains: q } },
-      { requesterName:       { contains: q } },
-      { freeTextDescription: { contains: q } },
-      { department:          { contains: q } },
-    ];
+    andClauses.push({
+      OR: [
+        { ticketNumber:        { contains: q } },
+        { requesterName:       { contains: q } },
+        { freeTextDescription: { contains: q } },
+        { department:          { contains: q } },
+      ],
+    });
   }
 
   // ── Filtros por role ────────────────────────────────────────────────────
@@ -268,9 +272,11 @@ export async function listTickets(req, res) {
     if (techUser?.nucleoResponsavel) {
       orConditions.push({ nucleoResponsavel: techUser.nucleoResponsavel });
     }
-    where.OR = orConditions;
+    andClauses.push({ OR: orConditions });
   }
   // ADMIN vê tudo (sem filtro adicional)
+
+  if (andClauses.length > 0) where.AND = andClauses;
 
   const take        = Math.min(Number(limit) || 200, 200);
   const cursorClause = cursor ? { cursor: { id: Number(cursor) }, skip: 1 } : {};

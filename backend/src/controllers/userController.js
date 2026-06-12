@@ -5,6 +5,7 @@ import { prisma } from "../config/prisma.js";
 import { stripCpf, isValidCpf, maskCpf } from "../utils/cpf.js";
 import { toTitleCase } from "../utils/name.js";
 import { createAuditLog } from "./auditController.js";
+import { setAuthCookie } from "../utils/authCookie.js";
 
 const VALID_PREFIXOS = ["GOVERNO", "TERCEIRIZADO", "ESTAGIARIO"];
 
@@ -253,12 +254,7 @@ export async function changePassword(req, res) {
     process.env.JWT_SECRET,
     { expiresIn }
   );
-  res.cookie("hd_token", newToken, {
-    httpOnly: true,
-    secure: process.env.COOKIE_SECURE === "true",
-    sameSite: "strict",
-    maxAge: 8 * 60 * 60 * 1000,
-  });
+  setAuthCookie(res, newToken);
 
   res.json({ ok: true });
 }

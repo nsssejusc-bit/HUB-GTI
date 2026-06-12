@@ -1,29 +1,30 @@
 import { prisma } from "../config/prisma.js";
 
 async function nextSeq(column) {
-  // Garante que a linha do dia existe (idempotente)
-  await prisma.$executeRaw`
-    INSERT IGNORE INTO DailyCounter (\`date\`, ticketCount, osCount)
-    VALUES (CURDATE(), 0, 0)
-  `;
+  // Statement único e atômico: cria a linha do dia já com seq 1 ou incrementa a existente.
+  // INSERT IGNORE + UPDATE separados causavam deadlock (1213) sob concorrência
+  // (lock S na chave duplicada seguido de lock X na mesma linha).
+  // LAST_INSERT_ID(expr) registra o valor na sessão para leitura logo em seguida —
+  // a transação interativa fixa uma única conexão do pool entre os dois statements,
+  // senão o SELECT poderia ler o valor de outra requisição.
+  return prisma.$transaction(async (tx) => {
+    if (column === "ticket") {
+      await tx.$executeRaw`
+        INSERT INTO DailyCounter (\`date\`, ticketCount, osCount)
+        VALUES (CURDATE(), LAST_INSERT_ID(1), 0)
+        ON DUPLICATE KEY UPDATE ticketCount = LAST_INSERT_ID(ticketCount + 1)
+      `;
+    } else {
+      await tx.$executeRaw`
+        INSERT INTO DailyCounter (\`date\`, ticketCount, osCount)
+        VALUES (CURDATE(), 0, LAST_INSERT_ID(1))
+        ON DUPLICATE KEY UPDATE osCount = LAST_INSERT_ID(osCount + 1)
+      `;
+    }
 
-  // Incremento atômico via LAST_INSERT_ID (MySQL garante valor por conexão)
-  if (column === "ticket") {
-    await prisma.$executeRaw`
-      UPDATE DailyCounter
-      SET ticketCount = LAST_INSERT_ID(ticketCount + 1)
-      WHERE \`date\` = CURDATE()
-    `;
-  } else {
-    await prisma.$executeRaw`
-      UPDATE DailyCounter
-      SET osCount = LAST_INSERT_ID(osCount + 1)
-      WHERE \`date\` = CURDATE()
-    `;
-  }
-
-  const [{ seq }] = await prisma.$queryRaw`SELECT LAST_INSERT_ID() AS seq`;
-  return Number(seq);
+    const [{ seq }] = await tx.$queryRaw`SELECT LAST_INSERT_ID() AS seq`;
+    return Number(seq);
+  });
 }
 
 export const nextTicketSeq = () => nextSeq("ticket");
