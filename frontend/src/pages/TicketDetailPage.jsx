@@ -7,6 +7,7 @@ import { StatusBadge, InfoItem, Alert, Spinner } from "../components/ui";
 import AppHeader from "../components/AppHeader";
 import { formatElapsed, formatRelative, STATUS_LABEL, STATUS_ORDER, statusIndex } from "../lib/statuses";
 import { useServerTick, serverNow } from "../lib/serverTime";
+import { isImageMessage } from "../lib/messages";
 import { ArrowLeft, Clock, CheckCircle2, Circle, ChevronRight, Trash2, AlertTriangle, MonitorSmartphone, Copy, Check as CheckIcon, ClipboardList, Plus, ExternalLink, Shield, ShieldCheck, ShieldX, ThumbsUp, ThumbsDown, UserCheck, X, MessageSquare, ArrowRight, FileText, RotateCcw, Users2, Send, Timer, ImageIcon } from "lucide-react";
 
 const TRANSITION_LABEL = {
@@ -314,8 +315,8 @@ export default function TicketDetailPage() {
 
   const canTransition = ["TECHNICIAN", "ADMIN"].includes(user?.role);
   const isAdmin       = user?.role === "ADMIN";
-  const filteredTechs = form.unitId
-    ? techs.filter((t) => t.unitId === Number(form.unitId) || t.role === "ADMIN")
+  const filteredTechs = form.nucleoResponsavel
+    ? techs.filter((t) => t.nucleoResponsavel === form.nucleoResponsavel || t.role === "ADMIN")
     : techs;
 
   return (
@@ -918,12 +919,12 @@ export default function TicketDetailPage() {
                     </div>
                     <div className={`flex flex-col ${m.fromUser ? "items-start" : "items-end"} max-w-[85%]`}>
                       <div className={`rounded-xl text-sm overflow-hidden ${
-                        m.content.startsWith("data:image/") ? "p-1" :
+                        isImageMessage(m.content) ? "p-1" :
                         m.fromUser
                           ? "bg-slate-100 dark:bg-gray-800 text-slate-800 dark:text-gray-200 px-3 py-2"
                           : "bg-brand-50 dark:bg-brand-900/20 text-brand-900 dark:text-brand-100 px-3 py-2"
                       }`}>
-                        {m.content.startsWith("data:image/")
+                        {isImageMessage(m.content)
                           ? <img src={m.content} alt="imagem" className="max-w-[260px] max-h-64 rounded-lg object-contain cursor-zoom-in" onClick={() => setLightbox(m.content)} />
                           : m.content}
                       </div>
@@ -1084,19 +1085,6 @@ export default function TicketDetailPage() {
                 {ticket.allowedNext.includes("VIEWED") && (
                   <>
                     <div>
-                      <label className="field-label">Unidade</label>
-                      <select
-                        className="field-input"
-                        value={form.unitId}
-                        onChange={(e) => setForm({ ...form, unitId: e.target.value, assignedTechId: "" })}
-                      >
-                        <option value="">Selecione a unidade...</option>
-                        {units.map((u) => (
-                          <option key={u.id} value={u.id}>{u.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
                       <label className="field-label">Técnico responsável</label>
                       <select
                         className="field-input"
@@ -1114,7 +1102,7 @@ export default function TicketDetailPage() {
                       <select
                         className="field-input"
                         value={form.nucleoResponsavel}
-                        onChange={(e) => setForm({ ...form, nucleoResponsavel: e.target.value })}
+                        onChange={(e) => setForm({ ...form, nucleoResponsavel: e.target.value, assignedTechId: "" })}
                       >
                         <option value="">— Não definido</option>
                         <option value="NMT">NMT – Manutenção Técnica</option>
@@ -1217,7 +1205,7 @@ export default function TicketDetailPage() {
                       const needsCauseSol    = next === "COMPLETED" && ticket.requiresCauseSolution !== false;
                       const missingCauseSol  = needsCauseSol && (!form.cause.trim() || !form.solution.trim());
                       const needsAssignment  = next === "VIEWED";
-                      const missingAssignment = needsAssignment && (!form.unitId || !form.assignedTechId);
+                      const missingAssignment = needsAssignment && !form.assignedTechId;
                       return (
                         <div key={next}>
                           <button
@@ -1235,7 +1223,7 @@ export default function TicketDetailPage() {
                           )}
                           {missingAssignment && (
                             <p className="text-[11px] text-slate-500 dark:text-gray-400 text-center mt-1">
-                              Selecione unidade e técnico para visualizar
+                              Selecione o técnico para visualizar
                             </p>
                           )}
                         </div>

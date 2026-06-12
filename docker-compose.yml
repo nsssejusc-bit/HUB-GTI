@@ -53,6 +53,7 @@ services:
     volumes:
       - ./backend:/app
       - helpdesk_backend_modules:/app/node_modules
+      - helpdesk_uploads:/app/uploads
     networks:
       - helpdesk-net
 
@@ -77,3 +78,4 @@ networks:
 volumes:
   helpdesk_mysql_data:
   helpdesk_backend_modules:
+  helpdesk_uploads:

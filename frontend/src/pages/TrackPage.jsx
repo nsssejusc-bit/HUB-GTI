@@ -4,6 +4,7 @@ import { api } from "../lib/api";
 import { STATUS_ORDER, STATUS_LABEL, statusIndex, formatElapsed, formatRelative } from "../lib/statuses";
 import { useServerTick, serverNow } from "../lib/serverTime";
 import { StatusBadge, InfoItem, Spinner } from "../components/ui";
+import { isImageMessage } from "../lib/messages";
 import {
   Home, Clock, CheckCircle2, Circle, Star, MonitorSmartphone, Wifi,
   Shield, ShieldCheck, ShieldX, MessageSquare, Send, UserCheck,
@@ -566,12 +567,12 @@ export default function TrackPage() {
                         </div>
                         <div className={`flex flex-col max-w-[80%] ${m.fromUser ? "items-end" : "items-start"}`}>
                           <div className={`rounded-xl text-sm leading-relaxed overflow-hidden ${
-                            m.content.startsWith("data:image/") ? "p-1" :
+                            isImageMessage(m.content) ? "p-1" :
                             m.fromUser
                               ? "bg-slate-100 dark:bg-gray-800 text-slate-800 dark:text-gray-200 px-3 py-2"
                               : "bg-brand-50 dark:bg-brand-900/20 text-brand-900 dark:text-brand-100 px-3 py-2"
                           }`}>
-                            {m.content.startsWith("data:image/")
+                            {isImageMessage(m.content)
                               ? <img src={m.content} alt="imagem" className="max-w-[220px] max-h-60 rounded-lg object-contain cursor-zoom-in" onClick={() => setLightbox(m.content)} />
                               : m.content}
                           </div>

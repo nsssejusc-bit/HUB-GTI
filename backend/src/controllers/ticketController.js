@@ -4,6 +4,7 @@ import { maskCpf } from "../utils/cpf.js";
 import { buildTicketNumber } from "../utils/ticketNumber.js";
 import { nextTicketSeq } from "../utils/nextSequence.js";
 import { STATUS, canTransition, allowedNext, canReopen } from "../utils/ticketStateMachine.js";
+import { IMG_PREFIX, saveImageFromDataUrl, resolveImagePath, mimeForFilename, deleteTicketImages } from "../utils/messageImages.js";
 
 const VALID_PRIORITIES = ["LOW", "MEDIUM", "HIGH", "URGENT"];
 
@@ -481,10 +482,16 @@ export async function transitionTicket(req, res) {
 
   if (toStatus === STATUS.VIEWED) {
     updateData.viewedAt = now;
-    if (!unitId || !assignedTechId) {
-      return res.status(400).json({ error: "Unidade e técnico são obrigatórios ao visualizar" });
+    if (!assignedTechId) {
+      return res.status(400).json({ error: "Técnico é obrigatório ao visualizar" });
     }
-    updateData.unitId          = Number(unitId);
+    const tech = await prisma.user.findUnique({
+      where: { id: Number(assignedTechId) },
+      select: { unitId: true },
+    });
+    if (!tech) return res.status(400).json({ error: "Técnico inválido" });
+    // Unidade explícita tem precedência; senão herda a do técnico
+    updateData.unitId          = unitId ? Number(unitId) : tech.unitId;
     updateData.assignedTechId  = Number(assignedTechId);
     // auto-preenche ou sobrescreve o núcleo
     if (nucleoResponsavel !== undefined) {
@@ -532,6 +539,7 @@ export async function deleteTicket(req, res) {
   const ticket = await prisma.ticket.findUnique({ where: { id } });
   if (!ticket) return res.status(404).json({ error: "Chamado não encontrado" });
   await prisma.ticket.delete({ where: { id } });
+  await deleteTicketImages(id);
   req.app.get("io")?.emit("ticket:deleted", { id });
   res.json({ ok: true });
 }
@@ -750,6 +758,27 @@ function formatTicket(t) {
 
 // ── MENSAGENS AO SOLICITANTE ──────────────────────────────────────────────────
 
+// Imagens são gravadas em disco (utils/messageImages.js) e o content vira "img:<arquivo>".
+// Na resposta da API, esse marcador é trocado pela URL de download — mensagens
+// antigas em base64 (data:image/...) passam intactas e seguem renderizando no client.
+function withImageUrl(msg, urlBase) {
+  if (!msg.content.startsWith(IMG_PREFIX)) return msg;
+  return { ...msg, content: `${urlBase}/${msg.id}/image` };
+}
+
+// Valida e persiste o conteúdo de uma mensagem; retorna { content } ou { error }
+async function prepareMessageContent(content, ticketId) {
+  if (content.startsWith("data:image/")) {
+    if (content.length > MAX_IMG_B64) {
+      return { error: "Imagem muito grande. Máximo 3 MB." };
+    }
+    const filename = await saveImageFromDataUrl(content, ticketId);
+    if (!filename) return { error: "Imagem inválida. Use PNG, JPEG, GIF ou WebP." };
+    return { content: `${IMG_PREFIX}${filename}` };
+  }
+  return { content: content.trim() };
+}
+
 // GET /tickets/:id/messages — staff
 export async function listMessages(req, res) {
   const id = Number(req.params.id);
@@ -758,7 +787,7 @@ export async function listMessages(req, res) {
     include: { author: { select: { name: true, role: true } } },
     orderBy: { createdAt: "asc" },
   });
-  res.json(msgs);
+  res.json(msgs.map((m) => withImageUrl(m, `/api/tickets/${id}/messages`)));
 }
 
 // POST /tickets/:id/messages — staff envia mensagem ao solicitante
@@ -768,20 +797,51 @@ export async function sendMessage(req, res) {
   const id = Number(req.params.id);
   const { content } = req.body || {};
   if (!content?.trim()) return res.status(400).json({ error: "Mensagem vazia" });
-  if (content.startsWith("data:image/") && content.length > MAX_IMG_B64) {
-    return res.status(400).json({ error: "Imagem muito grande. Máximo 3 MB." });
-  }
 
   const ticket = await prisma.ticket.findUnique({ where: { id }, select: { id: true } });
   if (!ticket) return res.status(404).json({ error: "Chamado não encontrado" });
 
+  const prepared = await prepareMessageContent(content, id);
+  if (prepared.error) return res.status(400).json({ error: prepared.error });
+
   const msg = await prisma.ticketMessage.create({
-    data: { ticketId: id, authorId: req.user.id, fromUser: false, content: content.trim() },
+    data: { ticketId: id, authorId: req.user.id, fromUser: false, content: prepared.content },
     include: { author: { select: { name: true, role: true } } },
   });
 
   req.app.get("io")?.emit("ticket:message", { ticketId: id });
-  res.status(201).json(msg);
+  res.status(201).json(withImageUrl(msg, `/api/tickets/${id}/messages`));
+}
+
+// GET /tickets/:id/messages/:msgId/image — staff
+export async function getMessageImage(req, res) {
+  return serveMessageImage(res, Number(req.params.id), Number(req.params.msgId));
+}
+
+// GET /tickets/track/:ticketNumber/messages/:msgId/image — público
+export async function getMessageImagePublic(req, res) {
+  const ticket = await prisma.ticket.findUnique({
+    where: { ticketNumber: req.params.ticketNumber },
+    select: { id: true },
+  });
+  if (!ticket) return res.status(404).json({ error: "Chamado não encontrado" });
+  return serveMessageImage(res, ticket.id, Number(req.params.msgId));
+}
+
+async function serveMessageImage(res, ticketId, msgId) {
+  const msg = await prisma.ticketMessage.findUnique({ where: { id: msgId } });
+  if (!msg || msg.ticketId !== ticketId || !msg.content.startsWith(IMG_PREFIX)) {
+    return res.status(404).json({ error: "Imagem não encontrada" });
+  }
+  const filename = msg.content.slice(IMG_PREFIX.length);
+  const filePath = resolveImagePath(ticketId, filename);
+  if (!filePath) return res.status(404).json({ error: "Imagem não encontrada" });
+
+  res.setHeader("Content-Type", mimeForFilename(filename));
+  res.setHeader("Cache-Control", "private, max-age=86400");
+  res.sendFile(filePath, (err) => {
+    if (err && !res.headersSent) res.status(404).json({ error: "Imagem não encontrada" });
+  });
 }
 
 // GET /tickets/track/:ticketNumber/messages — público
@@ -801,7 +861,7 @@ export async function listMessagesPublic(req, res) {
     },
     orderBy: { createdAt: "asc" },
   });
-  res.json(msgs);
+  res.json(msgs.map((m) => withImageUrl(m, `/api/tickets/track/${ticketNumber}/messages`)));
 }
 
 // Subcategorias que permitem o solicitante enviar a primeira mensagem
@@ -812,9 +872,6 @@ export async function sendMessagePublic(req, res) {
   const { ticketNumber } = req.params;
   const { content } = req.body || {};
   if (!content?.trim()) return res.status(400).json({ error: "Mensagem vazia" });
-  if (content.startsWith("data:image/") && content.length > MAX_IMG_B64) {
-    return res.status(400).json({ error: "Imagem muito grande. Máximo 3 MB." });
-  }
 
   const ticket = await prisma.ticket.findUnique({
     where: { ticketNumber },
@@ -834,10 +891,13 @@ export async function sendMessagePublic(req, res) {
     }
   }
 
+  const prepared = await prepareMessageContent(content, ticket.id);
+  if (prepared.error) return res.status(400).json({ error: prepared.error });
+
   const msg = await prisma.ticketMessage.create({
-    data: { ticketId: ticket.id, fromUser: true, content: content.trim() },
+    data: { ticketId: ticket.id, fromUser: true, content: prepared.content },
   });
 
   req.app.get("io")?.emit("ticket:message", { ticketId: ticket.id });
-  res.status(201).json(msg);
+  res.status(201).json(withImageUrl(msg, `/api/tickets/track/${ticketNumber}/messages`));
 }

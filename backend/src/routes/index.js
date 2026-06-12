@@ -10,6 +10,7 @@ import {
   transitionTicket, approveTicket, deleteTicket, submitFeedback,
   reopenTicket, assignTicket, listComments, addComment, submitFeedbackAuth,
   listMessages, sendMessage, listMessagesPublic, sendMessagePublic,
+  getMessageImage, getMessageImagePublic,
 } from "../controllers/ticketController.js";
 import {
   listCategories, listUnits, listTechnicians, getPublicConfig,
@@ -107,6 +108,7 @@ router.get("/tickets/track/:ticketNumber",                  publicTicketLimiter,
 router.post("/tickets/track/:ticketNumber/feedback",        publicTicketLimiter, submitFeedback);
 router.get("/tickets/track/:ticketNumber/messages",         publicTicketLimiter, listMessagesPublic);
 router.post("/tickets/track/:ticketNumber/messages",        publicTicketLimiter, sendMessagePublic);
+router.get("/tickets/track/:ticketNumber/messages/:msgId/image", publicTicketLimiter, getMessageImagePublic);
 
 // ── Autenticação ──────────────────────────────────────────────────────────────
 router.post("/auth/login",           authLimiter, login);
@@ -146,6 +148,7 @@ router.patch("/tickets/:id/assign",    authRequired, requireRole("TECHNICIAN", "
 router.get("/tickets/:id/comments",   authRequired, listComments);
 router.post("/tickets/:id/comments",  authRequired, addComment);
 router.get("/tickets/:id/messages",   authRequired, requireRole("TECHNICIAN", "ADMIN"), listMessages);
+router.get("/tickets/:id/messages/:msgId/image", authRequired, requireRole("TECHNICIAN", "ADMIN"), getMessageImage);
 router.post("/tickets/:id/messages",  authRequired, requireRole("TECHNICIAN", "ADMIN"), sendMessage);
 router.post("/tickets/:id/feedback",  authRequired, submitFeedbackAuth);
 router.delete("/tickets/:id", authRequired, requireRole("ADMIN"), deleteTicket);

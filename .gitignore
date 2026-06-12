@@ -12,3 +12,6 @@ build/
 # Prisma
 backend/prisma/*.db
 backend/prisma/*.db-journal
+
+# Uploads de imagens das mensagens (dev local sem volume Docker)
+backend/uploads/
