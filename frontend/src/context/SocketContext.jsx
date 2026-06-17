@@ -13,7 +13,7 @@ const NOTIFY_ROLES = ["TECHNICIAN", "ADMIN"];
 const BASE_TITLE = document.title || "HelpDesk";
 
 export function SocketProvider({ children }) {
-  const { user }    = useAuth();
+  const { user, refreshUser } = useAuth();
   const socketRef   = useRef(null);
   const userRef     = useRef(user);       // evita closure stale no handler do socket
   const [connected, setConnected] = useState(false);
@@ -96,6 +96,12 @@ export function SocketProvider({ children }) {
           window.focus();
           notif.close();
         };
+      }
+    });
+
+    socket.on("user:updated", (data) => {
+      if (data.id === userRef.current?.id) {
+        refreshUser();
       }
     });
 

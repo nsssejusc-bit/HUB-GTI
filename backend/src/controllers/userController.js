@@ -159,6 +159,19 @@ export async function updateUser(req, res) {
     },
   });
 
+  // Notifica via Socket.io para que a sessão do usuário afetado atualize imediatamente
+  if (data.role !== undefined || data.active !== undefined || data.nucleoResponsavel !== undefined) {
+    const io = req.app.get("io");
+    if (io) {
+      io.emit("user:updated", {
+        id: updated.id,
+        role: updated.role,
+        active: updated.active,
+        nucleoResponsavel: updated.nucleoResponsavel,
+      });
+    }
+  }
+
   const changedFields = Object.keys(data).join(", ");
   await createAuditLog(prisma, {
     actorId: req.user.id, actorName: req.user.name,
