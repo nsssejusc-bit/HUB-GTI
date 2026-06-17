@@ -40,6 +40,7 @@ const ACTIVE_STATUSES = ["OPEN", "VIEWED", "EN_ROUTE", "IN_SERVICE"];
 const FILTER_TABS = [
   { key: "active",    label: "Ativos" },
   { key: "completed", label: "Concluídos" },
+  { key: "cancelled", label: "Cancelados" },
   { key: "all",       label: "Todos" },
 ];
 
@@ -325,7 +326,7 @@ export default function DashboardPage() {
   const [histHasMore, setHistHasMore] = useState(false);
   const [loading, setLoading]         = useState(true);
   const [histLoading, setHistLoading] = useState(false);
-  const VALID_TABS = ["active", "completed", "all", "history"];
+  const VALID_TABS = ["active", "completed", "cancelled", "all", "history"];
   const [filter, setFilter]           = useState(() => {
     const tab = searchParams.get("tab");
     return VALID_TABS.includes(tab) ? tab : "active";
@@ -361,7 +362,7 @@ export default function DashboardPage() {
         api.get("/tickets", { params: completedParams }),
       ]);
 
-      const activeTickets    = activeRes.data.tickets.filter((t) => ACTIVE_STATUSES.includes(t.status));
+      const activeTickets    = activeRes.data.tickets.filter((t) => ACTIVE_STATUSES.includes(t.status) || t.status === "CANCELADO");
       const completedTickets = completedRes.data.tickets;
 
       setTickets([...activeTickets, ...completedTickets]);
@@ -471,6 +472,7 @@ export default function DashboardPage() {
   }, [tickets, categoryFilter, deptFilter, dateFilter, priorityFilter]);
   const active    = useMemo(() => kpiBase.filter((t) => ACTIVE_STATUSES.includes(t.status)), [kpiBase]);
   const completed = useMemo(() => kpiBase.filter((t) => t.status === "COMPLETED"), [kpiBase]);
+  const cancelled = useMemo(() => kpiBase.filter((t) => t.status === "CANCELADO"), [kpiBase]);
   const noUnit    = useMemo(() => kpiBase.filter((t) => ACTIVE_STATUSES.includes(t.status) && !t.unit), [kpiBase]);
   const todayTotal = useMemo(() => {
     const start = new Date(); start.setHours(0, 0, 0, 0);
@@ -482,6 +484,7 @@ export default function DashboardPage() {
   const visible = useMemo(() => {
     let result = filter === "active"    ? active
                : filter === "completed" ? completed
+               : filter === "cancelled" ? cancelled
                : filter === "history"   ? history
                : tickets;
     if (categoryFilter && filter !== "history") result = result.filter((t) => String(t.category?.id) === categoryFilter);

@@ -278,6 +278,8 @@ export async function listTickets(req, res) {
     const orConditions = [
       { assignedTechId: req.user.id },
       { unitId: techUser?.unitId || -1 },
+      // Cancelados por rejeição do chefe não têm atribuição — visíveis para todos os técnicos
+      { status: STATUS.CANCELADO },
     ];
     // Técnico com núcleo definido vê todos os chamados do seu núcleo
     if (techUser?.nucleoResponsavel) {
