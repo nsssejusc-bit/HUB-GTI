@@ -147,13 +147,24 @@ export async function createTicket(req, res) {
   const ticketNumber = buildTicketNumber(seq);
   const ticket       = await prisma.ticket.create({ data: { ticketNumber, ...ticketPayload } });
 
-  req.app.get("io")?.emit("ticket:created", {
+  const io = req.app.get("io");
+  io?.emit("ticket:created", {
     ticketNumber:      ticket.ticketNumber,
     department:        ticket.department,
     category:          category.name,
     subcategory:       selectedSub?.name ?? null,
     nucleoResponsavel: ticket.nucleoResponsavel ?? null,
   });
+
+  if (requiresApproval) {
+    io?.emit("ticket:approval-needed", {
+      ticketNumber: ticket.ticketNumber,
+      department:   ticket.department,
+      departmentId: ticket.departmentId,
+      category:     category.name,
+      subcategory:  selectedSub?.name ?? null,
+    });
+  }
 
   res.status(201).json({
     ticketNumber: ticket.ticketNumber,

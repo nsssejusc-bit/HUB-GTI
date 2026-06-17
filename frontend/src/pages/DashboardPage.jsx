@@ -64,7 +64,7 @@ const CAT_CHIP = {
 // ── View simplificada para Chefe de Setor ────────────────────────────────────
 function ChefeDashboard() {
   const { user } = useAuth();
-  useServerTick(60000);
+  const socketRef = useSocket();
   const [tickets,    setTickets]    = useState([]);
   const [loading,    setLoading]    = useState(true);
   const [rejectId,   setRejectId]   = useState(null); // id do ticket em rejeição
@@ -75,14 +75,26 @@ function ChefeDashboard() {
   async function load() {
     setLoading(true);
     try {
-      const deptId = user.department?.id;
-      const { data } = await api.get("/tickets", deptId ? { params: { pendingForDept: deptId } } : undefined);
+      const { data } = await api.get("/tickets");
       setTickets(data.tickets ?? data);
     } catch {}
     finally { setLoading(false); }
   }
 
-  useEffect(() => { load(); }, []);
+  // Carga inicial + auto-refresh a cada 60s
+  useEffect(() => {
+    load();
+    const timer = setInterval(load, 60_000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Atualiza imediatamente ao receber evento de aprovação pendente
+  useEffect(() => {
+    const s = socketRef?.current;
+    if (!s) return;
+    s.on("ticket:approval-needed", load);
+    return () => { s.off("ticket:approval-needed", load); };
+  }, [socketRef?.current]);
 
   async function decide(ticketId, status, note) {
     setActing(true);

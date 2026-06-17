@@ -8,6 +8,7 @@ const UnreadCtx     = createContext(0);
 
 // Roles que recebem notificações de novos chamados
 const NOTIFY_ROLES = ["TECHNICIAN", "ADMIN"];
+const APPROVAL_ROLES = ["CHEFE_SETOR"];
 
 // Título base da aba (sem badge de não lidos)
 const BASE_TITLE = document.title || "HelpDesk";
@@ -22,9 +23,9 @@ export function SocketProvider({ children }) {
   // Mantém userRef sempre atualizado sem recriar o socket
   useEffect(() => { userRef.current = user; }, [user]);
 
-  // Pede permissão de notificação assim que um técnico/admin faz login
+  // Pede permissão de notificação para técnicos, admins e chefes de setor
   useEffect(() => {
-    if (user && NOTIFY_ROLES.includes(user.role)) {
+    if (user && (NOTIFY_ROLES.includes(user.role) || APPROVAL_ROLES.includes(user.role))) {
       if (typeof Notification !== "undefined" && Notification.permission === "default") {
         Notification.requestPermission();
       }
@@ -102,6 +103,28 @@ export function SocketProvider({ children }) {
     socket.on("user:updated", (data) => {
       if (data.id === userRef.current?.id) {
         refreshUser();
+      }
+    });
+
+    socket.on("ticket:approval-needed", (data) => {
+      const u = userRef.current;
+      if (!u || !APPROVAL_ROLES.includes(u.role)) return;
+
+      // Filtra por departamento — chefe só recebe notificação do próprio setor
+      if (u.department?.id && data.departmentId && u.department.id !== data.departmentId) return;
+
+      if (!document.hasFocus()) {
+        setUnread((n) => n + 1);
+      }
+
+      if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+        const body = [data.department, data.category, data.subcategory].filter(Boolean).join(" · ");
+        const notif = new Notification(`Aprovação necessária — ${data.ticketNumber}`, {
+          body,
+          icon: "/favicon.ico",
+          tag: `approval-${data.ticketNumber}`,
+        });
+        notif.onclick = () => { window.focus(); notif.close(); };
       }
     });
 
