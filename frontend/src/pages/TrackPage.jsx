@@ -17,6 +17,7 @@ const STATUS_DESC = {
   EN_ROUTE:   "Técnico a caminho do seu departamento",
   IN_SERVICE: "Atendimento em andamento",
   COMPLETED:  "Problema resolvido",
+  CANCELADO:  "Chamado cancelado pelo Chefe de Setor",
 };
 
 const PRIORITY_LABEL = { LOW: "Baixa", MEDIUM: "Média", HIGH: "Alta", URGENT: "Urgente" };
@@ -57,7 +58,7 @@ export default function TrackPage() {
   const COUNTER_SUBCATEGORY_CODES = ["PRINTER_NO_PAPER", "PRINTER_TONER"];
   const isCounterTicket = COUNTER_SUBCATEGORY_CODES.includes(ticket?.subcategoryCode);
   const techMessages = messages.filter((m) => !m.fromUser);
-  const canReply = isCounterTicket || techMessages.length > 0;
+  const canReply = ticket?.status !== "CANCELADO" && (isCounterTicket || techMessages.length > 0);
 
   useEffect(() => {
     api.get("/config").then((r) => setConfig(r.data));

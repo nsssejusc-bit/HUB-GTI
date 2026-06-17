@@ -1,4 +1,4 @@
-export const STATUS_ORDER = ["OPEN", "VIEWED", "EN_ROUTE", "IN_SERVICE", "COMPLETED"];
+export const STATUS_ORDER = ["OPEN", "VIEWED", "EN_ROUTE", "IN_SERVICE", "COMPLETED", "CANCELADO"];
 
 export const STATUS_LABEL = {
   OPEN: "Aberto",
@@ -6,6 +6,7 @@ export const STATUS_LABEL = {
   EN_ROUTE: "Técnico a caminho",
   IN_SERVICE: "Em atendimento",
   COMPLETED: "Concluído",
+  CANCELADO: "Cancelado",
 };
 
 export function statusIndex(s) {

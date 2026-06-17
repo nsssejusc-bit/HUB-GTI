@@ -438,9 +438,29 @@ export async function approveTicket(req, res) {
     newApprovalStatus = "PENDING"; // ainda há pendências (dual approval)
   }
 
+  const ticketPatch = { approvalStatus: newApprovalStatus };
+
+  // Rejeição fecha o chamado imediatamente com o motivo registrado
+  if (newApprovalStatus === "REJECTED") {
+    ticketPatch.status          = STATUS.CANCELADO;
+    ticketPatch.completionNote  = note?.trim() || "Recusado pelo Chefe de Setor";
+  }
+
   await prisma.ticket.update({
     where: { id },
-    data: { approvalStatus: newApprovalStatus },
+    data: {
+      ...ticketPatch,
+      ...(newApprovalStatus === "REJECTED" && {
+        history: {
+          create: {
+            fromStatus:   ticket.status,
+            toStatus:     STATUS.CANCELADO,
+            actorId:      req.user.id,
+            internalNote: ticketPatch.completionNote,
+          },
+        },
+      }),
+    },
   });
 
   req.app.get("io")?.emit("ticket:approval", {

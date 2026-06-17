@@ -4,6 +4,7 @@ export const STATUS = {
   EN_ROUTE: "EN_ROUTE",
   IN_SERVICE: "IN_SERVICE",
   COMPLETED: "COMPLETED",
+  CANCELADO: "CANCELADO",
 };
 
 export const STATUS_LABEL_PT = {
@@ -12,6 +13,7 @@ export const STATUS_LABEL_PT = {
   EN_ROUTE: "Técnico a caminho",
   IN_SERVICE: "Em atendimento",
   COMPLETED: "Concluído",
+  CANCELADO: "Cancelado",
 };
 
 const TRANSITIONS = {
@@ -20,6 +22,7 @@ const TRANSITIONS = {
   EN_ROUTE: ["IN_SERVICE"],
   IN_SERVICE: ["COMPLETED"],
   COMPLETED: [],
+  CANCELADO: [],
 };
 
 // Reabrir é uma transição especial — não aparece em allowedNext (para técnicos)

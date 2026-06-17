@@ -12,6 +12,7 @@ const BADGE_STYLES = {
   EN_ROUTE:   "bg-amber-50   text-amber-700  ring-amber-200  dark:bg-amber-900/40 dark:text-amber-300 dark:ring-amber-700",
   IN_SERVICE: "bg-violet-50  text-violet-700 ring-violet-200 dark:bg-violet-900/40 dark:text-violet-300 dark:ring-violet-700",
   COMPLETED:  "bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-300 dark:ring-emerald-700",
+  CANCELADO:  "bg-red-50 text-red-700 ring-red-200 dark:bg-red-900/40 dark:text-red-300 dark:ring-red-700",
 };
 
 export const STATUS_LABEL = {
@@ -20,6 +21,7 @@ export const STATUS_LABEL = {
   EN_ROUTE:   "Técnico a caminho",
   IN_SERVICE: "Em atendimento",
   COMPLETED:  "Concluído",
+  CANCELADO:  "Cancelado",
 };
 
 export function StatusBadge({ status }) {

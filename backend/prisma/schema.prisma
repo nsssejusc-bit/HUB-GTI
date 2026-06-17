@@ -26,6 +26,7 @@ enum TicketStatus {
   EN_ROUTE
   IN_SERVICE
   COMPLETED
+  CANCELADO
 }
 
 enum ApprovalStatus {

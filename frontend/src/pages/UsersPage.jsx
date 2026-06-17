@@ -140,19 +140,21 @@ export default function UsersPage() {
   }
 
   // ── Agrupamentos de tabs ─────────────────────────────────────────────────
-  const active    = users.filter((u) => u.active);
-  const chefes    = active.filter((u) => u.role === "CHEFE_SETOR" || u.isChefe);
-  const usuarios  = active.filter((u) => u.role === "USER");
-  const tecnicos  = active.filter((u) => u.role === "TECHNICIAN");
-  const admins    = active.filter((u) => u.role === "ADMIN");
+  const active      = users.filter((u) => u.active);
+  const inactive    = users.filter((u) => !u.active);
+  const chefes      = active.filter((u) => u.role === "CHEFE_SETOR" || u.isChefe);
+  const usuarios    = active.filter((u) => u.role === "USER");
+  const tecnicos    = active.filter((u) => u.role === "TECHNICIAN");
+  const admins      = active.filter((u) => u.role === "ADMIN");
 
-  const tabData = { all: active, usuarios, tecnicos, admins, chefes };
+  const tabData = { all: active, usuarios, tecnicos, admins, chefes, inativos: inactive };
   const tabs = [
-    { key: "all",      label: "Todos",          count: active.length   },
-    { key: "usuarios", label: "Usuários",        count: usuarios.length },
-    { key: "tecnicos", label: "Técnicos",        count: tecnicos.length },
-    { key: "chefes",   label: "Chefes de Setor", count: chefes.length   },
-    { key: "admins",   label: "Admins",          count: admins.length   },
+    { key: "all",      label: "Todos",           count: active.length   },
+    { key: "usuarios", label: "Usuários",         count: usuarios.length },
+    { key: "tecnicos", label: "Técnicos",         count: tecnicos.length },
+    { key: "chefes",   label: "Chefes de Setor",  count: chefes.length   },
+    { key: "admins",   label: "Admins",            count: admins.length   },
+    { key: "inativos", label: "Desativados",       count: inactive.length, alert: true },
   ];
 
   const displayList = tabData[tab] ?? active;
