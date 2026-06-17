@@ -11,7 +11,7 @@ import {
   BookOpen, X, AlertTriangle,
 } from "lucide-react";
 
-const STAFF_ROLES = ["TECHNICIAN", "ADMIN"];
+const STAFF_ROLES = ["TECHNICIAN", "ADMIN", "CHEFE_SETOR"];
 
 export default function HomePage() {
   const nav = useNavigate();
