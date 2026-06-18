@@ -91,7 +91,7 @@ export default function TeamPage() {
       </div>
 
       {/* ── Cards ── */}
-      <div className="flex-1 px-4 py-10">
+      <div className="flex-1 px-4 py-10 pb-16">
         <p className="text-center text-xs font-semibold text-slate-400 dark:text-gray-500 uppercase tracking-widest mb-8">
           Equipe
         </p>
@@ -132,7 +132,7 @@ export default function TeamPage() {
       </div>
 
       {/* ── Rodapé ── */}
-      <p className="text-center text-xs text-slate-300 dark:text-gray-700 pb-8">
+      <p className="text-center text-xs text-slate-300 dark:text-gray-700 pb-20">
         © {new Date().getFullYear()} GTI · SEJUSC — Todos os direitos reservados
       </p>
     </div>

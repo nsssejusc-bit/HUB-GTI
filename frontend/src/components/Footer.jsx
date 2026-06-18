@@ -11,7 +11,7 @@ export default function Footer() {
         className="inline-flex items-center gap-1.5 text-xs text-slate-400 dark:text-gray-500 hover:text-brand-600 dark:hover:text-brand-400 transition-colors"
       >
         <Code2 size={13} />
-        Desenvolvido pelo GTI · SEJUSC
+        Desenvolvido pela Gerência de Tecnologia da Informação - GTI · SEJUSC
       </button>
     </footer>
   );
