@@ -315,9 +315,7 @@ export default function TicketDetailPage() {
 
   const canTransition = ["TECHNICIAN", "ADMIN"].includes(user?.role);
   const isAdmin       = user?.role === "ADMIN";
-  const filteredTechs = form.nucleoResponsavel
-    ? techs.filter((t) => t.nucleoResponsavel === form.nucleoResponsavel || t.role === "ADMIN")
-    : techs;
+  const filteredTechs = techs;
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-gray-950">
