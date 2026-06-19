@@ -79,7 +79,7 @@ export default function ForgotPasswordPage() {
         {step === 1 ? (
           <form onSubmit={submit} className="card p-6 space-y-4">
             <p className="text-sm text-slate-600 dark:text-gray-300">
-              Preencha os dados abaixo. O suporte entrará em contato pelo telefone informado com a nova senha.
+              Preencha os dados abaixo. O suporte irá verificar as informações e sua senha será resetada.
             </p>
 
             <div>

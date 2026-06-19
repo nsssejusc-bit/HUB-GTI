@@ -100,7 +100,7 @@ export async function listUsers(req, res) {
 // PATCH /api/users/:id — atualiza usuário (ADMIN only)
 export async function updateUser(req, res) {
   const id = Number(req.params.id);
-  const { active, unitId, role, name, isChefe, email, telefone, matricula, prefixo, nucleoResponsavel } = req.body || {};
+  const { active, unitId, departmentId, role, name, isChefe, email, telefone, matricula, prefixo, nucleoResponsavel } = req.body || {};
 
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) return res.status(404).json({ error: "Usuário não encontrado" });
@@ -112,6 +112,13 @@ export async function updateUser(req, res) {
   const data = {};
   if (active !== undefined) data.active = active;
   if (unitId !== undefined) data.unitId = unitId ? Number(unitId) : null;
+  if (departmentId !== undefined) {
+    if (departmentId) {
+      const dept = await prisma.department.findUnique({ where: { id: Number(departmentId) } });
+      if (!dept || !dept.active) return res.status(400).json({ error: "Setor inválido ou inativo" });
+    }
+    data.departmentId = departmentId ? Number(departmentId) : null;
+  }
   if (isChefe !== undefined) data.isChefe = Boolean(isChefe);
   if (email !== undefined) data.email = email || null;
   if (telefone !== undefined) data.telefone = telefone || null;

@@ -50,6 +50,7 @@ export default function UsersPage() {
   const [searchParams] = useSearchParams();
   const [users,          setUsers]          = useState([]);
   const [units,          setUnits]          = useState([]);
+  const [departments,    setDepartments]    = useState([]);
   const [loading,        setLoading]        = useState(true);
   const [err,            setErr]            = useState("");
   const [tab,            setTab]            = useState(searchParams.get("tab") || "all");
@@ -63,6 +64,7 @@ export default function UsersPage() {
   useEffect(() => {
     load();
     api.get("/units").then((r) => setUnits(r.data)).catch(() => {});
+    api.get("/departments").then((r) => setDepartments(r.data)).catch(() => {});
     loadResetRequests();
   }, []);
 
@@ -349,6 +351,7 @@ export default function UsersPage() {
               <UserDetailPanel
                 user={users.find((u) => u.id === selectedUser.id) ?? selectedUser}
                 units={units}
+                departments={departments}
                 me={me}
                 onUpdate={update}
                 onDelete={() => setConfirmDelete(selectedUser)}
@@ -416,7 +419,7 @@ function UserRow({ user, isSelected, onClick }) {
 }
 
 // ── Painel lateral de detalhes ───────────────────────────────────────────────
-function UserDetailPanel({ user, units, me, onUpdate, onDelete, onGrantAdmin, onRevokeAdmin, onResetPassword, onClose }) {
+function UserDetailPanel({ user, units, departments, me, onUpdate, onDelete, onGrantAdmin, onRevokeAdmin, onResetPassword, onClose }) {
   const [editing, setEditing] = useState(false);
   const [saving,  setSaving]  = useState(false);
 
@@ -427,6 +430,7 @@ function UserDetailPanel({ user, units, me, onUpdate, onDelete, onGrantAdmin, on
   const [telefone,         setTelefone]         = useState(user.telefone ?? "");
   const [prefixo,          setPrefixo]          = useState(user.prefixo ?? "");
   const [unitId,           setUnitId]           = useState(user.unit?.id ?? "");
+  const [departmentId,     setDepartmentId]     = useState(user.department?.id ?? "");
   const [isChefe,          setIsChefe]          = useState(user.isChefe ?? false);
   const [nucleoResponsavel, setNucleoResponsavel] = useState(user.nucleoResponsavel ?? "");
 
@@ -438,6 +442,7 @@ function UserDetailPanel({ user, units, me, onUpdate, onDelete, onGrantAdmin, on
     setTelefone(user.telefone ?? "");
     setPrefixo(user.prefixo ?? "");
     setUnitId(user.unit?.id ?? "");
+    setDepartmentId(user.department?.id ?? "");
     setIsChefe(user.isChefe ?? false);
     setNucleoResponsavel(user.nucleoResponsavel ?? "");
     setEditing(false);
@@ -452,6 +457,7 @@ function UserDetailPanel({ user, units, me, onUpdate, onDelete, onGrantAdmin, on
       telefone: telefone.replace(/\D/g, "") || null,
       prefixo: prefixo || null,
       unitId: unitId || null,
+      departmentId: departmentId || null,
       isChefe,
       nucleoResponsavel: nucleoResponsavel || null,
     });
@@ -472,7 +478,7 @@ function UserDetailPanel({ user, units, me, onUpdate, onDelete, onGrantAdmin, on
                  : "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400";
 
   return (
-    <div className="w-full md:w-96 shrink-0 card overflow-hidden">
+    <div className="w-full md:w-96 shrink-0 card overflow-hidden sticky top-20 self-start">
       {/* Header do painel */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-gray-700">
         <h2 className="text-sm font-semibold text-slate-800 dark:text-gray-200">Detalhes do usuário</h2>
@@ -579,6 +585,13 @@ function UserDetailPanel({ user, units, me, onUpdate, onDelete, onGrantAdmin, on
                 <option value="GOVERNO">Servidor do Governo</option>
                 <option value="TERCEIRIZADO">Terceirizado</option>
                 <option value="ESTAGIARIO">Estagiário</option>
+              </select>
+            </div>
+            <div>
+              <label className="field-label text-xs">Setor</label>
+              <select className="field-input w-full text-sm" value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}>
+                <option value="">Sem setor</option>
+                {departments.filter((d) => d.active).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
               </select>
             </div>
             <div>
