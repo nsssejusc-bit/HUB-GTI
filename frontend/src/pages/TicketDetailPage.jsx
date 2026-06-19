@@ -1087,11 +1087,32 @@ export default function TicketDetailPage() {
                       <select
                         className="field-input"
                         value={form.assignedTechId}
-                        onChange={(e) => setForm({ ...form, assignedTechId: e.target.value })}
+                        onChange={(e) => {
+                          const techId = e.target.value;
+                          const selectedTech = techs.find((t) => String(t.id) === techId);
+                          setForm({
+                            ...form,
+                            assignedTechId: techId,
+                            unitId: selectedTech?.unitId ? String(selectedTech.unitId) : form.unitId,
+                          });
+                        }}
                       >
                         <option value="">Selecione o técnico...</option>
                         {filteredTechs.map((t) => (
-                          <option key={t.id} value={t.id}>{t.name}</option>
+                          <option key={t.id} value={t.id}>{t.name}{t.unit ? ` (${t.unit.name})` : ""}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="field-label">Unidade responsável</label>
+                      <select
+                        className="field-input"
+                        value={form.unitId}
+                        onChange={(e) => setForm({ ...form, unitId: e.target.value })}
+                      >
+                        <option value="">— Sem unidade</option>
+                        {units.map((u) => (
+                          <option key={u.id} value={u.id}>{u.name}</option>
                         ))}
                       </select>
                     </div>

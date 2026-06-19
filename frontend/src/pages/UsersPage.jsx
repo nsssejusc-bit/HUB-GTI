@@ -591,7 +591,7 @@ function UserDetailPanel({ user, units, departments, me, onUpdate, onDelete, onG
               <label className="field-label text-xs">Setor</label>
               <select className="field-input w-full text-sm" value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}>
                 <option value="">Sem setor</option>
-                {departments.filter((d) => d.active).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
               </select>
             </div>
             <div>
