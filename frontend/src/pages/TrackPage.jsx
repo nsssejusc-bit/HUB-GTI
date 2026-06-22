@@ -54,6 +54,7 @@ export default function TrackPage() {
   const imgInputRef      = useRef(null);
   const msgEndRef        = useRef(null);
   const prevMsgCountRef  = useRef(0);
+  const scrollFlagRef    = useRef(true);
 
   const COUNTER_SUBCATEGORY_CODES = ["PRINTER_NO_PAPER", "PRINTER_TONER"];
   const isCounterTicket = COUNTER_SUBCATEGORY_CODES.includes(ticket?.subcategoryCode);
@@ -69,8 +70,10 @@ export default function TrackPage() {
     return () => { clearInterval(t); clearInterval(tm); };
   }, [ticketNumber]);
 
-  // Auto-scroll ao receber novas mensagens
+  // Rola para o fim apenas quando há mensagens novas (não em cada poll)
   useEffect(() => {
+    if (!scrollFlagRef.current) return;
+    scrollFlagRef.current = false;
     msgEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
@@ -86,14 +89,16 @@ export default function TrackPage() {
   async function loadMessages() {
     try {
       const { data } = await api.get(`/tickets/track/${ticketNumber}/messages`);
+      const prevCount = prevMsgCountRef.current;
+      prevMsgCountRef.current = data.length;
       setMessages(data);
       setLastUpdated(new Date());
       // Detecta nova mensagem do técnico chegando durante poll
-      if (data.length > prevMsgCountRef.current && prevMsgCountRef.current > 0) {
+      if (data.length > prevCount && prevCount > 0) {
+        scrollFlagRef.current = true;
         setHasNewMsg(true);
         setTimeout(() => setHasNewMsg(false), 5000);
       }
-      prevMsgCountRef.current = data.length;
     } catch (_) {}
   }
 
@@ -109,6 +114,7 @@ export default function TrackPage() {
     setReplyErr("");
     try {
       const { data } = await api.post(`/tickets/track/${ticketNumber}/messages`, { content: replyText });
+      scrollFlagRef.current = true;
       setMessages((prev) => [...prev, data]);
       setReplyText("");
     } catch (e) {
@@ -132,6 +138,7 @@ export default function TrackPage() {
           setReplySending(true); setReplyErr("");
           try {
             const { data } = await api.post(`/tickets/track/${ticketNumber}/messages`, { content: ev.target.result });
+            scrollFlagRef.current = true;
             setMessages((prev) => [...prev, data]);
           } catch (err) {
             setReplyErr(err.response?.data?.error || "Erro ao enviar imagem");
@@ -157,6 +164,7 @@ export default function TrackPage() {
       setReplyErr("");
       try {
         const { data } = await api.post(`/tickets/track/${ticketNumber}/messages`, { content: ev.target.result });
+        scrollFlagRef.current = true;
         setMessages((prev) => [...prev, data]);
       } catch (err) {
         setReplyErr(err.response?.data?.error || "Erro ao enviar imagem");
@@ -196,7 +204,8 @@ export default function TrackPage() {
   const isRejected    = ticket.approvalStatus === "REJECTED";
 
   const visibleStatuses = STATUS_ORDER.filter(
-    (s) => s !== "EN_ROUTE" || ticket.presential
+    (s) => (s !== "EN_ROUTE" || ticket.presential) &&
+           (s !== "CANCELADO" || ticket.status === "CANCELADO")
   );
 
   const timestamps = {

@@ -83,8 +83,9 @@ export default function TicketDetailPage() {
   const [msgSending, setMsgSending] = useState(false);
   const [msgErr, setMsgErr] = useState("");
   const [lightbox, setLightbox] = useState(null);
-  const msgEndRef = useRef(null);
-  const msgImgRef = useRef(null);
+  const msgEndRef     = useRef(null);
+  const msgImgRef     = useRef(null);
+  const scrollFlagRef = useRef(true);
   const [deleting, setDeleting] = useState(false);
   const [showReopenModal,  setShowReopenModal]  = useState(false);
   const [reopenReason,     setReopenReason]     = useState("");
@@ -117,7 +118,10 @@ export default function TicketDetailPage() {
     return () => clearInterval(tm);
   }, [id]);
 
+  // Rola para o fim apenas quando há mensagens novas (não em cada poll)
   useEffect(() => {
+    if (!scrollFlagRef.current) return;
+    scrollFlagRef.current = false;
     msgEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
@@ -222,6 +226,7 @@ export default function TicketDetailPage() {
     setMsgErr("");
     try {
       const { data } = await api.post(`/tickets/${id}/messages`, { content: newMessage });
+      scrollFlagRef.current = true;
       setMessages((prev) => [...prev, data]);
       setNewMessage("");
     } catch (e) {
@@ -245,6 +250,7 @@ export default function TicketDetailPage() {
           setMsgSending(true); setMsgErr("");
           try {
             const { data } = await api.post(`/tickets/${id}/messages`, { content: ev.target.result });
+            scrollFlagRef.current = true;
             setMessages((prev) => [...prev, data]);
           } catch (err) {
             setMsgErr(err.response?.data?.error || "Erro ao enviar imagem");
@@ -270,6 +276,7 @@ export default function TicketDetailPage() {
       setMsgErr("");
       try {
         const { data } = await api.post(`/tickets/${id}/messages`, { content: ev.target.result });
+        scrollFlagRef.current = true;
         setMessages((prev) => [...prev, data]);
       } catch (err) {
         setMsgErr(err.response?.data?.error || "Erro ao enviar imagem");
