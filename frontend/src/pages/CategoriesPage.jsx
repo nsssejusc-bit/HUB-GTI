@@ -6,9 +6,11 @@ import { useToast } from "../context/ToastContext";
 import {
   GripVertical, ChevronDown, Plus, Trash2, Pencil, Check, X,
   Monitor, Wifi, KeyRound, HelpCircle, MonitorSmartphone, Printer, Server, BookOpen,
-  Tag, ToggleLeft, ToggleRight, Clock, Flame, Lightbulb, Network, ShieldCheck,
+  Tag, ToggleLeft, ToggleRight, Clock, Flame, Lightbulb, ShieldCheck, AlignLeft,
+  Eye, Layout, GripHorizontal,
 } from "lucide-react";
 
+// ── Constantes ────────────────────────────────────────────────────────────────
 const NUCLEO_OPTIONS = [
   { value: "NMT", label: "NMT" },
   { value: "NIR", label: "NIR" },
@@ -22,27 +24,32 @@ const PRIORITY_OPTIONS = [
   { value: "URGENT", label: "Urgente", cls: "bg-red-50    dark:bg-red-900/30 text-red-600 dark:text-red-300",    active: "bg-red-500   text-white" },
 ];
 
-function PrioritySelector({ value, onChange, compact = false }) {
-  return (
-    <div className={`flex items-center gap-1 ${compact ? "" : "flex-wrap"}`}>
-      {PRIORITY_OPTIONS.map((opt) => (
-        <button
-          key={opt.value}
-          type="button"
-          onClick={() => onChange(opt.value)}
-          title={`Prioridade: ${opt.label}`}
-          className={`rounded-full border text-[11px] font-semibold transition px-2 py-0.5 ${
-            value === opt.value
-              ? `${opt.active} border-transparent`
-              : `${opt.cls} border-transparent hover:opacity-80`
-          }`}
-        >
-          {opt.label}
-        </button>
-      ))}
-    </div>
-  );
-}
+const FORM_TYPE_OPTIONS = [
+  { value: "",               label: "Sem formulário extra" },
+  { value: "freetext",       label: "Texto livre" },
+  { value: "custom",         label: "Campos personalizados" },
+  { value: "whatsapp_print", label: "Envio de arquivo via WhatsApp (impressão)" },
+];
+
+const FORM_TYPE_LABELS = {
+  ...Object.fromEntries(FORM_TYPE_OPTIONS.filter(o => o.value).map(o => [o.value, o.label])),
+  // legados (não aparecem no select mas ainda existem em subcategorias antigas)
+  printer:            "Impressora — identificação + bloco",
+  printer_counter:    "Impressora — com contador de páginas",
+  net_user_create:    "Rede — criar usuário",
+  net_user_delete:    "Rede — excluir usuário",
+  net_password_reset: "Rede — resetar senha",
+  siged_user_create:  "SIGED — criar usuário",
+  siged_sector_move:  "SIGED — mover setor",
+  siged_user_delete:  "SIGED — excluir usuário",
+};
+
+const CUSTOM_FIELD_TYPES = [
+  { value: "text",     label: "Texto" },
+  { value: "textarea", label: "Parágrafo" },
+  { value: "number",   label: "Número" },
+  { value: "select",   label: "Lista de opções" },
+];
 
 const CAT_ICONS = {
   HARDWARE:  Monitor,
@@ -69,9 +76,9 @@ const CAT_COLORS = {
 function getCatIcon(code) { return CAT_ICONS[code] || Tag; }
 function getCatColor(code) { return CAT_COLORS[code] || CAT_COLORS.OTHER; }
 
-// ── Pointer-based drag-to-reorder ─────────────────────────────────────────────
+// ── Drag-to-reorder ───────────────────────────────────────────────────────────
 function useDragReorder(items, onReorder) {
-  const [drag, setDrag]   = useState(null); // { fromIdx, overIdx }
+  const [drag, setDrag]   = useState(null);
   const dragRef  = useRef(null);
   const itemsRef = useRef(items);
   const listRef  = useRef(null);
@@ -82,43 +89,31 @@ function useDragReorder(items, onReorder) {
     e.preventDefault();
     const container = listRef.current;
     if (!container) return;
-
     const itemEl = [...container.children][idx];
     if (!itemEl) return;
-
-    const rect     = itemEl.getBoundingClientRect();
-    const offsetY  = e.clientY - rect.top;
-
-    const clone = itemEl.cloneNode(true);
+    const rect    = itemEl.getBoundingClientRect();
+    const offsetY = e.clientY - rect.top;
+    const clone   = itemEl.cloneNode(true);
     clone.style.cssText = [
-      `position:fixed`,
-      `left:${rect.left}px`,
-      `top:${rect.top}px`,
-      `width:${rect.width}px`,
-      `margin:0`,
-      `z-index:9999`,
-      `pointer-events:none`,
-      `opacity:0.93`,
-      `transform:scale(1.025) rotate(0.5deg)`,
+      `position:fixed`, `left:${rect.left}px`, `top:${rect.top}px`,
+      `width:${rect.width}px`, `margin:0`, `z-index:9999`, `pointer-events:none`,
+      `opacity:0.93`, `transform:scale(1.025) rotate(0.5deg)`,
       `box-shadow:0 24px 48px -8px rgba(0,0,0,0.35),0 12px 24px -6px rgba(0,0,0,0.2)`,
       `transition:none`,
     ].join(';');
     document.body.appendChild(clone);
-
     dragRef.current = { fromIdx: idx, overIdx: idx };
     setDrag({ fromIdx: idx, overIdx: idx });
-
     function computeOver(clientY) {
       const children = [...container.children];
       let over = 0, bestDist = Infinity;
       children.forEach((el, i) => {
-        const r    = el.getBoundingClientRect();
+        const r = el.getBoundingClientRect();
         const dist = Math.abs(clientY - (r.top + r.height / 2));
         if (dist < bestDist) { bestDist = dist; over = i; }
       });
       return over;
     }
-
     function onMove(ev) {
       clone.style.top = (ev.clientY - offsetY) + 'px';
       const over = computeOver(ev.clientY);
@@ -127,16 +122,13 @@ function useDragReorder(items, onReorder) {
         setDrag({ ...dragRef.current });
       }
     }
-
     function onUp() {
       document.body.removeChild(clone);
       window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup',   onUp);
-
+      window.removeEventListener('pointerup', onUp);
       const { fromIdx, overIdx } = dragRef.current || {};
       dragRef.current = null;
       setDrag(null);
-
       if (fromIdx != null && overIdx != null && fromIdx !== overIdx && onReorder) {
         const next = [...itemsRef.current];
         const [moved] = next.splice(fromIdx, 1);
@@ -144,17 +136,11 @@ function useDragReorder(items, onReorder) {
         onReorder(next);
       }
     }
-
     window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup',   onUp);
+    window.addEventListener('pointerup', onUp);
   }
 
-  return {
-    listRef,
-    startDrag,
-    fromIdx: drag?.fromIdx ?? null,
-    overIdx: drag?.overIdx ?? null,
-  };
+  return { listRef, startDrag, fromIdx: drag?.fromIdx ?? null, overIdx: drag?.overIdx ?? null };
 }
 
 // ── Inline name editor ────────────────────────────────────────────────────────
@@ -184,16 +170,11 @@ function InlineName({ value, onSave, className = "" }) {
           className="field-input py-1 text-sm min-w-0 w-40"
           maxLength={80}
         />
-        <button onClick={confirm} className="flex h-7 w-7 items-center justify-center rounded-lg text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition" title="Confirmar">
-          <Check size={14} />
-        </button>
-        <button onClick={cancel} className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-gray-700 transition" title="Cancelar">
-          <X size={14} />
-        </button>
+        <button onClick={confirm} className="flex h-7 w-7 items-center justify-center rounded-lg text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition"><Check size={14} /></button>
+        <button onClick={cancel}  className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-gray-700 transition"><X size={14} /></button>
       </div>
     );
   }
-
   return (
     <button onClick={start} className={`group flex items-center gap-1.5 text-left ${className}`} title="Clique para editar">
       <span>{value}</span>
@@ -202,53 +183,518 @@ function InlineName({ value, onSave, className = "" }) {
   );
 }
 
-// ── Drop indicator ────────────────────────────────────────────────────────────
 function DropLine({ show }) {
   if (!show) return null;
   return <div className="h-0.5 rounded-full bg-brand-500 mx-1" />;
 }
 
-// ── Subcategory row ───────────────────────────────────────────────────────────
-function SubRow({ sub, catId, onRename, onDelete, onUpdateSla, onUpdatePriority, onUpdateN1Tips, onUpdateNucleo, onUpdateApproval, onGripPointerDown, isDragging }) {
-  const addToast = useToast();
-  const [deleteErr,  setDeleteErr]  = useState("");
-  const [slaEdit,    setSlaEdit]    = useState(false);
-  const [slaDraft,   setSlaDraft]   = useState(sub.slaHours != null ? String(sub.slaHours) : "");
-  const [tipsOpen,   setTipsOpen]   = useState(false);
-  const [tipsDraft,  setTipsDraft]  = useState(
-    sub.n1Tips ? JSON.parse(sub.n1Tips).join("\n") : ""
+// ── Toggle row ────────────────────────────────────────────────────────────────
+function ToggleRow({ label, description, checked, onChange, indent = false }) {
+  return (
+    <label className={`flex items-start gap-3 cursor-pointer rounded-xl border px-3 py-2.5 transition hover:bg-slate-50 dark:hover:bg-gray-800/50 ${
+      checked ? "border-brand-200 dark:border-brand-700 bg-brand-50/50 dark:bg-brand-900/10" : "border-slate-200 dark:border-gray-700"
+    } ${indent ? "ml-6" : ""}`}>
+      <input type="checkbox" className="sr-only" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      <div className={`relative mt-0.5 h-5 w-9 shrink-0 rounded-full transition-colors ${checked ? "bg-brand-600" : "bg-slate-200 dark:bg-gray-600"}`}>
+        <div className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${checked ? "translate-x-4" : "translate-x-0.5"}`} />
+      </div>
+      <div>
+        <div className="text-sm font-medium text-slate-700 dark:text-gray-200">{label}</div>
+        {description && <div className="text-xs text-slate-400 dark:text-gray-500 mt-0.5">{description}</div>}
+      </div>
+    </label>
   );
+}
 
-  const tipsCount = sub.n1Tips ? JSON.parse(sub.n1Tips).length : 0;
-
-  function handlePriorityChange(priority) {
-    api.patch(`/categories/${catId}/subcategories/${sub.id}`, { defaultPriority: priority })
-      .then(() => onUpdatePriority(sub.id, priority))
-      .catch(() => {});
+// ── Custom field row (construtor de campos) ───────────────────────────────────
+function CustomFieldRow({ field, onChange, onRemove }) {
+  function slugify(str) {
+    return str.toLowerCase()
+      .normalize("NFD").replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "")
+      || `campo_${Date.now()}`;
   }
 
-  function handleNucleoChange(e) {
-    const nucleo = e.target.value;
-    api.patch(`/categories/${catId}/subcategories/${sub.id}`, { nucleoResponsavel: nucleo || null })
-      .then(() => onUpdateNucleo(sub.id, nucleo || null))
-      .catch((err) => addToast({ message: err.response?.data?.error || "Erro ao salvar núcleo", type: "error" }));
+  return (
+    <div className="rounded-xl border border-slate-200 dark:border-gray-700 p-3 space-y-2.5 bg-white dark:bg-gray-900">
+      <div className="flex items-center gap-2">
+        <GripHorizontal size={13} className="text-slate-300 shrink-0" />
+        <input
+          className="field-input flex-1 text-sm py-1.5"
+          placeholder="Label do campo *"
+          value={field.label}
+          onChange={(e) => {
+            const label = e.target.value;
+            onChange({ ...field, label, key: slugify(label) });
+          }}
+        />
+        <select
+          className="field-input w-36 text-sm py-1.5 shrink-0"
+          value={field.type}
+          onChange={(e) => onChange({ ...field, type: e.target.value, options: [] })}
+        >
+          {CUSTOM_FIELD_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+        </select>
+        <label className="flex items-center gap-1 text-xs text-slate-600 dark:text-gray-300 cursor-pointer shrink-0 select-none">
+          <input
+            type="checkbox"
+            checked={field.required}
+            onChange={(e) => onChange({ ...field, required: e.target.checked })}
+            className="accent-brand-600 rounded"
+          />
+          Obrig.
+        </label>
+        <button
+          onClick={onRemove}
+          className="flex h-6 w-6 items-center justify-center rounded-lg text-slate-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition"
+        >
+          <X size={12} />
+        </button>
+      </div>
+      {field.type === "select" && (
+        <div>
+          <label className="field-label text-[10px]">Opções (uma por linha)</label>
+          <textarea
+            rows={2}
+            className="field-input text-xs resize-none"
+            placeholder={"Opção 1\nOpção 2\nOpção 3"}
+            value={(field.options || []).join("\n")}
+            onChange={(e) => onChange({ ...field, options: e.target.value.split("\n").map(s => s.trim()).filter(Boolean) })}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Modal de edição completa de subcategoria ──────────────────────────────────
+function SubEditModal({ sub, catId, onClose, onUpdate }) {
+  const addToast = useToast();
+  const [name,                  setName]                  = useState(sub.name);
+  const [slaHours,              setSlaHours]              = useState(sub.slaHours != null ? String(sub.slaHours) : "");
+  const [priority,              setPriority]              = useState(sub.defaultPriority ?? "MEDIUM");
+  const [nucleo,                setNucleo]                = useState(sub.nucleoResponsavel ?? "");
+  const [requiresApproval,      setRequiresApproval]      = useState(sub.requiresApproval ?? false);
+  const [dualApproval,          setDualApproval]          = useState(sub.dualApproval ?? false);
+  const [requiresPresential,    setRequiresPresential]    = useState(sub.requiresPresential ?? true);
+  const [requiresCauseSolution, setRequiresCauseSolution] = useState(sub.requiresCauseSolution ?? true);
+  const [allowsFreeText,        setAllowsFreeText]        = useState(sub.allowsFreeText ?? false);
+  const [freeTextLabel,         setFreeTextLabel]         = useState(sub.freeTextLabel ?? "");
+  const [formTypeVal,           setFormTypeVal]           = useState(sub.formType ?? "");
+  const [customFieldsList,      setCustomFieldsList]      = useState(() => {
+    try {
+      const parsed = sub.customFields ? JSON.parse(sub.customFields) : [];
+      // garante id estável para cada campo (evita remount ao digitar label)
+      return parsed.map((f, i) => ({ id: f.id || `cf_${Date.now()}_${i}`, ...f }));
+    } catch { return []; }
+  });
+  const [n1Tips,   setN1Tips]   = useState(sub.n1Tips ? JSON.parse(sub.n1Tips).join("\n") : "");
+  const [saving,   setSaving]   = useState(false);
+
+  function addCustomField() {
+    const ts = Date.now();
+    setCustomFieldsList(prev => [...prev, { id: `cf_${ts}`, key: `campo_${ts}`, label: "", type: "text", required: false, options: [] }]);
   }
 
-  function handleApprovalToggle() {
-    const newVal = !sub.requiresApproval;
-    api.patch(`/categories/${catId}/subcategories/${sub.id}`, { requiresApproval: newVal })
-      .then(() => onUpdateApproval(sub.id, newVal))
-      .catch(() => addToast({ message: "Erro ao salvar aprovação", type: "error" }));
+  async function handleSave() {
+    const trimmedName = name.trim();
+    if (!trimmedName) { addToast({ message: "Nome obrigatório", type: "error" }); return; }
+    if (formTypeVal === "custom" && customFieldsList.some(f => !f.label.trim())) {
+      addToast({ message: "Todos os campos personalizados precisam de um label", type: "error" }); return;
+    }
+    setSaving(true);
+    try {
+      const slaVal  = slaHours ? parseInt(slaHours, 10) : null;
+      const lines   = n1Tips.split("\n").map((s) => s.trim()).filter(Boolean);
+      const n1Json  = lines.length > 0 ? JSON.stringify(lines) : null;
+      const cfJson  = (formTypeVal === "custom" && customFieldsList.length > 0)
+        ? JSON.stringify(customFieldsList) : null;
+
+      const res = await api.patch(`/categories/${catId}/subcategories/${sub.id}`, {
+        name: trimmedName, slaHours: slaVal, defaultPriority: priority,
+        nucleoResponsavel: nucleo || null,
+        requiresApproval, dualApproval, requiresPresential, requiresCauseSolution,
+        allowsFreeText,
+        freeTextLabel: formTypeVal === "whatsapp_print"
+          ? (freeTextLabel.replace(/\D/g, "") || null)
+          : (allowsFreeText ? freeTextLabel.trim() || null : null),
+        formType: formTypeVal || null, customFields: cfJson,
+        n1Tips: n1Json,
+      });
+      onUpdate(res.data);
+      addToast({ message: "Subcategoria salva", type: "success" });
+      onClose();
+    } catch (e) {
+      addToast({ message: e.response?.data?.error || "Erro ao salvar", type: "error" });
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function saveTips() {
-    const lines = tipsDraft.split("\n").map((s) => s.trim()).filter(Boolean);
-    const json   = lines.length > 0 ? JSON.stringify(lines) : null;
-    if (json === sub.n1Tips) { setTipsOpen(false); return; }
-    api.patch(`/categories/${catId}/subcategories/${sub.id}`, { n1Tips: json })
-      .then(() => { onUpdateN1Tips(sub.id, json); setTipsOpen(false); })
-      .catch(() => {});
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="card w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 space-y-5">
+
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-semibold text-slate-900 dark:text-gray-100">Editar subcategoria</h3>
+            <p className="text-xs text-slate-400 dark:text-gray-500 mt-0.5">{sub.name}</p>
+          </div>
+          <button onClick={onClose} className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-gray-700 transition"><X size={14} /></button>
+        </div>
+
+        {/* Nome */}
+        <div>
+          <label className="field-label">Nome *</label>
+          <input autoFocus className="field-input" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} onKeyDown={(e) => e.key === "Enter" && handleSave()} />
+        </div>
+
+        {/* Prioridade + Núcleo + SLA */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="field-label">Prioridade padrão</label>
+            <div className="flex flex-wrap gap-1 mt-1">
+              {PRIORITY_OPTIONS.map((opt) => (
+                <button key={opt.value} type="button" onClick={() => setPriority(opt.value)}
+                  className={`rounded-full border text-[11px] font-semibold transition px-2 py-0.5 ${priority === opt.value ? `${opt.active} border-transparent` : `${opt.cls} border-transparent hover:opacity-80`}`}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="space-y-3">
+            <div>
+              <label className="field-label">Núcleo responsável</label>
+              <select className="field-input" value={nucleo} onChange={(e) => setNucleo(e.target.value)}>
+                <option value="">Sem núcleo definido</option>
+                {NUCLEO_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="field-label">SLA (horas)</label>
+              <input type="number" min="1" max="9999" className="field-input" placeholder="Ex: 24" value={slaHours} onChange={(e) => setSlaHours(e.target.value)} />
+            </div>
+          </div>
+        </div>
+
+        {/* Comportamento */}
+        <div>
+          <p className="text-[11px] font-semibold text-slate-400 dark:text-gray-500 uppercase tracking-wide mb-2">Comportamento</p>
+          <div className="space-y-2">
+            <ToggleRow label="Requer aprovação do Chefe de Setor" description="Chamado fica em PENDENTE até aprovação antes de avançar" checked={requiresApproval} onChange={(v) => { setRequiresApproval(v); if (!v) setDualApproval(false); }} />
+            {requiresApproval && <ToggleRow label="Aprovação dupla" description="Exige dois chefes de setor diferentes" checked={dualApproval} onChange={setDualApproval} indent />}
+            <ToggleRow label="Atendimento presencial" description="Habilita transição EN_ROUTE (técnico se desloca ao local)" checked={requiresPresential} onChange={setRequiresPresential} />
+            <ToggleRow label="Obrigar Causa e Solução ao concluir" description="Técnico precisa preencher Causa e Solução antes de fechar" checked={requiresCauseSolution} onChange={setRequiresCauseSolution} />
+            {formTypeVal !== "whatsapp_print" && (
+              <>
+                <ToggleRow label="Campo de texto livre complementar" description="Textarea extra no formulário, abaixo do formulário principal" checked={allowsFreeText} onChange={setAllowsFreeText} />
+                {allowsFreeText && (
+                  <div className="ml-6 space-y-1">
+                    <label className="field-label text-[11px]">Label do campo <span className="font-normal text-slate-400">(opcional)</span></label>
+                    <input className="field-input text-sm py-1.5" placeholder='Ex: "Descreva o equipamento com defeito"' value={freeTextLabel} onChange={(e) => setFreeTextLabel(e.target.value)} maxLength={100} />
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Formulário extra */}
+        <div>
+          <p className="text-[11px] font-semibold text-slate-400 dark:text-gray-500 uppercase tracking-wide mb-2">Formulário extra</p>
+          <div className="space-y-3">
+            <div>
+              <label className="field-label">Tipo de formulário</label>
+              <select className="field-input" value={formTypeVal} onChange={(e) => { setFormTypeVal(e.target.value); if (e.target.value !== "custom") setCustomFieldsList([]); }}>
+                {FORM_TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+              <p className="text-[10px] text-slate-400 dark:text-gray-500 mt-1">
+                Define os campos exibidos no formulário de chamado ao selecionar esta subcategoria.
+              </p>
+            </div>
+
+            {formTypeVal === "whatsapp_print" && (
+              <div>
+                <label className="field-label">Número WhatsApp da GTI *</label>
+                <input
+                  className="field-input"
+                  placeholder="Ex: 559281234567 (DDI+DDD+número, sem espaços)"
+                  value={freeTextLabel}
+                  onChange={(e) => setFreeTextLabel(e.target.value.replace(/\D/g, ""))}
+                  inputMode="numeric"
+                />
+                <p className="text-[10px] text-slate-400 dark:text-gray-500 mt-1">
+                  Formato internacional sem "+" — ex: <strong>559281234567</strong>. O solicitante verá um botão para abrir direto no WhatsApp.
+                </p>
+              </div>
+            )}
+
+            {formTypeVal === "custom" && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-medium text-slate-600 dark:text-gray-300">Campos personalizados</p>
+                  <button onClick={addCustomField}
+                    className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400 hover:bg-brand-100 dark:hover:bg-brand-900/40 transition font-medium">
+                    <Plus size={11} /> Adicionar campo
+                  </button>
+                </div>
+                {customFieldsList.length === 0 ? (
+                  <p className="text-xs text-slate-400 dark:text-gray-500 italic text-center py-3 border border-dashed border-slate-200 dark:border-gray-700 rounded-xl">
+                    Nenhum campo. Clique em "Adicionar campo".
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {customFieldsList.map((field, idx) => (
+                      <CustomFieldRow
+                        key={field.id}
+                        field={field}
+                        onChange={(updated) => setCustomFieldsList(prev => prev.map((f, i) => i === idx ? updated : f))}
+                        onRemove={() => setCustomFieldsList(prev => prev.filter((_, i) => i !== idx))}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Dicas N1 */}
+        <div>
+          <label className="field-label flex items-center gap-1.5">
+            <Lightbulb size={12} className="text-amber-500" />
+            Dicas N1 <span className="font-normal text-slate-400 dark:text-gray-500">(uma por linha)</span>
+          </label>
+          <textarea rows={3} className="field-input resize-none text-sm"
+            placeholder={"Ex:\nReinicie o computador e tente novamente\nVerifique se o cabo está conectado"}
+            value={n1Tips} onChange={(e) => setN1Tips(e.target.value)} />
+          <p className="text-[10px] text-slate-400 dark:text-gray-500 mt-1">
+            Cada linha vira uma dica numerada exibida ao solicitante antes de abrir o chamado.
+          </p>
+        </div>
+
+        <div className="flex gap-2 justify-end pt-1 border-t border-slate-100 dark:border-gray-700">
+          <button type="button" onClick={onClose} className="btn-secondary text-sm py-2 px-4">Cancelar</button>
+          <button type="button" onClick={handleSave} disabled={saving || !name.trim()}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 text-sm font-semibold transition disabled:opacity-60">
+            {saving ? <Spinner className="h-4 w-4" /> : <Check size={14} />} Salvar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Dicas N1 simplificado (para preview) ─────────────────────────────────────
+function N1TipsPreview({ tips, title }) {
+  return (
+    <div className="rounded-xl border border-amber-200 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/15 px-3 py-2.5 space-y-1.5 mb-3">
+      <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-800 dark:text-amber-300">
+        <Lightbulb size={12} /> Antes de continuar — {title}
+      </div>
+      <ul className="space-y-1">
+        {tips.map((tip, i) => (
+          <li key={i} className="flex items-start gap-1.5 text-xs text-amber-800 dark:text-amber-300">
+            <span className="mt-0.5 shrink-0 w-4 h-4 rounded-full bg-amber-200 dark:bg-amber-800/60 text-amber-700 dark:text-amber-300 font-bold flex items-center justify-center text-[10px]">{i + 1}</span>
+            {tip}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+// ── Modal de preview ──────────────────────────────────────────────────────────
+function CategoryPreviewModal({ cat, onClose }) {
+  const [selectedSubId, setSelectedSubId] = useState(null);
+  const selectedSub = cat.subcategories?.find(s => s.id === selectedSubId);
+  const catN1Tips   = cat.n1Tips ? (() => { try { return JSON.parse(cat.n1Tips); } catch { return []; } })() : [];
+  const subN1Tips   = selectedSub?.n1Tips ? (() => { try { return JSON.parse(selectedSub.n1Tips); } catch { return []; } })() : [];
+  const subFormType = selectedSub?.formType || null;
+  const customFields = (subFormType === "custom" && selectedSub?.customFields)
+    ? (() => { try { return JSON.parse(selectedSub.customFields); } catch { return []; } })()
+    : [];
+
+  function renderFormPreview() {
+    if (!selectedSub) return null;
+    if (selectedSub.allowsFreeText && !subFormType) {
+      return (
+        <div className="rounded-xl border border-slate-200 dark:border-gray-700 p-3 mt-2 space-y-1">
+          <label className="field-label text-xs">{selectedSub.freeTextLabel || "Descreva a solicitação"} *</label>
+          <div className="field-input bg-slate-50 dark:bg-gray-800 text-slate-400 dark:text-gray-500 text-xs italic min-h-[60px] flex items-start pt-1.5">
+            Descreva com o máximo de detalhes...
+          </div>
+        </div>
+      );
+    }
+    if (subFormType === "freetext") {
+      return (
+        <div className="rounded-xl border border-slate-200 dark:border-gray-700 p-3 mt-2 space-y-1">
+          <label className="field-label text-xs">Descreva a solicitação *</label>
+          <div className="field-input bg-slate-50 dark:bg-gray-800 text-slate-400 dark:text-gray-500 text-xs italic min-h-[60px] flex items-start pt-1.5">
+            Descreva com o máximo de detalhes...
+          </div>
+        </div>
+      );
+    }
+    if (subFormType === "custom" && customFields.length > 0) {
+      return (
+        <div className="rounded-xl border border-slate-200 dark:border-gray-700 p-3 mt-2 space-y-2">
+          {customFields.map(f => (
+            <div key={f.key}>
+              <label className="field-label text-xs">{f.label} {f.required && <span className="text-red-500">*</span>}</label>
+              {f.type === "select" ? (
+                <div className="field-input bg-slate-50 dark:bg-gray-800 text-slate-400 dark:text-gray-500 text-xs italic">
+                  Selecione: {(f.options || []).join(", ") || "sem opções"}
+                </div>
+              ) : f.type === "textarea" ? (
+                <div className="field-input bg-slate-50 dark:bg-gray-800 text-slate-400 dark:text-gray-500 text-xs italic min-h-[50px]">
+                  Texto longo...
+                </div>
+              ) : (
+                <div className="field-input bg-slate-50 dark:bg-gray-800 text-slate-400 dark:text-gray-500 text-xs italic">
+                  {f.type === "number" ? "Ex: 123" : "Texto..."}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      );
+    }
+    if (subFormType && !["none"].includes(subFormType)) {
+      return (
+        <div className="rounded-xl border border-slate-100 dark:border-gray-700 bg-slate-50 dark:bg-gray-800 p-3 mt-2">
+          <p className="text-xs text-slate-500 dark:text-gray-400">
+            Formulário: <span className="font-medium text-slate-700 dark:text-gray-200">{FORM_TYPE_LABELS[subFormType] || subFormType}</span>
+          </p>
+          <p className="text-[10px] text-slate-400 dark:text-gray-500 mt-1">Formulário predefinido do sistema</p>
+        </div>
+      );
+    }
+    return null;
   }
+
+  const CatIcon = getCatIcon(cat.code);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="card w-full max-w-lg max-h-[85vh] overflow-y-auto">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-gray-700">
+          <div className="flex items-center gap-2">
+            <Eye size={15} className="text-brand-500 dark:text-brand-400" />
+            <span className="font-semibold text-sm text-slate-800 dark:text-gray-100">Preview — visão do solicitante</span>
+          </div>
+          <button onClick={onClose} className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-gray-700 transition"><X size={14} /></button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {/* Banner de contexto */}
+          <div className="rounded-xl border border-brand-200 dark:border-brand-700/60 bg-brand-50 dark:bg-brand-900/10 px-3 py-2 flex items-center gap-2">
+            <Layout size={13} className="text-brand-500 shrink-0" />
+            <p className="text-xs text-brand-700 dark:text-brand-300">Simulação da tela "Detalhes" do formulário de chamado</p>
+          </div>
+
+          {/* Tela simulada */}
+          <div className="rounded-xl border-2 border-dashed border-slate-200 dark:border-gray-700 p-4 space-y-3">
+            {/* Dicas N1 da categoria (só para freeText) */}
+            {cat.allowsFreeText && catN1Tips.length > 0 && (
+              <N1TipsPreview tips={catN1Tips} title={cat.name} />
+            )}
+
+            {/* Header da tela */}
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${getCatColor(cat.code)}`}>
+                  <CatIcon size={14} />
+                </span>
+                <h3 className="text-sm font-semibold text-slate-800 dark:text-gray-100">{cat.name}</h3>
+              </div>
+              <p className="text-xs text-slate-400 dark:text-gray-500">
+                {cat.allowsFreeText ? "Descreva o problema com detalhes" : "Selecione a opção que mais se encaixa"}
+              </p>
+            </div>
+
+            {/* Texto livre (categoria) */}
+            {cat.allowsFreeText && (
+              <div className="space-y-1">
+                <label className="field-label text-xs">Descrição do problema</label>
+                <div className="field-input bg-slate-50 dark:bg-gray-800 text-slate-400 dark:text-gray-500 text-xs italic min-h-[80px] flex items-start pt-1.5">
+                  Descreva o problema com o máximo de detalhes possível...
+                </div>
+              </div>
+            )}
+
+            {/* Subcategorias */}
+            {!cat.allowsFreeText && (
+              <div className="space-y-1.5">
+                {(cat.subcategories || []).length === 0 ? (
+                  <p className="text-xs text-slate-400 italic text-center py-3">Nenhuma subcategoria cadastrada</p>
+                ) : (cat.subcategories || []).map(sub => (
+                  <button
+                    key={sub.id}
+                    onClick={() => setSelectedSubId(sub.id === selectedSubId ? null : sub.id)}
+                    className={`w-full flex items-center gap-3 rounded-xl border cursor-pointer p-3 text-left transition ${
+                      sub.id === selectedSubId
+                        ? "border-brand-500 bg-brand-50 dark:bg-brand-900/20 ring-1 ring-brand-500/30"
+                        : "border-slate-200 dark:border-gray-700 hover:border-slate-300 dark:hover:border-gray-600 hover:bg-slate-50 dark:hover:bg-gray-800"
+                    }`}
+                  >
+                    <div className={`h-4 w-4 shrink-0 rounded-full border-2 flex items-center justify-center ${
+                      sub.id === selectedSubId ? "border-brand-600 bg-brand-600" : "border-slate-300 dark:border-gray-600"
+                    }`}>
+                      {sub.id === selectedSubId && <div className="h-1.5 w-1.5 rounded-full bg-white" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm text-slate-700 dark:text-gray-200">{sub.name}</span>
+                      {sub.requiresApproval && (
+                        <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 text-xs text-amber-700 dark:text-amber-400 ring-1 ring-amber-200 dark:ring-amber-700">
+                          <ShieldCheck size={9} /> Requer aprovação
+                        </span>
+                      )}
+                    </div>
+                    {/* Badges de info da sub */}
+                    <div className="flex items-center gap-1 text-[10px] text-slate-400">
+                      {sub.slaHours && <span>{sub.slaHours}h</span>}
+                      {(sub.formType || sub.allowsFreeText) && <AlignLeft size={10} className="text-blue-400" />}
+                    </div>
+                  </button>
+                ))}
+
+                {/* Detalhe da subcategoria selecionada */}
+                {selectedSub && (
+                  <div className="space-y-1 pt-1">
+                    {subN1Tips.length > 0 && <N1TipsPreview tips={subN1Tips} title={selectedSub.name} />}
+                    {renderFormPreview()}
+                    {selectedSub.allowsFreeText && (selectedSub.formType && selectedSub.formType !== "freetext") && (
+                      <div className="rounded-xl border border-slate-200 dark:border-gray-700 p-3 mt-1 space-y-1">
+                        <label className="field-label text-xs">{selectedSub.freeTextLabel || "Descreva a solicitação"} (complementar)</label>
+                        <div className="field-input bg-slate-50 dark:bg-gray-800 text-slate-400 text-xs italic min-h-[50px]">
+                          Textarea complementar...
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <p className="text-[10px] text-slate-400 dark:text-gray-500 text-center">
+            Clique em uma subcategoria para ver o formulário que aparecerá ao solicitante
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Subcategory row ───────────────────────────────────────────────────────────
+function SubRow({ sub, catId, onDelete, onUpdate, onGripPointerDown, isDragging }) {
+  const addToast  = useToast();
+  const [editOpen,  setEditOpen]  = useState(false);
+  const [deleteErr, setDeleteErr] = useState("");
 
   async function handleDelete() {
     setDeleteErr("");
@@ -260,18 +706,9 @@ function SubRow({ sub, catId, onRename, onDelete, onUpdateSla, onUpdatePriority,
     }
   }
 
-  function saveSla() {
-    setSlaEdit(false);
-    const parsed = slaDraft ? parseInt(slaDraft, 10) : null;
-    if (slaDraft && (isNaN(parsed) || parsed < 1)) {
-      setSlaDraft(sub.slaHours != null ? String(sub.slaHours) : "");
-      return;
-    }
-    if (parsed === sub.slaHours) return;
-    api.patch(`/categories/${catId}/subcategories/${sub.id}`, { slaHours: parsed })
-      .then(() => onUpdateSla(sub.id, parsed))
-      .catch(() => setSlaDraft(sub.slaHours != null ? String(sub.slaHours) : ""));
-  }
+  const priorityOpt = PRIORITY_OPTIONS.find((p) => p.value === (sub.defaultPriority ?? "MEDIUM"));
+  const tipsCount   = sub.n1Tips ? JSON.parse(sub.n1Tips).length : 0;
+  const hasForm     = sub.formType || sub.allowsFreeText;
 
   return (
     <div className="flex flex-col" style={isDragging ? { opacity: 0.3 } : undefined}>
@@ -282,128 +719,58 @@ function SubRow({ sub, catId, onRename, onDelete, onUpdateSla, onUpdatePriority,
           onPointerDown={onGripPointerDown}
           style={{ touchAction: "none" }}
         />
-        <InlineName
-          value={sub.name}
-          onSave={(name) => onRename(sub.id, name)}
-          className="flex-1 text-sm text-slate-700 dark:text-gray-200 font-medium"
-        />
-        {/* Prioridade por subcategoria */}
-        <PrioritySelector
-          value={sub.defaultPriority ?? "MEDIUM"}
-          onChange={handlePriorityChange}
-          compact
-        />
-        {/* Núcleo responsável */}
-        <select
-          value={sub.nucleoResponsavel ?? ""}
-          onChange={handleNucleoChange}
-          onClick={(e) => e.stopPropagation()}
-          title="Núcleo responsável por este tipo de chamado"
-          className={`text-[11px] rounded-lg border px-1.5 py-0.5 font-semibold transition opacity-0 group-hover:opacity-100 focus:opacity-100 ${
-            sub.nucleoResponsavel
-              ? "border-brand-300 dark:border-brand-700 bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400"
-              : "border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-slate-400 dark:text-gray-500"
-          }`}
-        >
-          <option value="" disabled>Núcleo</option>
-          {NUCLEO_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
-        {/* Dicas N1 */}
-        <button
-          onClick={() => { setTipsOpen((v) => !v); setTipsDraft(sub.n1Tips ? JSON.parse(sub.n1Tips).join("\n") : ""); }}
-          title="Dicas de suporte N1 para este problema"
-          className={`flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-lg transition opacity-0 group-hover:opacity-100 ${
-            tipsCount > 0
-              ? "text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20"
-              : "text-slate-400 dark:text-gray-500 hover:bg-slate-200 dark:hover:bg-gray-700"
-          }`}
-        >
-          <Lightbulb size={12} />
-          {tipsCount > 0 && <span className="font-semibold">{tipsCount}</span>}
-        </button>
-        {/* Requer aprovação */}
-        <button
-          onClick={handleApprovalToggle}
-          title={sub.requiresApproval ? "Requer aprovação — clique para desativar" : "Clique para exigir aprovação do Chefe de Setor"}
-          className={`flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-lg transition opacity-0 group-hover:opacity-100 ${
-            sub.requiresApproval
-              ? "text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20"
-              : "text-slate-400 dark:text-gray-500 hover:bg-slate-200 dark:hover:bg-gray-700"
-          }`}
-        >
-          <ShieldCheck size={12} />
-        </button>
-        {/* SLA por subcategoria */}
-        <div className="flex items-center gap-1 shrink-0" title="SLA desta subcategoria (horas)">
-          {slaEdit ? (
-            <>
-              <input
-                autoFocus
-                type="number" min="1" max="9999"
-                value={slaDraft}
-                onChange={(e) => setSlaDraft(e.target.value)}
-                onBlur={saveSla}
-                onKeyDown={(e) => { if (e.key === "Enter") saveSla(); if (e.key === "Escape") { setSlaEdit(false); setSlaDraft(sub.slaHours != null ? String(sub.slaHours) : ""); } }}
-                className="field-input py-0.5 text-xs w-16 text-center"
-                placeholder="h"
-              />
-              <span className="text-xs text-slate-400">h</span>
-            </>
-          ) : (
-            <button
-              onClick={() => setSlaEdit(true)}
-              className="text-xs px-1.5 py-0.5 rounded-lg text-slate-400 dark:text-gray-500 hover:bg-slate-200 dark:hover:bg-gray-700 transition opacity-0 group-hover:opacity-100"
-              title="Definir SLA desta subcategoria"
-            >
-              {sub.slaHours ? <span className="text-brand-600 dark:text-brand-400 font-medium">{sub.slaHours}h</span> : "SLA"}
-            </button>
+
+        <span className="flex-1 text-sm text-slate-700 dark:text-gray-200 font-medium truncate">{sub.name}</span>
+
+        <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition">
+          {sub.nucleoResponsavel && (
+            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400 border border-brand-200 dark:border-brand-700">
+              {sub.nucleoResponsavel}
+            </span>
+          )}
+          {sub.slaHours && (
+            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-gray-700 text-slate-600 dark:text-gray-300">
+              {sub.slaHours}h
+            </span>
+          )}
+          {priorityOpt && priorityOpt.value !== "MEDIUM" && (
+            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${priorityOpt.cls}`}>{priorityOpt.label}</span>
+          )}
+          {sub.requiresApproval && (
+            <ShieldCheck size={12} className="text-amber-500 dark:text-amber-400" title={sub.dualApproval ? "Aprovação dupla" : "Requer aprovação"} />
+          )}
+          {hasForm && (
+            <AlignLeft size={12} className="text-blue-500 dark:text-blue-400" title={sub.formType ? `Formulário: ${FORM_TYPE_LABELS[sub.formType] || sub.formType}` : "Campo livre"} />
+          )}
+          {tipsCount > 0 && (
+            <span className="flex items-center gap-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400" title={`${tipsCount} dica(s) N1`}>
+              <Lightbulb size={11} />{tipsCount}
+            </span>
           )}
         </div>
-        <button
-          onClick={handleDelete}
+
+        <button onClick={() => setEditOpen(true)}
+          className="flex h-6 w-6 items-center justify-center rounded-lg text-slate-300 dark:text-gray-600 hover:text-brand-500 dark:hover:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/20 transition opacity-0 group-hover:opacity-100"
+          title="Editar subcategoria">
+          <Pencil size={12} />
+        </button>
+        <button onClick={handleDelete}
           className="flex h-6 w-6 items-center justify-center rounded-lg text-slate-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition opacity-0 group-hover:opacity-100"
-          title="Excluir subcategoria"
-        >
+          title="Excluir subcategoria">
           <Trash2 size={12} />
         </button>
       </div>
 
-      {/* Editor de dicas N1 */}
-      {tipsOpen && (
-        <div className="mt-1 mx-1 rounded-xl border border-amber-200 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/10 p-3 space-y-2">
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 dark:text-amber-400">
-            <Lightbulb size={12} />
-            Dicas de suporte N1 — {sub.name}
-          </div>
-          <textarea
-            autoFocus
-            rows={4}
-            value={tipsDraft}
-            onChange={(e) => setTipsDraft(e.target.value)}
-            placeholder={"Uma dica por linha, ex:\nReinicie o computador e tente novamente\nVerifique se o cabo está conectado"}
-            className="w-full rounded-lg border border-amber-200 dark:border-amber-700/60 bg-white dark:bg-gray-900 px-3 py-2 text-xs text-slate-700 dark:text-gray-200 placeholder-slate-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none"
-          />
-          <p className="text-[10px] text-amber-600 dark:text-amber-500">Cada linha vira uma dica numerada exibida ao solicitante antes de abrir o chamado.</p>
-          <div className="flex gap-2 justify-end">
-            <button
-              onClick={() => setTipsOpen(false)}
-              className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg text-slate-500 dark:text-gray-400 hover:bg-slate-100 dark:hover:bg-gray-700 transition"
-            >
-              <X size={11} /> Cancelar
-            </button>
-            <button
-              onClick={saveTips}
-              className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-medium transition"
-            >
-              <Check size={11} /> Salvar dicas
-            </button>
-          </div>
-        </div>
-      )}
-
       {deleteErr && <p className="text-xs text-red-500 dark:text-red-400 mt-1 px-3">{deleteErr}</p>}
+
+      {editOpen && (
+        <SubEditModal
+          sub={sub}
+          catId={catId}
+          onClose={() => setEditOpen(false)}
+          onUpdate={(updated) => { onUpdate(updated); setEditOpen(false); }}
+        />
+      )}
     </div>
   );
 }
@@ -419,6 +786,7 @@ function CategoryCard({ cat, onUpdate, onDelete, onGripPointerDown, isDragging }
   const [subcats,    setSubcats]   = useState(cat.subcategories || []);
   const [slaDraft,   setSlaDraft]  = useState(cat.slaHours != null ? String(cat.slaHours) : "");
   const [slaEditing, setSlaEditing] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
   useEffect(() => { setSubcats(cat.subcategories || []); }, [cat.subcategories]);
 
@@ -446,7 +814,7 @@ function CategoryCard({ cat, onUpdate, onDelete, onGripPointerDown, isDragging }
     const val = slaDraft.trim();
     const parsed = val === "" ? null : Number(val);
     if (val !== "" && (isNaN(parsed) || parsed <= 0)) {
-      addToast({ message: "SLA inválido — informe um número positivo", type: "error" });
+      addToast({ message: "SLA inválido", type: "error" });
       setSlaDraft(cat.slaHours != null ? String(cat.slaHours) : "");
       return;
     }
@@ -494,30 +862,12 @@ function CategoryCard({ cat, onUpdate, onDelete, onGripPointerDown, isDragging }
     }
   }
 
-  function renameSubcategory(subId, name) {
-    api.patch(`/categories/${cat.id}/subcategories/${subId}`, { name })
-      .then(() => setSubcats((prev) => prev.map((s) => s.id === subId ? { ...s, name } : s)))
-      .catch((e) => addToast({ message: e.response?.data?.error || "Erro ao renomear", type: "error" }));
+  function updateSubcat(updatedSub) {
+    setSubcats((prev) => prev.map((s) => s.id === updatedSub.id ? updatedSub : s));
   }
 
-  function updateSubcategorySla(subId, slaHours) {
-    setSubcats((prev) => prev.map((s) => s.id === subId ? { ...s, slaHours } : s));
-  }
-
-  function updateSubcategoryPriority(subId, defaultPriority) {
-    setSubcats((prev) => prev.map((s) => s.id === subId ? { ...s, defaultPriority } : s));
-  }
-
-  function updateSubcategoryN1Tips(subId, n1Tips) {
-    setSubcats((prev) => prev.map((s) => s.id === subId ? { ...s, n1Tips } : s));
-  }
-
-  function updateSubcategoryNucleo(subId, nucleoResponsavel) {
-    setSubcats((prev) => prev.map((s) => s.id === subId ? { ...s, nucleoResponsavel } : s));
-  }
-
-  function updateSubcategoryApproval(subId, requiresApproval) {
-    setSubcats((prev) => prev.map((s) => s.id === subId ? { ...s, requiresApproval } : s));
+  function deleteSubcat(subId) {
+    setSubcats((prev) => prev.filter((s) => s.id !== subId));
   }
 
   async function saveCategoryPriority(defaultPriority) {
@@ -530,188 +880,163 @@ function CategoryCard({ cat, onUpdate, onDelete, onGripPointerDown, isDragging }
     }
   }
 
-  function deleteSubcategory(subId) {
-    setSubcats((prev) => prev.filter((s) => s.id !== subId));
-  }
+  // Cat com subcats atualizado para o preview
+  const catForPreview = { ...cat, subcategories: subcats };
 
   return (
-    <div className={`card transition-opacity duration-150 ${isDragging ? "opacity-30" : "opacity-100"}`}>
-      {/* Header */}
-      <div
-        className="flex items-center gap-3 px-4 py-3.5 cursor-pointer select-none"
-        onClick={() => setOpen((v) => !v)}
-      >
-        <GripVertical
-          size={16}
-          className="text-slate-300 dark:text-gray-600 shrink-0 cursor-grab active:cursor-grabbing"
-          style={{ touchAction: "none" }}
-          onPointerDown={(e) => { e.stopPropagation(); onGripPointerDown(e); }}
-          onClick={(e) => e.stopPropagation()}
-        />
-
-        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${getCatColor(cat.code)}`}>
-          <Icon size={18} />
-        </span>
-
-        <div className="flex-1 min-w-0 flex items-center gap-3 flex-wrap" onClick={(e) => e.stopPropagation()}>
-          <InlineName
-            value={cat.name}
-            onSave={renameCategory}
-            className="font-semibold text-slate-800 dark:text-gray-100"
+    <>
+      <div className={`card transition-opacity duration-150 ${isDragging ? "opacity-30" : "opacity-100"}`}>
+        {/* Header */}
+        <div className="flex items-center gap-3 px-4 py-3.5 cursor-pointer select-none" onClick={() => setOpen((v) => !v)}>
+          <GripVertical
+            size={16} className="text-slate-300 dark:text-gray-600 shrink-0 cursor-grab active:cursor-grabbing"
+            style={{ touchAction: "none" }}
+            onPointerDown={(e) => { e.stopPropagation(); onGripPointerDown(e); }}
+            onClick={(e) => e.stopPropagation()}
           />
-          <button
-            onClick={toggleFreeText}
-            title={cat.allowsFreeText ? "Texto livre — clique para usar subcategorias" : "Subcategorias — clique para texto livre"}
-            className={`flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium transition ${
-              cat.allowsFreeText
-                ? "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400"
-                : "bg-slate-100 dark:bg-gray-700 text-slate-500 dark:text-gray-400"
-            }`}
-          >
-            {cat.allowsFreeText
-              ? <><ToggleRight size={13} /> Texto livre</>
-              : <><ToggleLeft  size={13} /> Subcategorias</>}
-          </button>
-          {!cat.allowsFreeText && (
-            <span className="text-xs text-slate-400 dark:text-gray-500">
-              {subcats.length} {subcats.length !== 1 ? "subcategorias" : "subcategoria"}
-            </span>
-          )}
-        </div>
 
-        <button
-          onClick={(e) => { e.stopPropagation(); handleDeleteCat(); }}
-          className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition shrink-0"
-          title="Excluir categoria"
-        >
-          <Trash2 size={14} />
-        </button>
+          <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${getCatColor(cat.code)}`}>
+            <Icon size={18} />
+          </span>
 
-        <ChevronDown size={16} className={`text-slate-400 dark:text-gray-500 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
-      </div>
-
-      {deleteErr && (
-        <p className="px-5 pb-3 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/10">
-          {deleteErr}
-        </p>
-      )}
-
-      {/* Expanded body */}
-      {open && (
-        <div className="border-t border-slate-100 dark:border-gray-700/60 px-5 py-4 space-y-4">
-
-          {/* SLA */}
-          <div className="flex items-center gap-3">
-            <Clock size={14} className="text-slate-400 dark:text-gray-500 shrink-0" />
-            <span className="text-sm text-slate-500 dark:text-gray-400 w-20 shrink-0">SLA (horas)</span>
-            {slaEditing ? (
-              <div className="flex items-center gap-1">
-                <input
-                  autoFocus
-                  type="number"
-                  min="1"
-                  value={slaDraft}
-                  onChange={(e) => setSlaDraft(e.target.value)}
-                  onBlur={saveSlaHours}
-                  onKeyDown={(e) => { if (e.key === "Enter") saveSlaHours(); if (e.key === "Escape") { setSlaEditing(false); setSlaDraft(cat.slaHours != null ? String(cat.slaHours) : ""); } }}
-                  placeholder="Ex: 24"
-                  className="field-input py-1 text-sm w-24"
-                />
-              </div>
-            ) : (
-              <button
-                onClick={() => setSlaEditing(true)}
-                className="group flex items-center gap-1.5 text-sm text-slate-700 dark:text-gray-200 rounded-lg px-2 py-1 hover:bg-slate-100 dark:hover:bg-gray-800 transition"
-                title="Clique para editar SLA"
-              >
-                {cat.slaHours ? (
-                  <span className="font-medium">{cat.slaHours}h</span>
-                ) : (
-                  <span className="text-slate-400 dark:text-gray-500 italic">Sem prazo</span>
-                )}
-                <Pencil size={11} className="opacity-0 group-hover:opacity-60 transition text-slate-400" />
-              </button>
+          <div className="flex-1 min-w-0 flex items-center gap-3 flex-wrap" onClick={(e) => e.stopPropagation()}>
+            <InlineName value={cat.name} onSave={renameCategory} className="font-semibold text-slate-800 dark:text-gray-100" />
+            <button onClick={toggleFreeText}
+              title={cat.allowsFreeText ? "Texto livre — clique para usar subcategorias" : "Subcategorias — clique para texto livre"}
+              className={`flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium transition ${
+                cat.allowsFreeText ? "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400" : "bg-slate-100 dark:bg-gray-700 text-slate-500 dark:text-gray-400"
+              }`}>
+              {cat.allowsFreeText ? <><ToggleRight size={13} /> Texto livre</> : <><ToggleLeft size={13} /> Subcategorias</>}
+            </button>
+            {!cat.allowsFreeText && (
+              <span className="text-xs text-slate-400 dark:text-gray-500">
+                {subcats.length} {subcats.length !== 1 ? "subcategorias" : "subcategoria"}
+              </span>
             )}
           </div>
 
-          {/* Prioridade padrão — exibida para categorias freeText/remote (sem subcategorias) */}
-          {cat.allowsFreeText && (
-            <div className="flex items-center gap-3">
-              <Flame size={14} className="text-slate-400 dark:text-gray-500 shrink-0" />
-              <span className="text-sm text-slate-500 dark:text-gray-400 w-20 shrink-0">Prioridade</span>
-              <PrioritySelector
-                value={cat.defaultPriority ?? "MEDIUM"}
-                onChange={saveCategoryPriority}
-              />
-            </div>
-          )}
+          {/* Preview button */}
+          <button
+            onClick={(e) => { e.stopPropagation(); setShowPreview(true); }}
+            className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg text-slate-400 dark:text-gray-500 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/20 transition shrink-0"
+            title="Visualizar como o solicitante vê"
+          >
+            <Eye size={13} /> Preview
+          </button>
 
-          {cat.allowsFreeText ? (
-            <p className="text-sm text-slate-400 dark:text-gray-500 italic">
-              O usuário descreve o problema livremente — nenhuma subcategoria é exibida.
-            </p>
-          ) : (
-            <>
-              {subcats.length === 0 ? (
-                <p className="text-sm text-slate-400 dark:text-gray-500 border border-dashed border-slate-200 dark:border-gray-700 rounded-xl py-4 text-center">
-                  Nenhuma subcategoria. Adicione abaixo.
-                </p>
+          <button onClick={(e) => { e.stopPropagation(); handleDeleteCat(); }}
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition shrink-0"
+            title="Excluir categoria">
+            <Trash2 size={14} />
+          </button>
+
+          <ChevronDown size={16} className={`text-slate-400 dark:text-gray-500 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+        </div>
+
+        {deleteErr && <p className="px-5 pb-3 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/10">{deleteErr}</p>}
+
+        {/* Expanded body */}
+        {open && (
+          <div className="border-t border-slate-100 dark:border-gray-700/60 px-5 py-4 space-y-4">
+            {/* SLA */}
+            <div className="flex items-center gap-3">
+              <Clock size={14} className="text-slate-400 dark:text-gray-500 shrink-0" />
+              <span className="text-sm text-slate-500 dark:text-gray-400 w-20 shrink-0">SLA (horas)</span>
+              {slaEditing ? (
+                <input autoFocus type="number" min="1" value={slaDraft}
+                  onChange={(e) => setSlaDraft(e.target.value)} onBlur={saveSlaHours}
+                  onKeyDown={(e) => { if (e.key === "Enter") saveSlaHours(); if (e.key === "Escape") { setSlaEditing(false); setSlaDraft(cat.slaHours != null ? String(cat.slaHours) : ""); } }}
+                  placeholder="Ex: 24" className="field-input py-1 text-sm w-24" />
               ) : (
-                <div ref={subListRef} className="space-y-1.5">
-                  {subcats.map((sub, idx) => (
-                    <div key={sub.id}>
-                      <DropLine show={subFromIdx !== null && subOverIdx === idx && subFromIdx > idx} />
-                      <SubRow
-                        sub={sub}
-                        catId={cat.id}
-                        onRename={renameSubcategory}
-                        onDelete={deleteSubcategory}
-                        onUpdateSla={updateSubcategorySla}
-                        onUpdatePriority={updateSubcategoryPriority}
-                        onUpdateN1Tips={updateSubcategoryN1Tips}
-                        onUpdateNucleo={updateSubcategoryNucleo}
-                        onUpdateApproval={updateSubcategoryApproval}
-                        isDragging={subFromIdx === idx}
-                        onGripPointerDown={(e) => { e.stopPropagation(); startSubDrag(e, idx); }}
-                      />
-                      <DropLine show={subFromIdx !== null && subOverIdx === idx && subFromIdx < idx} />
-                    </div>
+                <button onClick={() => setSlaEditing(true)}
+                  className="group flex items-center gap-1.5 text-sm text-slate-700 dark:text-gray-200 rounded-lg px-2 py-1 hover:bg-slate-100 dark:hover:bg-gray-800 transition">
+                  {cat.slaHours ? <span className="font-medium">{cat.slaHours}h</span> : <span className="text-slate-400 dark:text-gray-500 italic">Sem prazo</span>}
+                  <Pencil size={11} className="opacity-0 group-hover:opacity-60 transition text-slate-400" />
+                </button>
+              )}
+            </div>
+
+            {cat.allowsFreeText && (
+              <div className="flex items-center gap-3">
+                <Flame size={14} className="text-slate-400 dark:text-gray-500 shrink-0" />
+                <span className="text-sm text-slate-500 dark:text-gray-400 w-20 shrink-0">Prioridade</span>
+                <div className="flex flex-wrap gap-1">
+                  {PRIORITY_OPTIONS.map((opt) => (
+                    <button key={opt.value} type="button"
+                      onClick={async () => {
+                        try {
+                          const res = await api.patch(`/categories/${cat.id}`, { defaultPriority: opt.value });
+                          onUpdate({ ...cat, defaultPriority: res.data.defaultPriority });
+                          addToast({ message: "Prioridade padrão atualizada", type: "success" });
+                        } catch (e) { addToast({ message: "Erro ao salvar", type: "error" }); }
+                      }}
+                      className={`rounded-full border text-[11px] font-semibold transition px-2 py-0.5 ${
+                        (cat.defaultPriority ?? "MEDIUM") === opt.value ? `${opt.active} border-transparent` : `${opt.cls} border-transparent hover:opacity-80`
+                      }`}>
+                      {opt.label}
+                    </button>
                   ))}
                 </div>
-              )}
-
-              <div className="flex gap-2 pt-1">
-                <input
-                  className="field-input flex-1 text-sm py-2"
-                  placeholder="Nova subcategoria..."
-                  value={newSub}
-                  onChange={(e) => setNewSub(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && addSubcategory()}
-                  maxLength={80}
-                />
-                <button
-                  onClick={addSubcategory}
-                  disabled={!newSub.trim() || savingSub}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 dark:bg-gray-700 hover:bg-slate-200 dark:hover:bg-gray-600 text-slate-700 dark:text-gray-200 text-sm font-medium transition disabled:opacity-40 shrink-0"
-                >
-                  {savingSub ? <Spinner className="h-4 w-4" /> : <><Plus size={14} /> Adicionar</>}
-                </button>
               </div>
-              {addingErr && <p className="text-xs text-red-500 dark:text-red-400">{addingErr}</p>}
-            </>
-          )}
-        </div>
+            )}
+
+            {cat.allowsFreeText ? (
+              <p className="text-sm text-slate-400 dark:text-gray-500 italic">
+                O usuário descreve o problema livremente — nenhuma subcategoria é exibida.
+              </p>
+            ) : (
+              <>
+                {subcats.length === 0 ? (
+                  <p className="text-sm text-slate-400 dark:text-gray-500 border border-dashed border-slate-200 dark:border-gray-700 rounded-xl py-4 text-center">
+                    Nenhuma subcategoria. Adicione abaixo.
+                  </p>
+                ) : (
+                  <div ref={subListRef} className="space-y-1.5">
+                    {subcats.map((sub, idx) => (
+                      <div key={sub.id}>
+                        <DropLine show={subFromIdx !== null && subOverIdx === idx && subFromIdx > idx} />
+                        <SubRow
+                          sub={sub} catId={cat.id}
+                          onDelete={deleteSubcat} onUpdate={updateSubcat}
+                          isDragging={subFromIdx === idx}
+                          onGripPointerDown={(e) => { e.stopPropagation(); startSubDrag(e, idx); }}
+                        />
+                        <DropLine show={subFromIdx !== null && subOverIdx === idx && subFromIdx < idx} />
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="flex gap-2 pt-1">
+                  <input
+                    className="field-input flex-1 text-sm py-2" placeholder="Nova subcategoria..."
+                    value={newSub} onChange={(e) => setNewSub(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && addSubcategory()} maxLength={80}
+                  />
+                  <button onClick={addSubcategory} disabled={!newSub.trim() || savingSub}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 dark:bg-gray-700 hover:bg-slate-200 dark:hover:bg-gray-600 text-slate-700 dark:text-gray-200 text-sm font-medium transition disabled:opacity-40 shrink-0">
+                    {savingSub ? <Spinner className="h-4 w-4" /> : <><Plus size={14} /> Adicionar</>}
+                  </button>
+                </div>
+                {addingErr && <p className="text-xs text-red-500 dark:text-red-400">{addingErr}</p>}
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
+      {showPreview && (
+        <CategoryPreviewModal cat={catForPreview} onClose={() => setShowPreview(false)} />
       )}
-    </div>
+    </>
   );
 }
 
 // ── New Category Modal ────────────────────────────────────────────────────────
 function NewCategoryModal({ onClose, onCreate }) {
-  const [name,           setName]           = useState("");
+  const [name, setName] = useState("");
   const [allowsFreeText, setAllowsFreeText] = useState(false);
-  const [saving,         setSaving]         = useState(false);
-  const [err,            setErr]            = useState("");
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -727,10 +1052,7 @@ function NewCategoryModal({ onClose, onCreate }) {
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="card w-full max-w-sm p-6 space-y-4">
         <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-100 dark:bg-brand-900/40 text-brand-600 dark:text-brand-400">
@@ -741,44 +1063,24 @@ function NewCategoryModal({ onClose, onCreate }) {
             <p className="text-xs text-slate-500 dark:text-gray-400 mt-0.5">Será exibida no formulário de chamado</p>
           </div>
         </div>
-
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
             <label className="field-label">Nome *</label>
-            <input
-              autoFocus required
-              className="field-input"
-              placeholder="Ex: Periféricos"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              maxLength={60}
-            />
+            <input autoFocus required className="field-input" placeholder="Ex: Periféricos" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} />
           </div>
-
           <label className="flex items-center gap-3 cursor-pointer rounded-xl border border-slate-200 dark:border-gray-700 px-4 py-3 hover:bg-slate-50 dark:hover:bg-gray-800 transition">
-            <input
-              type="checkbox"
-              checked={allowsFreeText}
-              onChange={(e) => setAllowsFreeText(e.target.checked)}
-              className="rounded accent-brand-600"
-            />
+            <input type="checkbox" checked={allowsFreeText} onChange={(e) => setAllowsFreeText(e.target.checked)} className="rounded accent-brand-600" />
             <div>
               <div className="text-sm font-medium text-slate-700 dark:text-gray-200">Texto livre</div>
               <div className="text-xs text-slate-400 dark:text-gray-500">Usuário descreve em vez de escolher subcategoria</div>
             </div>
           </label>
-
           {err && <Alert message={err} />}
-
           <div className="flex gap-2 justify-end pt-1">
             <button type="button" onClick={onClose} className="btn-secondary text-sm py-2 px-4">Cancelar</button>
-            <button
-              type="submit"
-              disabled={saving || !name.trim()}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 text-sm font-semibold transition disabled:opacity-60"
-            >
-              {saving ? <Spinner className="h-4 w-4" /> : <Plus size={14} />}
-              Criar
+            <button type="submit" disabled={saving || !name.trim()}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 text-sm font-semibold transition disabled:opacity-60">
+              {saving ? <Spinner className="h-4 w-4" /> : <Plus size={14} />} Criar
             </button>
           </div>
         </form>
@@ -815,12 +1117,10 @@ export default function CategoriesPage() {
   function handleUpdate(updated) {
     setCategories((prev) => prev.map((c) => c.id === updated.id ? { ...c, ...updated } : c));
   }
-
   function handleDelete(catId) {
     setCategories((prev) => prev.filter((c) => c.id !== catId));
     addToast({ message: "Categoria excluída", type: "success" });
   }
-
   function handleCreate(cat) {
     setCategories((prev) => [...prev, { ...cat, subcategories: cat.subcategories || [] }]);
     setShowNew(false);
@@ -830,28 +1130,22 @@ export default function CategoriesPage() {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-gray-950">
       <AppHeader />
-
       <main className="max-w-3xl mx-auto p-4 md:p-6 space-y-5">
-
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-lg font-semibold text-slate-900 dark:text-gray-100">Categorias de chamado</h1>
             <p className="text-sm text-slate-500 dark:text-gray-400 mt-0.5">
-              Arraste para reordenar · clique no nome para editar
+              Arraste para reordenar · lápis para editar subcategoria · <Eye size={12} className="inline" /> para preview
             </p>
           </div>
-          <button
-            onClick={() => setShowNew(true)}
-            className="flex items-center gap-1.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white px-3.5 py-2 text-sm font-semibold transition"
-          >
+          <button onClick={() => setShowNew(true)}
+            className="flex items-center gap-1.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white px-3.5 py-2 text-sm font-semibold transition">
             <Plus size={15} /> Nova categoria
           </button>
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <Spinner className="h-8 w-8" />
-          </div>
+          <div className="flex items-center justify-center py-20"><Spinner className="h-8 w-8" /></div>
         ) : categories.length === 0 ? (
           <div className="card p-12 text-center">
             <Tag size={32} className="mx-auto text-slate-300 dark:text-gray-600 mb-3" />
@@ -863,23 +1157,15 @@ export default function CategoriesPage() {
             {categories.map((cat, idx) => (
               <div key={cat.id}>
                 <DropLine show={catFromIdx !== null && catOverIdx === idx && catFromIdx > idx} />
-                <CategoryCard
-                  cat={cat}
-                  onUpdate={handleUpdate}
-                  onDelete={handleDelete}
-                  onGripPointerDown={(e) => startCatDrag(e, idx)}
-                  isDragging={catFromIdx === idx}
-                />
+                <CategoryCard cat={cat} onUpdate={handleUpdate} onDelete={handleDelete}
+                  onGripPointerDown={(e) => startCatDrag(e, idx)} isDragging={catFromIdx === idx} />
                 <DropLine show={catFromIdx !== null && catOverIdx === idx && catFromIdx < idx} />
               </div>
             ))}
           </div>
         )}
       </main>
-
-      {showNew && (
-        <NewCategoryModal onClose={() => setShowNew(false)} onCreate={handleCreate} />
-      )}
+      {showNew && <NewCategoryModal onClose={() => setShowNew(false)} onCreate={handleCreate} />}
     </div>
   );
 }

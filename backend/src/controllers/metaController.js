@@ -134,7 +134,11 @@ const VALID_NUCLEOS = ["NMT", "NIR", "NSS"];
 
 export async function updateSubcategory(req, res) {
   const subId = Number(req.params.subId);
-  const { name, slaHours, defaultPriority, n1Tips, nucleoResponsavel, requiresApproval } = req.body || {};
+  const {
+    name, slaHours, defaultPriority, n1Tips, nucleoResponsavel,
+    requiresApproval, dualApproval, requiresPresential, requiresCauseSolution,
+    allowsFreeText, freeTextLabel, formType, customFields,
+  } = req.body || {};
   const sub = await prisma.subcategory.findUnique({ where: { id: subId } });
   if (!sub) return res.status(404).json({ error: "Subcategoria não encontrada" });
   const data = {};
@@ -143,8 +147,16 @@ export async function updateSubcategory(req, res) {
     if (!trimmed) return res.status(400).json({ error: "Nome obrigatório" });
     data.name = trimmed;
   }
-  if (slaHours !== undefined) data.slaHours = slaHours ? Number(slaHours) : null;
-  if (n1Tips !== undefined)    data.n1Tips   = n1Tips || null;
+  if (slaHours !== undefined)            data.slaHours            = slaHours ? Number(slaHours) : null;
+  if (n1Tips !== undefined)              data.n1Tips              = n1Tips || null;
+  if (requiresApproval !== undefined)    data.requiresApproval    = Boolean(requiresApproval);
+  if (dualApproval !== undefined)        data.dualApproval        = Boolean(dualApproval);
+  if (requiresPresential !== undefined)  data.requiresPresential  = Boolean(requiresPresential);
+  if (requiresCauseSolution !== undefined) data.requiresCauseSolution = Boolean(requiresCauseSolution);
+  if (allowsFreeText !== undefined)      data.allowsFreeText      = Boolean(allowsFreeText);
+  if (freeTextLabel !== undefined)       data.freeTextLabel       = freeTextLabel?.trim() || null;
+  if (formType !== undefined)            data.formType            = formType || null;
+  if (customFields !== undefined)        data.customFields        = customFields || null;
   if (defaultPriority !== undefined) {
     if (!VALID_PRIORITIES.includes(defaultPriority))
       return res.status(400).json({ error: "Prioridade inválida" });
@@ -155,7 +167,6 @@ export async function updateSubcategory(req, res) {
       return res.status(400).json({ error: "Núcleo inválido" });
     data.nucleoResponsavel = nucleoResponsavel || null;
   }
-  if (requiresApproval !== undefined) data.requiresApproval = Boolean(requiresApproval);
   const updated = await prisma.subcategory.update({ where: { id: subId }, data });
   res.json(updated);
 }

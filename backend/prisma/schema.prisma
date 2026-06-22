@@ -191,6 +191,10 @@ model Subcategory {
   dualApproval          Boolean  @default(false)
   requiresPresential    Boolean  @default(true)
   requiresCauseSolution Boolean  @default(true)
+  allowsFreeText        Boolean  @default(false)
+  freeTextLabel         String?
+  formType              String?
+  customFields          String?  @db.Text
   categoryId            Int
   category              Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   tickets               Ticket[]

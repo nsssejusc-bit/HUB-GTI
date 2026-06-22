@@ -148,8 +148,22 @@ function DeptSelect({ value, onChange, departments, placeholder = "Selecione o s
 }
 
 // ── Formulários extras por tipo ──────────────────────────────────────────────
-function ExtraFields({ formType, fields, setFields, departments }) {
+function ExtraFields({ formType, fields, setFields, departments, wppPhone }) {
   const set = (key, val) => setFields((prev) => ({ ...prev, [key]: val }));
+
+  if (formType === "whatsapp_print") {
+    return (
+      <div className="rounded-xl border border-green-200 dark:border-green-700/60 bg-green-50 dark:bg-green-900/15 p-4 space-y-2 mt-1">
+        <div className="flex items-center gap-2 text-sm font-semibold text-green-800 dark:text-green-300">
+          <span className="text-base leading-none">📲</span> Envio por WhatsApp
+        </div>
+        <p className="text-xs text-green-700 dark:text-green-400 leading-relaxed">
+          Após confirmar o chamado, um botão abrirá o WhatsApp da GTI com uma mensagem já preenchida
+          contendo seu nome e o número do protocolo. Basta anexar o arquivo e enviar.
+        </p>
+      </div>
+    );
+  }
 
   if (formType === "printer_counter") {
     const selectedModel = PRINTER_COUNTER_MODELS.find((m) => m.id === fields.printerModel);
@@ -431,6 +445,8 @@ function isExtraValid(formType, fields) {
   if (formType === "siged_sector_move")  return !!(fields.cpf?.trim() && fields.targetDeptId);
   if (formType === "siged_user_delete")  return !!(fields.cpf?.trim());
   if (formType === "freetext")           return (fields.freetext?.trim().length || 0) >= 5;
+  if (formType === "custom")            return true; // validação feita em canSubmit com parsedCustomFields
+  if (formType === "whatsapp_print")    return true;
   return true;
 }
 
@@ -467,6 +483,8 @@ function buildPayload(formType, fields) {
     freeTextDescription = `CPF: ${fields.cpf}${fields.obs ? `\nObservações: ${fields.obs}` : ""}`;
   } else if (formType === "freetext") {
     freeTextDescription = fields.freetext?.trim() || null;
+  } else if (formType === "whatsapp_print") {
+    freeTextDescription = "Envio de arquivo para impressão via WhatsApp.";
   }
 
   return { freeTextDescription, extraData };
@@ -547,8 +565,15 @@ export default function NewTicketPage() {
   const selectedSubcategory = selectedCategory?.subcategories?.find((s) => s.id === form.subcategoryId);
   const subN1Tips           = selectedSubcategory?.n1Tips ? JSON.parse(selectedSubcategory.n1Tips) : [];
   const subCode             = selectedSubcategory?.code;
-  const formType           = subCode ? (EXTRA_FORM_TYPE[subCode] ?? "none") : null;
-  const requiresApproval   = selectedSubcategory?.requiresApproval ?? false;
+  // DB formType tem prioridade sobre o mapeamento estático
+  const formType            = selectedSubcategory?.formType || (subCode ? (EXTRA_FORM_TYPE[subCode] ?? null) : null);
+  const requiresApproval    = selectedSubcategory?.requiresApproval ?? false;
+  // Campo livre configurado na subcategoria (só exibido quando não há outro formType)
+  const subcatHasFreeText   = !!(selectedSubcategory?.allowsFreeText && (!formType || formType === "none"));
+  // Campos personalizados (formType === "custom")
+  const parsedCustomFields  = (formType === "custom" && selectedSubcategory?.customFields)
+    ? (() => { try { return JSON.parse(selectedSubcategory.customFields); } catch { return []; } })()
+    : [];
 
   const steps      = ["Tipo do problema", "Detalhes"];
   const currentStep = screen === "category" ? 1 : 2;
@@ -584,6 +609,14 @@ export default function NewTicketPage() {
     if (isRemote) return form.anyDeskCode.trim().length >= 3;
     if (selectedCategory?.allowsFreeText) return form.freeTextDescription.trim().length >= 5;
     if (!form.subcategoryId) return false;
+    if (subcatHasFreeText) return (extraFields.subcatFreetext?.trim().length || 0) >= 5;
+    if (formType === "custom") {
+      const requiredFields = parsedCustomFields.filter(f => f.required);
+      return requiredFields.every(f => {
+        const val = extraFields[`custom_${f.key}`];
+        return val !== undefined && String(val).trim().length > 0;
+      });
+    }
     if (PERSONAL_DATA_FORMS.has(formType) && !dataConfirmed) return false;
     return isExtraValid(formType, extraFields);
   }
@@ -602,6 +635,17 @@ export default function NewTicketPage() {
         payload.freeTextDescription = form.freeTextDescription?.trim() || null;
       } else if (selectedCategory?.allowsFreeText) {
         payload.freeTextDescription = form.freeTextDescription?.trim() || null;
+      } else if (subcatHasFreeText) {
+        payload.freeTextDescription = extraFields.subcatFreetext?.trim() || null;
+      } else if (formType === "custom") {
+        const lines = parsedCustomFields.map(f => {
+          const val = extraFields[`custom_${f.key}`];
+          return `${f.label}: ${val ?? ""}`;
+        }).filter(Boolean);
+        payload.freeTextDescription = lines.join("\n") || null;
+        payload.extraData = Object.fromEntries(
+          parsedCustomFields.map(f => [f.key, extraFields[`custom_${f.key}`] ?? ""])
+        );
       } else if (formType) {
         const built = buildPayload(formType, extraFields);
         payload.freeTextDescription = built.freeTextDescription;
@@ -623,6 +667,10 @@ export default function NewTicketPage() {
         isPrinterCounter:   formType === "printer_counter",
         printerModel:       formType === "printer_counter" ? extraFields.printerModel : null,
         subcategoryCode:    subCode || null,
+        isWhatsappPrint:    formType === "whatsapp_print",
+        wppPhone:           formType === "whatsapp_print"
+          ? (selectedSubcategory?.freeTextLabel?.replace(/\D/g, "") || "")
+          : null,
       });
     } catch (e) {
       setError(e.response?.data?.error || "Falha ao abrir chamado");
@@ -633,6 +681,13 @@ export default function NewTicketPage() {
 
   // ── Tela de sucesso ──────────────────────────────────────────────────────
   if (createdTicket) {
+    if (createdTicket.isWhatsappPrint) return (
+      <WhatsappPrintSuccessScreen
+        ticketNumber={createdTicket.ticketNumber}
+        wppPhone={createdTicket.wppPhone}
+        userName={user?.name || ""}
+      />
+    );
     if (createdTicket.isRemote) return <RemoteSuccessScreen ticketNumber={createdTicket.ticketNumber} />;
     if (createdTicket.isPrinterCounter) return (
       <PrinterCounterSuccessScreen
@@ -921,13 +976,90 @@ export default function NewTicketPage() {
                       <N1TipsBox tips={subN1Tips} title={selectedSubcategory.name} />
                     )}
 
-                    {form.subcategoryId && formType && formType !== "none" && (
+                    {/* Campo livre configurado na subcategoria */}
+                    {form.subcategoryId && subcatHasFreeText && (
+                      <div className="rounded-xl border border-slate-200 dark:border-gray-700 p-4 mt-1 space-y-1">
+                        <label className="field-label">
+                          {selectedSubcategory.freeTextLabel || "Descreva a solicitação"} *
+                        </label>
+                        <textarea
+                          rows={4}
+                          autoFocus
+                          className="field-input resize-none"
+                          placeholder="Descreva com o máximo de detalhes..."
+                          value={extraFields.subcatFreetext || ""}
+                          onChange={(e) => setExtraFields((prev) => ({ ...prev, subcatFreetext: e.target.value }))}
+                        />
+                        <p className={`text-xs ${(extraFields.subcatFreetext?.length || 0) < 5 ? "text-amber-600 dark:text-amber-400" : "text-slate-400 dark:text-gray-500"}`}>
+                          {(extraFields.subcatFreetext?.length || 0)} / mínimo 5 caracteres
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Campos personalizados (formType = "custom") */}
+                    {form.subcategoryId && formType === "custom" && parsedCustomFields.length > 0 && (
+                      <div className="rounded-xl border border-slate-200 dark:border-gray-700 p-4 mt-1 space-y-3">
+                        {parsedCustomFields.map((field) => {
+                          const fieldKey = `custom_${field.key}`;
+                          const val = extraFields[fieldKey] || "";
+                          return (
+                            <div key={field.key}>
+                              <label className="field-label">
+                                {field.label} {field.required && <span className="text-red-500">*</span>}
+                              </label>
+                              {field.type === "select" ? (
+                                <select
+                                  className="field-input"
+                                  value={val}
+                                  onChange={(e) => setExtraFields(prev => ({ ...prev, [fieldKey]: e.target.value }))}
+                                >
+                                  <option value="">Selecione...</option>
+                                  {(field.options || []).map((opt) => (
+                                    <option key={opt} value={opt}>{opt}</option>
+                                  ))}
+                                </select>
+                              ) : field.type === "textarea" ? (
+                                <textarea
+                                  rows={3}
+                                  className="field-input resize-none"
+                                  placeholder={`${field.label}...`}
+                                  value={val}
+                                  onChange={(e) => setExtraFields(prev => ({ ...prev, [fieldKey]: e.target.value }))}
+                                />
+                              ) : (
+                                <input
+                                  type={field.type === "number" ? "number" : "text"}
+                                  className="field-input"
+                                  placeholder={field.type === "number" ? "Ex: 123" : `${field.label}...`}
+                                  value={val}
+                                  onChange={(e) => setExtraFields(prev => ({ ...prev, [fieldKey]: e.target.value }))}
+                                />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* WhatsApp print — renderiza sem container extra */}
+                    {form.subcategoryId && formType === "whatsapp_print" && (
+                      <ExtraFields
+                        formType="whatsapp_print"
+                        fields={extraFields}
+                        setFields={setExtraFields}
+                        departments={departments}
+                        wppPhone=""
+                      />
+                    )}
+
+                    {form.subcategoryId && !subcatHasFreeText && formType && formType !== "none" && formType !== "custom" && formType !== "whatsapp_print" && (
                       <div className="rounded-xl border border-slate-200 dark:border-gray-700 p-4 space-y-1 mt-1">
                         <ExtraFields
                           formType={formType}
                           fields={extraFields}
                           setFields={setExtraFields}
                           departments={departments}
+                          wppPhone=""
                         />
                         {PERSONAL_DATA_FORMS.has(formType) && (
                           <label className="flex items-start gap-2.5 cursor-pointer pt-3 mt-2 border-t border-slate-100 dark:border-gray-700">
@@ -1036,6 +1168,73 @@ export default function NewTicketPage() {
           )}
         </div>
       </main>
+    </div>
+  );
+}
+
+// ── Tela: chamado de impressão via WhatsApp aberto ────────────────────────────
+function WhatsappPrintSuccessScreen({ ticketNumber, wppPhone, userName }) {
+  const msg = `Olá! Sou *${userName}*, protocolo do chamado: *${ticketNumber}*. Segue o arquivo solicitado para impressão.`;
+  const wppUrl = wppPhone
+    ? `https://wa.me/${wppPhone}?text=${encodeURIComponent(msg)}`
+    : null;
+
+  return (
+    <div className="min-h-screen bg-slate-50 dark:bg-gray-950 flex items-center justify-center p-4">
+      <div className="card w-full max-w-md p-8 space-y-5">
+
+        <div className="text-center space-y-3">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 mx-auto">
+            <CheckCircle2 size={28} />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-gray-100">Chamado aberto!</h2>
+            <p className="font-mono text-sm text-brand-600 dark:text-brand-400 mt-1">{ticketNumber}</p>
+          </div>
+        </div>
+
+        {/* Instrução */}
+        <div className="rounded-xl border border-green-200 dark:border-green-700/60 bg-green-50 dark:bg-green-900/15 p-4 space-y-3">
+          <div className="flex items-center gap-2 text-sm font-semibold text-green-800 dark:text-green-300">
+            <span className="text-base leading-none">📲</span> Agora envie o arquivo pelo WhatsApp
+          </div>
+          <p className="text-xs text-green-700 dark:text-green-400 leading-relaxed">
+            Clique no botão abaixo. O WhatsApp abrirá com a mensagem já preenchida —
+            basta <strong>anexar o arquivo</strong> e enviar.
+          </p>
+
+          {/* Preview da mensagem */}
+          <div className="rounded-lg bg-white dark:bg-gray-800 border border-green-200 dark:border-green-700/40 px-3 py-2.5">
+            <p className="text-[10px] text-green-600 dark:text-green-400 font-semibold mb-1 uppercase tracking-wide">Mensagem que será enviada</p>
+            <p className="text-xs text-slate-700 dark:text-gray-200 leading-relaxed">
+              Olá! Sou <strong>{userName}</strong>, protocolo do chamado:{" "}
+              <strong className="font-mono">{ticketNumber}</strong>. Segue o arquivo solicitado para impressão.
+            </p>
+          </div>
+
+          {wppUrl ? (
+            <a
+              href={wppUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 w-full rounded-xl bg-green-500 hover:bg-green-600 active:bg-green-700 text-white font-semibold py-3 text-sm transition"
+            >
+              <span className="text-lg leading-none">💬</span> Abrir WhatsApp e enviar arquivo
+            </a>
+          ) : (
+            <p className="text-xs text-amber-700 dark:text-amber-400 italic text-center">
+              Número de WhatsApp não configurado. Contate a GTI diretamente.
+            </p>
+          )}
+        </div>
+
+        <Link to={`/acompanhar/${ticketNumber}`} className="block text-center text-sm text-slate-500 dark:text-gray-400 hover:text-slate-700 dark:hover:text-gray-200 transition">
+          Acompanhar chamado
+        </Link>
+        <Link to="/" className="block text-center text-sm text-slate-400 dark:text-gray-500 hover:text-slate-600 dark:hover:text-gray-300 transition">
+          Voltar ao início
+        </Link>
+      </div>
     </div>
   );
 }

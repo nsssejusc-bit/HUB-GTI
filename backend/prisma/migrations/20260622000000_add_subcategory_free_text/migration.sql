@@ -1,0 +1,3 @@
+ALTER TABLE `Subcategory`
+  ADD COLUMN `allowsFreeText` TINYINT(1) NOT NULL DEFAULT 0,
+  ADD COLUMN `freeTextLabel` VARCHAR(191) NULL;
