@@ -208,6 +208,8 @@ function ToggleRow({ label, description, checked, onChange, indent = false }) {
 
 // ── Custom field row (construtor de campos) ───────────────────────────────────
 function CustomFieldRow({ field, onChange, onRemove }) {
+  const [optionsText, setOptionsText] = React.useState((field.options || []).join("\n"));
+
   function slugify(str) {
     return str.toLowerCase()
       .normalize("NFD").replace(/[̀-ͯ]/g, "")
@@ -231,7 +233,10 @@ function CustomFieldRow({ field, onChange, onRemove }) {
         <select
           className="field-input w-36 text-sm py-1.5 shrink-0"
           value={field.type}
-          onChange={(e) => onChange({ ...field, type: e.target.value, options: [] })}
+          onChange={(e) => {
+            setOptionsText("");
+            onChange({ ...field, type: e.target.value, options: [] });
+          }}
         >
           {CUSTOM_FIELD_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
         </select>
@@ -255,11 +260,16 @@ function CustomFieldRow({ field, onChange, onRemove }) {
         <div>
           <label className="field-label text-[10px]">Opções (uma por linha)</label>
           <textarea
-            rows={2}
+            rows={3}
             className="field-input text-xs resize-none"
             placeholder={"Opção 1\nOpção 2\nOpção 3"}
-            value={(field.options || []).join("\n")}
-            onChange={(e) => onChange({ ...field, options: e.target.value.split("\n").map(s => s.trim()).filter(Boolean) })}
+            value={optionsText}
+            onChange={(e) => {
+              const raw = e.target.value;
+              setOptionsText(raw);
+              const opts = raw.split("\n").map(s => s.trim()).filter(Boolean);
+              onChange({ ...field, options: opts });
+            }}
           />
         </div>
       )}
