@@ -208,7 +208,7 @@ function ToggleRow({ label, description, checked, onChange, indent = false }) {
 
 // ── Custom field row (construtor de campos) ───────────────────────────────────
 function CustomFieldRow({ field, onChange, onRemove }) {
-  const [optionsText, setOptionsText] = React.useState((field.options || []).join("\n"));
+  const [optionsText, setOptionsText] = useState((field.options || []).join("\n"));
 
   function slugify(str) {
     return str.toLowerCase()
