@@ -733,7 +733,7 @@ function SubRow({ sub, catId, onDelete, onUpdate, onGripPointerDown, isDragging 
               {sub.slaHours}h
             </span>
           )}
-          {priorityOpt && priorityOpt.value !== "MEDIUM" && (
+          {priorityOpt && (
             <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${priorityOpt.cls}`}>{priorityOpt.label}</span>
           )}
           {sub.requiresApproval && (

@@ -11,7 +11,7 @@ import { useServerTick, serverNow } from "../lib/serverTime";
 import {
   Ticket, AlertCircle, Activity, CheckCircle2,
   ChevronRight, Clock, RefreshCw, Filter, History,
-  ShieldCheck, ThumbsUp, ThumbsDown, X, Search, Download,
+  ShieldCheck, ThumbsUp, ThumbsDown, X, Search, Download, Megaphone,
 } from "lucide-react";
 
 function exportCsv(tickets) {
@@ -61,6 +61,75 @@ const CAT_CHIP = {
   PRINTER:   { on: "bg-green-500  text-white border-green-500",   off: "border-green-200  dark:border-green-800/60  text-green-600  dark:text-green-400  hover:bg-green-50  dark:hover:bg-green-900/20"  },
   _default:  { on: "bg-slate-600  text-white border-slate-600",   off: "border-slate-200  dark:border-gray-700      text-slate-600  dark:text-gray-400   hover:bg-slate-50  dark:hover:bg-gray-800"      },
 };
+
+// ── Balão flutuante de comunicado ─────────────────────────────────────────────
+const DISMISS_KEY = "dashAlertDismissed";
+
+function AlertBalloon() {
+  const [msg,     setMsg]     = useState("");
+  const [visible, setVisible] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+
+  useEffect(() => {
+    api.get("/config").then((r) => {
+      const m = (r.data.homeAlertMessage || "").trim();
+      if (!m) return;
+      if (localStorage.getItem(DISMISS_KEY) === m) return;
+      setMsg(m);
+      setVisible(true);
+    }).catch(() => {});
+  }, []);
+
+  function close(persist = false) {
+    if (persist) localStorage.setItem(DISMISS_KEY, msg);
+    setLeaving(true);
+    setTimeout(() => setVisible(false), 260);
+  }
+
+  if (!visible || !msg) return null;
+
+  return (
+    <div
+      className={`fixed left-6 top-1/2 -translate-y-1/2 z-40 w-72 transition-all duration-260 ${
+        leaving ? "opacity-0 -translate-x-2" : "opacity-100 translate-x-0"
+      }`}
+    >
+      {/* Balão */}
+      <div className="relative rounded-2xl bg-white dark:bg-gray-900 border-l-4 border-l-amber-400 dark:border-l-amber-500 border border-amber-200 dark:border-amber-700/60 shadow-xl shadow-black/10 dark:shadow-black/40">
+
+        {/* Cabeçalho */}
+        <div className="flex items-center gap-2 px-4 pt-3.5 pb-2 border-b border-amber-100 dark:border-amber-700/30">
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400">
+            <Megaphone size={13} />
+          </span>
+          <span className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wide">Comunicado</span>
+          <button
+            onClick={() => close(false)}
+            className="ml-auto flex h-5 w-5 items-center justify-center rounded-md text-slate-400 dark:text-gray-500 hover:text-slate-600 dark:hover:text-gray-300 hover:bg-slate-100 dark:hover:bg-gray-700 transition"
+            title="Fechar"
+          >
+            <X size={11} />
+          </button>
+        </div>
+
+        {/* Mensagem */}
+        <div className="px-4 py-3">
+          <p className="text-sm text-slate-700 dark:text-gray-200 leading-relaxed">{msg}</p>
+        </div>
+
+        {/* Rodapé */}
+        <div className="px-4 pb-3.5">
+          <button
+            onClick={() => close(true)}
+            className="text-[11px] text-slate-400 dark:text-gray-500 hover:text-slate-600 dark:hover:text-gray-300 underline underline-offset-2 transition"
+          >
+            Não mostrar mais
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ── View simplificada para Chefe de Setor ────────────────────────────────────
 function ChefeDashboard() {
@@ -115,6 +184,7 @@ function ChefeDashboard() {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-gray-950">
       <AppHeader />
+      <AlertBalloon />
 
       {/* Modal de rejeição */}
       {rejectId !== null && (
@@ -532,6 +602,7 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-gray-950">
       <AppHeader />
+      <AlertBalloon />
 
       <main className="max-w-6xl mx-auto p-4 md:p-6 space-y-5">
 
