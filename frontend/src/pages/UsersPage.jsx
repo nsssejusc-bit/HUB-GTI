@@ -149,6 +149,8 @@ export default function UsersPage() {
   const tecnicos    = active.filter((u) => u.role === "TECHNICIAN");
   const admins      = active.filter((u) => u.role === "ADMIN");
 
+  const [nameSearch, setNameSearch] = useState("");
+
   const tabData = { all: active, usuarios, tecnicos, admins, chefes, inativos: inactive };
   const tabs = [
     { key: "all",      label: "Todos",           count: active.length   },
@@ -159,7 +161,10 @@ export default function UsersPage() {
     { key: "inativos", label: "Desativados",       count: inactive.length, alert: true },
   ];
 
-  const displayList = tabData[tab] ?? active;
+  const baseList   = tabData[tab] ?? active;
+  const displayList = nameSearch.trim()
+    ? baseList.filter((u) => u.name.toLowerCase().includes(nameSearch.toLowerCase()))
+    : baseList;
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-gray-950">
@@ -329,6 +334,27 @@ export default function UsersPage() {
             <Spinner className="h-8 w-8" />
           </div>
         ) : (
+          <>
+            {/* Busca por nome */}
+            <div className="relative max-w-xs">
+              <input
+                type="text"
+                placeholder="Buscar por nome..."
+                value={nameSearch}
+                onChange={(e) => setNameSearch(e.target.value)}
+                className="field-input w-full pl-9 text-sm"
+              />
+              <Users size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-gray-500 pointer-events-none" />
+              {nameSearch && (
+                <button
+                  onClick={() => setNameSearch("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-gray-300"
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </div>
+
           <div className={`flex flex-col lg:flex-row gap-4 items-start transition-all ${selectedUser ? "" : ""}`}>
             {/* ── Lista compacta ──────────────────────────────────── */}
             <div className={`flex-1 min-w-0 card divide-y divide-slate-100 dark:divide-gray-700/60 transition-all ${selectedUser ? "hidden md:block" : ""}`}>
@@ -362,6 +388,7 @@ export default function UsersPage() {
               />
             )}
           </div>
+          </>
         )}
       </main>
     </div>

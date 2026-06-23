@@ -210,6 +210,7 @@ export async function getTicketPublic(req, res) {
     isRemote:            !!(ticket.anyDeskCode),
     presential:          ticket.presential,
     completionNote:      ticket.completionNote || null,
+    cancelNote:          ticket.cancelNotePublic ? (ticket.cancelNote || null) : null,
     unit:                ticket.unit?.name || null,
     technician:          ticket.assignedTech?.name || null,
     openedAt:            ticket.openedAt,
@@ -848,7 +849,7 @@ export async function sendMessage(req, res) {
     include: { author: { select: { name: true, role: true } } },
   });
 
-  req.app.get("io")?.emit("ticket:message", { ticketId: id });
+  req.app.get("io")?.emit("ticket:message", { ticketId: id, fromUserId: req.user.id });
   res.status(201).json(withImageUrl(msg, `/api/tickets/${id}/messages`));
 }
 
@@ -937,6 +938,37 @@ export async function sendMessagePublic(req, res) {
     data: { ticketId: ticket.id, fromUser: true, content: prepared.content },
   });
 
-  req.app.get("io")?.emit("ticket:message", { ticketId: ticket.id });
+  req.app.get("io")?.emit("ticket:message", { ticketId: ticket.id, fromUserId: null });
   res.status(201).json(withImageUrl(msg, `/api/tickets/track/${ticketNumber}/messages`));
+}
+
+// ── CANCEL ────────────────────────────────────────────────────────────────────
+export async function cancelTicket(req, res) {
+  const id = Number(req.params.id);
+  const { reason, showToUser } = req.body || {};
+
+  const ticket = await prisma.ticket.findUnique({ where: { id }, select: { id: true, status: true } });
+  if (!ticket) return res.status(404).json({ error: "Chamado não encontrado" });
+  if (ticket.status === "CANCELADO") return res.status(400).json({ error: "Chamado já está cancelado" });
+  if (ticket.status === "COMPLETED") return res.status(400).json({ error: "Não é possível cancelar um chamado concluído" });
+
+  await prisma.ticket.update({
+    where: { id },
+    data: {
+      status:          "CANCELADO",
+      cancelNote:      reason?.trim() || null,
+      cancelNotePublic: Boolean(showToUser),
+      history: {
+        create: {
+          fromStatus:   ticket.status,
+          toStatus:     "CANCELADO",
+          actorId:      req.user?.id ?? null,
+          internalNote: reason?.trim() || null,
+        },
+      },
+    },
+  });
+
+  req.app.get("io")?.emit("ticket:updated", { id });
+  res.json({ ok: true });
 }

@@ -10,7 +10,7 @@ import {
   transitionTicket, approveTicket, deleteTicket, submitFeedback,
   reopenTicket, assignTicket, listComments, addComment, submitFeedbackAuth,
   listMessages, sendMessage, listMessagesPublic, sendMessagePublic,
-  getMessageImage, getMessageImagePublic,
+  getMessageImage, getMessageImagePublic, cancelTicket,
 } from "../controllers/ticketController.js";
 import {
   listCategories, listUnits, listTechnicians, getPublicConfig,
@@ -144,6 +144,7 @@ router.get("/tickets/:id", authRequired, requireRole("TECHNICIAN", "ADMIN", "CHE
 router.post("/tickets/:id/transition", authRequired, requireRole("TECHNICIAN", "ADMIN"), transitionTicket);
 router.post("/tickets/:id/approve",    authRequired, requireRole("CHEFE_SETOR", "ADMIN"), approveTicket);
 router.post("/tickets/:id/reopen",     authRequired, reopenTicket);
+router.post("/tickets/:id/cancel",     authRequired, requireRole("TECHNICIAN", "ADMIN"), cancelTicket);
 router.patch("/tickets/:id/assign",    authRequired, requireRole("TECHNICIAN", "ADMIN"), assignTicket);
 router.get("/tickets/:id/comments",   authRequired, listComments);
 router.post("/tickets/:id/comments",  authRequired, addComment);

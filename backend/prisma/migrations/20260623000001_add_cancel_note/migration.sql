@@ -1,0 +1,2 @@
+ALTER TABLE `Ticket` ADD COLUMN `cancelNote` TEXT NULL;
+ALTER TABLE `Ticket` ADD COLUMN `cancelNotePublic` BOOLEAN NOT NULL DEFAULT false;

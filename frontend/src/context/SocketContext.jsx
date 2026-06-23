@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import { useAuth } from "./AuthContext";
+import { playNewTicket, playNewMessage } from "../lib/sounds";
 
 const SocketContext = createContext(null);
 const ConnectedCtx  = createContext(false);
@@ -75,6 +76,8 @@ export function SocketProvider({ children }) {
         data.nucleoResponsavel !== u.nucleoResponsavel
       ) return;
 
+      playNewTicket();
+
       // Incrementa badge só se a aba não estiver em foco
       if (!document.hasFocus()) {
         setUnread((n) => n + 1);
@@ -98,6 +101,13 @@ export function SocketProvider({ children }) {
           notif.close();
         };
       }
+    });
+
+    socket.on("ticket:message", ({ fromUserId }) => {
+      const u = userRef.current;
+      if (!u || !NOTIFY_ROLES.includes(u.role)) return;
+      if (fromUserId && fromUserId === u.id) return;
+      playNewMessage();
     });
 
     socket.on("user:updated", (data) => {

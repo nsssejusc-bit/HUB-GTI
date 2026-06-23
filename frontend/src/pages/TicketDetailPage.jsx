@@ -8,7 +8,7 @@ import AppHeader from "../components/AppHeader";
 import { formatElapsed, formatRelative, STATUS_LABEL, STATUS_ORDER, statusIndex } from "../lib/statuses";
 import { useServerTick, serverNow } from "../lib/serverTime";
 import { isImageMessage } from "../lib/messages";
-import { ArrowLeft, Clock, CheckCircle2, Circle, ChevronRight, Trash2, AlertTriangle, MonitorSmartphone, Copy, Check as CheckIcon, ClipboardList, Plus, ExternalLink, Shield, ShieldCheck, ShieldX, ThumbsUp, ThumbsDown, UserCheck, X, MessageSquare, ArrowRight, FileText, RotateCcw, Users2, Send, Timer, ImageIcon } from "lucide-react";
+import { ArrowLeft, Clock, CheckCircle2, Circle, ChevronRight, Trash2, AlertTriangle, MonitorSmartphone, Copy, Check as CheckIcon, ClipboardList, Plus, ExternalLink, Shield, ShieldCheck, ShieldX, ThumbsUp, ThumbsDown, UserCheck, X, MessageSquare, ArrowRight, FileText, RotateCcw, Users2, Send, Timer, ImageIcon, Ban } from "lucide-react";
 
 const TRANSITION_LABEL = {
   VIEWED:     "Marcar como Visualizado",
@@ -90,6 +90,10 @@ export default function TicketDetailPage() {
   const [showReopenModal,  setShowReopenModal]  = useState(false);
   const [reopenReason,     setReopenReason]     = useState("");
   const [reopenErr,        setReopenErr]        = useState("");
+  const [showCancelModal,  setShowCancelModal]  = useState(false);
+  const [cancelReason,     setCancelReason]     = useState("");
+  const [cancelShowUser,   setCancelShowUser]   = useState(false);
+  const [cancelErr,        setCancelErr]        = useState("");
   const [showUnsavedModal, setShowUnsavedModal] = useState(false);
 
   const isDirty = !!(form.internalNote.trim() || form.cause.trim() || form.solution.trim());
@@ -197,6 +201,21 @@ export default function TicketDetailPage() {
       load();
     } catch (e) {
       setReopenErr(e.response?.data?.error || "Erro ao reabrir chamado");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function confirmCancel() {
+    setLoading(true);
+    setCancelErr("");
+    try {
+      await api.post(`/tickets/${id}/cancel`, { reason: cancelReason.trim() || undefined, showToUser: cancelShowUser });
+      setShowCancelModal(false);
+      addToast({ message: "Chamado cancelado", type: "success" });
+      load();
+    } catch (e) {
+      setCancelErr(e.response?.data?.error || "Erro ao cancelar chamado");
     } finally {
       setLoading(false);
     }
@@ -473,6 +492,61 @@ export default function TicketDetailPage() {
         </div>
       )}
 
+      {/* Modal cancelar chamado */}
+      {showCancelModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowCancelModal(false); }}
+        >
+          <div className="card w-full max-w-sm p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400">
+                <Ban size={20} />
+              </span>
+              <div>
+                <h3 className="font-semibold text-slate-900 dark:text-gray-100">Cancelar chamado</h3>
+                <p className="text-xs text-slate-500 dark:text-gray-400 mt-0.5">Informe o motivo (opcional)</p>
+              </div>
+            </div>
+            <textarea
+              autoFocus
+              rows={3}
+              className="field-input resize-none w-full"
+              placeholder="Ex: Chamado duplicado, problema resolvido por outro meio..."
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+            />
+            <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-gray-300 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={cancelShowUser}
+                onChange={(e) => setCancelShowUser(e.target.checked)}
+                className="accent-brand-600 rounded"
+              />
+              Mostrar motivo para o solicitante
+            </label>
+            {cancelErr && (
+              <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl px-3 py-2">
+                {cancelErr}
+              </p>
+            )}
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setShowCancelModal(false)} className="btn-secondary text-sm py-2 px-4">
+                Voltar
+              </button>
+              <button
+                onClick={confirmCancel}
+                disabled={loading}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 text-sm font-semibold transition disabled:opacity-50"
+              >
+                {loading ? <Spinner className="h-4 w-4" /> : <Ban size={14} />}
+                Cancelar chamado
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal criar e vincular OS */}
       {showCreateOs && (
         <CreateOsModal
@@ -498,6 +572,16 @@ export default function TicketDetailPage() {
           <span className="font-mono text-slate-600 dark:text-gray-300">{ticket.ticketNumber}</span>
           <div className="ml-auto flex items-center gap-2">
             <StatusBadge status={ticket.status} />
+            {canTransition && ticket.status !== "CANCELADO" && ticket.status !== "COMPLETED" && (
+              <button
+                onClick={() => { setCancelReason(""); setCancelShowUser(false); setCancelErr(""); setShowCancelModal(true); }}
+                className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-gray-500 hover:text-orange-600 dark:hover:text-orange-400 transition px-2 py-1 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-900/20"
+                title="Cancelar chamado"
+              >
+                <Ban size={13} />
+                <span className="hidden sm:inline">Cancelar</span>
+              </button>
+            )}
             {isAdmin && (
               <button
                 onClick={() => { setShowDeleteModal(true); setDeleteErr(""); }}
@@ -637,7 +721,8 @@ export default function TicketDetailPage() {
             const needsApproval = ticket.approvalStatus && ticket.approvalStatus !== "NOT_REQUIRED";
             const isRejected    = ticket.approvalStatus === "REJECTED";
             const visibleStatuses = STATUS_ORDER.filter(
-              (s) => s !== "EN_ROUTE" || (ticket.presential && !ticket.isRemote)
+              (s) => (s !== "EN_ROUTE" || (ticket.presential && !ticket.isRemote)) &&
+                     (s !== "CANCELADO" || ticket.status === "CANCELADO")
             );
             const timestamps = {
               OPEN:       ticket.openedAt,

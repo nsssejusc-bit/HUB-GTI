@@ -502,6 +502,11 @@ export default function DashboardPage() {
   }, [load]);
 
   const loadDebounceRef = useRef(null);
+  const [unreadMsgs, setUnreadMsgs] = useState({});
+
+  function clearTicketUnread(ticketId) {
+    setUnreadMsgs((prev) => { const n = { ...prev }; delete n[ticketId]; return n; });
+  }
 
   useEffect(() => {
     const s = socket?.current;
@@ -517,16 +522,22 @@ export default function DashboardPage() {
       loadDebounceRef.current = setTimeout(() => load(), 300);
     };
     const onDeleted  = ({ id }) => setTickets((prev) => prev.filter((t) => t.id !== id));
+    const onMessage  = ({ ticketId, fromUserId }) => {
+      if (fromUserId && fromUserId === user?.id) return;
+      setUnreadMsgs((prev) => ({ ...prev, [ticketId]: (prev[ticketId] || 0) + 1 }));
+    };
 
     s.on("ticket:created", onCreated);
     s.on("ticket:updated", onUpdated);
     s.on("ticket:deleted", onDeleted);
+    s.on("ticket:message",  onMessage);
     return () => {
       s.off("ticket:created", onCreated);
       s.off("ticket:updated", onUpdated);
       s.off("ticket:deleted", onDeleted);
+      s.off("ticket:message",  onMessage);
     };
-  }, [socket, load, addToast]);
+  }, [socket, load, addToast, user?.id]);
 
   // KPI counts — respeitam todos os filtros ativos
   const kpiBase = useMemo(() => {
@@ -952,7 +963,7 @@ export default function DashboardPage() {
 
               <div className="card divide-y divide-slate-100 dark:divide-gray-700/60">
                 {list.map((t) => (
-                  <TicketRow key={t.id} ticket={t} />
+                  <TicketRow key={t.id} ticket={t} unreadMsgCount={unreadMsgs[t.id] || 0} onClearUnread={() => clearTicketUnread(t.id)} />
                 ))}
               </div>
             </section>
@@ -981,10 +992,11 @@ function PriorityBadge({ priority }) {
   );
 }
 
-function TicketRow({ ticket: t }) {
+function TicketRow({ ticket: t, unreadMsgCount = 0, onClearUnread }) {
   return (
     <Link
       to={`/painel/chamado/${t.id}`}
+      onClick={onClearUnread}
       className="group flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50 dark:hover:bg-gray-800/60 transition-colors duration-150"
     >
       <div className="flex gap-0.5 self-stretch shrink-0">
@@ -998,6 +1010,11 @@ function TicketRow({ ticket: t }) {
           <span className="text-xs font-mono text-slate-400 dark:text-gray-500">{t.ticketNumber}</span>
           <StatusBadge status={t.status} />
           <PriorityBadge priority={t.priority} />
+          {unreadMsgCount > 0 && (
+            <span className="inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none animate-pulse">
+              {unreadMsgCount > 9 ? "9+" : unreadMsgCount}
+            </span>
+          )}
         </div>
         <div className="text-sm font-medium text-slate-800 dark:text-gray-100 mt-0.5 truncate">
           {t.requesterName}

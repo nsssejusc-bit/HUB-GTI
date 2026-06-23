@@ -491,6 +491,21 @@ export default function TrackPage() {
               </ol>
             </div>
 
+            {/* Banner cancelamento com motivo público */}
+            {ticket.status === "CANCELADO" && ticket.cancelNote && (
+              <div className="card p-5 border-l-4 border-orange-400 dark:border-orange-500">
+                <div className="flex items-start gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400">
+                    <X size={20} />
+                  </span>
+                  <div>
+                    <div className="font-semibold text-orange-800 dark:text-orange-300 text-sm">Motivo do cancelamento</div>
+                    <p className="text-sm text-orange-700 dark:text-orange-400 mt-1 leading-relaxed">{ticket.cancelNote}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Banner AnyDesk — enquanto não concluído */}
             {ticket.isRemote && ticket.status !== "COMPLETED" && (
               <div className="card p-5 border-l-4 border-amber-400 dark:border-amber-500">

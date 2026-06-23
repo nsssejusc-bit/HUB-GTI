@@ -237,6 +237,8 @@ model Ticket {
   cause               String?      @db.Text
   solution            String?      @db.Text
   completionNote      String?      @db.Text
+  cancelNote          String?      @db.Text
+  cancelNotePublic    Boolean      @default(false)
   slaDeadline         DateTime?
   openedAt            DateTime     @default(now())
   viewedAt            DateTime?
