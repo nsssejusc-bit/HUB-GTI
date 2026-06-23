@@ -355,6 +355,7 @@ export default function DashboardPage() {
   if (user?.role === "CHEFE_SETOR") return <ChefeDashboard />;
 
   const isAdmin = user?.role === "ADMIN";
+  const isTechnician = user?.role === "TECHNICIAN";
   useServerTick(60000);
 
   // ── Aprovações pendentes apenas para ADMIN que também é chefe de setor ──
@@ -701,7 +702,7 @@ export default function DashboardPage() {
               </button>
             ))}
             <span className="ml-auto text-xs text-slate-400 dark:text-gray-500">{visible.length} chamado{visible.length !== 1 ? "s" : ""}</span>
-            {isAdmin && (
+            {(isAdmin || isTechnician) && (
               <button
                 onClick={() => changeFilter(filter === "history" ? "active" : "history")}
                 className={`relative pb-2 text-sm font-medium transition flex items-center gap-1 ${
