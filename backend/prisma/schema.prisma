@@ -144,9 +144,20 @@ model User {
   checklistsCreated  InventoryChecklist[] @relation("ChecklistCreator")
   checklistsApproved InventoryChecklist[] @relation("ChecklistApprover")
   ticketMessages     TicketMessage[]      @relation("MessageAuthor")
+  pushSubscription   PushSubscription?
 
   @@index([departmentId])
   @@index([role, active])
+}
+
+model PushSubscription {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @db.Text
+  p256dh    String   @db.Text
+  auth      String   @db.Text
+  updatedAt DateTime @updatedAt
 }
 
 model PasswordResetRequest {

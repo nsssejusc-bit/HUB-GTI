@@ -22,6 +22,7 @@ import {
   updateDepartment, deleteDepartment,
 } from "../controllers/departmentController.js";
 import { listAuditLogs } from "../controllers/auditController.js";
+import { subscribePush, unsubscribePush } from "../controllers/pushController.js";
 import { getAdminFlags, setAdminFlags } from "../controllers/configController.js";
 import {
   ticketsByUnit, ticketsByTechnician, ticketsByDepartment,
@@ -187,6 +188,10 @@ router.get("/inventory/:id/units",                        ...staffAccess, listIn
 router.post("/inventory/:id/units",                       ...staffAccess, createUnit);
 router.patch("/inventory/units/:unitId",                  ...staffAccess, updateUnit);
 router.delete("/inventory/units/:unitId",                 ...staffAccess, deleteUnit);
+
+// ── Push notifications ─────────────────────────────────────────────────────────
+router.post("/push/subscribe",   authRequired, subscribePush);
+router.delete("/push/subscribe", authRequired, unsubscribePush);
 
 // ── Auditoria ──────────────────────────────────────────────────────────────────
 router.get("/audit-logs", authRequired, requireRole("ADMIN"), listAuditLogs);

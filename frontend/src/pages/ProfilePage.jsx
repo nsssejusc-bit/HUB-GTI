@@ -4,8 +4,9 @@ import { api } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { StatusBadge, Spinner } from "../components/ui";
 import AppHeader from "../components/AppHeader";
-import { User, Building2, Shield, Clock, Ticket, KeyRound, ChevronRight, Search, X, Star } from "lucide-react";
+import { User, Building2, Shield, Clock, Ticket, KeyRound, ChevronRight, Search, X, Star, Volume2, Play } from "lucide-react";
 import { maskCpf } from "../lib/cpf";
+import { SOUND_THEMES, getSelectedThemeId, setSelectedThemeId } from "../lib/sounds";
 
 const ROLE_LABEL = {
   ADMIN:      "Administrador",
@@ -102,6 +103,12 @@ export default function ProfilePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusGroup, setStatusGroup] = useState("");
   const [openFeedback, setOpenFeedback] = useState(null);
+  const [soundTheme, setSoundTheme] = useState(() => getSelectedThemeId());
+
+  function handleSelectSound(id) {
+    setSoundTheme(id);
+    setSelectedThemeId(id);
+  }
 
   useEffect(() => {
     api.get("/users/me/tickets")
@@ -196,6 +203,52 @@ export default function ProfilePage() {
               <ChevronRight size={14} />
             </Link>
           </div>
+        </div>
+
+        {/* Sons de Notificação */}
+        <div className="card p-5">
+          <h2 className="text-sm font-semibold text-slate-700 dark:text-gray-300 flex items-center gap-2 mb-4">
+            <Volume2 size={15} />
+            Sons de Notificação
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {SOUND_THEMES.map((theme) => {
+              const active = soundTheme === theme.id;
+              return (
+                <button
+                  key={theme.id}
+                  onClick={() => handleSelectSound(theme.id)}
+                  className={`flex items-center gap-3 rounded-xl px-4 py-3 text-left w-full transition ring-1 ${
+                    active
+                      ? "ring-brand-600 bg-brand-100/60 dark:bg-brand-900/20"
+                      : "ring-slate-200 dark:ring-gray-700 bg-slate-50 dark:bg-gray-800/60 hover:bg-slate-100 dark:hover:bg-gray-800"
+                  }`}
+                >
+                  <div className={`h-4 w-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                    active ? "border-brand-600" : "border-slate-300 dark:border-gray-600"
+                  }`}>
+                    {active && <div className="h-2 w-2 rounded-full bg-brand-600" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-slate-800 dark:text-gray-100">{theme.label}</div>
+                    <div className="text-xs text-slate-400 dark:text-gray-500 mt-0.5 leading-snug">{theme.desc}</div>
+                  </div>
+                  {theme.id !== "silencioso" && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); try { theme.play(); } catch {} }}
+                      className="p-1.5 rounded-lg text-slate-400 dark:text-gray-500 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-white dark:hover:bg-gray-700 transition shrink-0"
+                      title="Testar som"
+                    >
+                      <Play size={13} />
+                    </button>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-3 text-xs text-slate-400 dark:text-gray-500">
+            Preferência salva neste dispositivo. Cada técnico pode escolher o som que prefere.
+          </p>
         </div>
 
         {/* Chamados abertos */}

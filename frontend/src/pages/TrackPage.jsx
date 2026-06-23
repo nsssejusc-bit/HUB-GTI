@@ -372,6 +372,26 @@ export default function TrackPage() {
                 <InfoItem label="Subcategoria" value={ticket.subcategory} />
                 <InfoItem label="Unidade responsável" value={ticket.unit || "Aguardando atribuição..."} />
                 <InfoItem label="Técnico responsável" value={ticket.technician || "Aguardando atribuição..."} />
+                {ticket.slaDeadline && !["COMPLETED", "CANCELADO"].includes(ticket.status) && (() => {
+                  const remaining = new Date(ticket.slaDeadline) - serverNow();
+                  const overdue   = remaining < 0;
+                  const abs       = Math.abs(remaining);
+                  const h         = Math.floor(abs / 3600000);
+                  const m         = Math.floor((abs % 3600000) / 60000);
+                  const label     = h > 0 ? `${h}h ${m}min` : `${m}min`;
+                  return (
+                    <div className="sm:col-span-2">
+                      <dt className="text-xs text-slate-400 dark:text-gray-500 mb-0.5">Prazo estimado</dt>
+                      <dd className={`text-sm font-medium flex items-center gap-1.5 ${overdue ? "text-red-600 dark:text-red-400" : "text-slate-700 dark:text-gray-200"}`}>
+                        <Clock size={12} />
+                        {overdue ? `Prazo excedido há ${label}` : `${label} restantes`}
+                        <span className="text-xs text-slate-400 dark:text-gray-500 font-normal">
+                          · até {new Date(ticket.slaDeadline).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                      </dd>
+                    </div>
+                  );
+                })()}
               </dl>
               {ticket.freeTextDescription && (
                 <div className="mt-4 rounded-xl bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 px-4 py-3">

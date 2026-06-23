@@ -1,7 +1,8 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import { useAuth } from "./AuthContext";
-import { playNewTicket, playNewMessage } from "../lib/sounds";
+import { playNewTicket, playNewMessage, playApproval } from "../lib/sounds";
+import { registerPushSubscription } from "../lib/pushSubscription";
 
 const SocketContext = createContext(null);
 const ConnectedCtx  = createContext(false);
@@ -24,12 +25,15 @@ export function SocketProvider({ children }) {
   // Mantém userRef sempre atualizado sem recriar o socket
   useEffect(() => { userRef.current = user; }, [user]);
 
-  // Pede permissão de notificação para técnicos, admins e chefes de setor
+  // Pede permissão de notificação (todos os usuários logados) e registra push subscription
   useEffect(() => {
-    if (user && (NOTIFY_ROLES.includes(user.role) || APPROVAL_ROLES.includes(user.role))) {
-      if (typeof Notification !== "undefined" && Notification.permission === "default") {
-        Notification.requestPermission();
-      }
+    if (!user) return;
+    if (typeof Notification !== "undefined" && Notification.permission === "default") {
+      Notification.requestPermission().then((perm) => {
+        if (perm === "granted") registerPushSubscription();
+      });
+    } else if (Notification.permission === "granted") {
+      registerPushSubscription();
     }
   }, [user?.id]);
 
@@ -122,6 +126,8 @@ export function SocketProvider({ children }) {
 
       // Filtra por departamento — chefe só recebe notificação do próprio setor
       if (u.department?.id && data.departmentId && u.department.id !== data.departmentId) return;
+
+      playApproval();
 
       if (!document.hasFocus()) {
         setUnread((n) => n + 1);

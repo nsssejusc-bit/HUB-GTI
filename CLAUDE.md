@@ -138,7 +138,7 @@ Badge de não lidos aparece no título da aba quando a janela não está em foco
 
 - **Backend é ESM** — usar `import`/`export`, nunca `require()`
 - **Prisma**: client importado de `src/config/prisma.js`
-- **Migrations manuais**: usar `ADD COLUMN IF NOT EXISTS` para evitar P3009 (`MODIFY COLUMN` é seguro — só `ADD COLUMN` precisa do `IF NOT EXISTS`)
+- **Migrations manuais**: MySQL 8 **não suporta** `ADD COLUMN IF NOT EXISTS` (sintaxe só existe no MariaDB). Usar `ADD COLUMN` simples. Se a coluna já existir, o erro P3009 deve ser resolvido manualmente (veja abaixo).
 - **Corrigir P3009 manualmente** (migration parcialmente aplicada, backend em restart loop):
   ```sql
   -- No MySQL interativo do container:
@@ -162,7 +162,7 @@ Badge de não lidos aparece no título da aba quando a janela não está em foco
    docker compose build --no-cache frontend backend
    docker compose up -d
    ```
-3. Para migrations novas: gerar SQL com `prisma migrate dev` ou escrever manualmente usando `ADD COLUMN IF NOT EXISTS`
+3. Para migrations novas: gerar SQL com `prisma migrate dev` ou escrever manualmente com `ADD COLUMN` simples (nunca `IF NOT EXISTS` — MySQL 8 não suporta)
 
 ---
 

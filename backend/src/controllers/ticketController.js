@@ -5,6 +5,7 @@ import { buildTicketNumber } from "../utils/ticketNumber.js";
 import { nextTicketSeq } from "../utils/nextSequence.js";
 import { STATUS, canTransition, allowedNext, canReopen } from "../utils/ticketStateMachine.js";
 import { IMG_PREFIX, saveImageFromDataUrl, resolveImagePath, mimeForFilename, deleteTicketImages } from "../utils/messageImages.js";
+import { sendPushToUser, buildStatusPush } from "./pushController.js";
 
 const VALID_PRIORITIES = ["LOW", "MEDIUM", "HIGH", "URGENT"];
 
@@ -96,9 +97,14 @@ export async function createTicket(req, res) {
   }
 
   // ── Monta registros de aprovação ────────────────────────────────────────
-  // Realocação de setor: apenas o chefe do setor de DESTINO aprova
-  const approvalRecords = requiresApproval
-    ? [{ chefDeptId: dualApproval && targetDeptId ? targetDeptId : deptId }]
+  const approvalDeptId = dualApproval && targetDeptId ? targetDeptId : deptId;
+  // Se o próprio chefe/admin responsável abre o chamado, aprova automaticamente
+  const selfApproval = requiresApproval
+    && (req.user.role === "CHEFE_SETOR" || req.user.role === "ADMIN")
+    && req.user.departmentId === approvalDeptId;
+
+  const approvalRecords = (requiresApproval && !selfApproval)
+    ? [{ chefDeptId: approvalDeptId }]
     : [];
 
   // SLA: subcategoria tem precedência; REMOTE sempre usa categoria; fallback para categoria
@@ -134,7 +140,7 @@ export async function createTicket(req, res) {
     extraData,
     presential:            requiresPresential,
     requiresCauseSolution: requiresCauseSolution,
-    approvalStatus: requiresApproval ? "PENDING" : "NOT_REQUIRED",
+    approvalStatus: requiresApproval ? (selfApproval ? "APPROVED" : "PENDING") : "NOT_REQUIRED",
     openedById:     req.user?.id ?? null,
     status:         STATUS.OPEN,
     history: { create: { toStatus: STATUS.OPEN } },
@@ -156,7 +162,7 @@ export async function createTicket(req, res) {
     nucleoResponsavel: ticket.nucleoResponsavel ?? null,
   });
 
-  if (requiresApproval) {
+  if (requiresApproval && !selfApproval) {
     io?.emit("ticket:approval-needed", {
       ticketNumber: ticket.ticketNumber,
       department:   ticket.department,
@@ -219,6 +225,7 @@ export async function getTicketPublic(req, res) {
     inServiceAt:         ticket.inServiceAt,
     completedAt:         ticket.completedAt,
     priority:            ticket.priority,
+    slaDeadline:         ticket.slaDeadline,
     hasFeedback:         !!ticket.feedback,
   });
 }
@@ -569,6 +576,11 @@ export async function transitionTicket(req, res) {
     ticketNumber: updated.ticketNumber,
     status:       updated.status,
   });
+
+  // Notificação push para o solicitante
+  if (ticket.openedById) {
+    sendPushToUser(ticket.openedById, buildStatusPush(ticket, toStatus)).catch(() => {});
+  }
 
   res.json({ ok: true, status: updated.status });
 }
