@@ -1,25 +1,5 @@
-export const TIPO_LABELS = {
-  VISITA_TECNICA:           "Visita Técnica",
-  TROCA_EQUIPAMENTO:        "Troca de Equipamento",
-  ENTREGA:                  "Entrega",
-  MANUTENCAO_REDE:          "Manutenção de Rede",
-  MANUTENCAO_CAMERA:        "Manutenção de Câmera",
-  RECOLHIMENTO_EQUIPAMENTO: "Recolhimento de Equipamento",
-  ACAO:                     "Ação",
-  OUTRO:                    "Outro",
-};
-
-export const TIPO_OPTIONS = [
-  { value: "",                         label: "Todos os tipos"             },
-  { value: "VISITA_TECNICA",           label: "Visita Técnica"             },
-  { value: "TROCA_EQUIPAMENTO",        label: "Troca de Equipamento"       },
-  { value: "ENTREGA",                  label: "Entrega"                    },
-  { value: "MANUTENCAO_REDE",          label: "Manutenção de Rede"         },
-  { value: "MANUTENCAO_CAMERA",        label: "Manutenção de Câmera"       },
-  { value: "RECOLHIMENTO_EQUIPAMENTO", label: "Recolhimento de Equipamento"},
-  { value: "ACAO",                     label: "Ação"                       },
-  { value: "OUTRO",                    label: "Outro"                      },
-];
+// Tipos de OS agora vêm da API — /work-order-types
+// Este arquivo mantém apenas as constantes de status (imutáveis)
 
 export const OS_STATUS_LABEL = {
   ABERTA:       "Aberta",

@@ -3,17 +3,6 @@ import { prisma } from "../config/prisma.js";
 import { allowedOsNext, canOsTransition } from "../utils/osStateMachine.js";
 import { nextOsSeq } from "../utils/nextSequence.js";
 
-const TIPO_LABELS = {
-  VISITA_TECNICA:           "Visita Técnica",
-  TROCA_EQUIPAMENTO:        "Troca de Equipamento",
-  ENTREGA:                  "Entrega",
-  MANUTENCAO_REDE:          "Manutenção de Rede",
-  MANUTENCAO_CAMERA:        "Manutenção de Câmera",
-  RECOLHIMENTO_EQUIPAMENTO: "Recolhimento de Equipamento",
-  ACAO:                     "Ação",
-  OUTRO:                    "Outro",
-};
-
 function buildOsNumber(seq) {
   const d = new Date();
   const y = d.getFullYear();
@@ -24,190 +13,135 @@ function buildOsNumber(seq) {
 
 function formatOs(os) {
   return {
-    id:            os.id,
-    osNumber:      os.osNumber,
-    tipo:          os.tipo,
-    tipoLabel:     TIPO_LABELS[os.tipo] || os.tipo,
-    status:        os.status,
-    local:         os.local,
-    problema:      os.problema,
-    materiais:     os.materiais,
-    prazo:         os.prazo,
-    relatorio:     os.relatorio,
-    // Ação-specific
-    nomeEvento:    os.nomeEvento ?? null,
-    startDateTime: os.startDateTime ?? null,
-    endDateTime:   os.endDateTime ?? null,
-    checklist:     os.checklist ? {
+    id:          os.id,
+    osNumber:    os.osNumber,
+    tipo:        os.tipo ? {
+      id:     os.tipo.id,
+      name:   os.tipo.name,
+      color:  os.tipo.color,
+      fields: os.tipo.fields ?? [],
+    } : null,
+    status:      os.status,
+    formData:    os.formData ?? {},
+    relatorio:   os.relatorio,
+    checklist:   os.checklist ? {
       id:        os.checklist.id,
       title:     os.checklist.title,
       nucleo:    os.checklist.nucleo,
       status:    os.checklist.status,
       itemCount: os.checklist.items?.length ?? 0,
       items:     os.checklist.items?.map((ci) => ({
-        id:    ci.id,
+        id:     ci.id,
         unitId: ci.unit?.id,
         tombo:  ci.unit?.tombo,
         status: ci.unit?.status,
         item:   ci.unit?.item ? { id: ci.unit.item.id, name: ci.unit.item.name, unitMeasure: ci.unit.item.unitMeasure } : null,
       })) ?? [],
     } : null,
-    preVisita:     os.preVisita ? {
-      id:            os.preVisita.id,
-      osNumber:      os.preVisita.osNumber,
-      local:         os.preVisita.local,
-      startDateTime: os.preVisita.startDateTime,
-      status:        os.preVisita.status,
-      tecnicos:      os.preVisita.tecnicos?.map((t) => ({ id: t.user.id, name: t.user.name })) ?? [],
+    preVisita:   os.preVisita ? {
+      id:       os.preVisita.id,
+      osNumber: os.preVisita.osNumber,
+      tipo:     os.preVisita.tipo ? { id: os.preVisita.tipo.id, name: os.preVisita.tipo.name, color: os.preVisita.tipo.color } : null,
+      formData: os.preVisita.formData ?? {},
+      status:   os.preVisita.status,
+      tecnicos: os.preVisita.tecnicos?.map((t) => ({ id: t.user.id, name: t.user.name })) ?? [],
     } : null,
-    unit:          os.unit ? { id: os.unit.id, name: os.unit.name } : null,
-    createdBy:     os.createdBy ? { id: os.createdBy.id, name: os.createdBy.name } : null,
-    tecnicos:      os.tecnicos?.map((t) => ({ id: t.user.id, name: t.user.name, unitId: t.user.unitId })) ?? [],
-    tickets:       os.tickets?.map((tw) => ({
+    unit:        os.unit ? { id: os.unit.id, name: os.unit.name } : null,
+    createdBy:   os.createdBy ? { id: os.createdBy.id, name: os.createdBy.name } : null,
+    tecnicos:    os.tecnicos?.map((t) => ({ id: t.user.id, name: t.user.name, unitId: t.user.unitId })) ?? [],
+    tickets:     os.tickets?.map((tw) => ({
       id:            tw.ticket.id,
       ticketNumber:  tw.ticket.ticketNumber,
       requesterName: tw.ticket.requesterName,
       department:    tw.ticket.department,
       status:        tw.ticket.status,
     })) ?? [],
-    createdAt:     os.createdAt,
-    updatedAt:     os.updatedAt,
-    startedAt:     os.startedAt,
-    concludedAt:   os.concludedAt,
-    cancelledAt:   os.cancelledAt,
-    allowedNext:   allowedOsNext(os.status),
+    createdAt:   os.createdAt,
+    updatedAt:   os.updatedAt,
+    startedAt:   os.startedAt,
+    concludedAt: os.concludedAt,
+    cancelledAt: os.cancelledAt,
+    allowedNext: allowedOsNext(os.status),
   };
 }
 
-// Lightweight include used for list queries (no heavy checklist items)
+const tipoSelect = { id: true, name: true, color: true, fields: true };
+
 const osListInclude = {
+  tipo:      { select: tipoSelect },
   unit:      { select: { id: true, name: true } },
   createdBy: { select: { id: true, name: true } },
   tecnicos:  { include: { user: { select: { id: true, name: true, unitId: true } } } },
   tickets:   { include: { ticket: { select: { id: true, ticketNumber: true, requesterName: true, department: true, status: true } } } },
   checklist: { select: { id: true, title: true, status: true, nucleo: true } },
-  preVisita: { select: { id: true, osNumber: true, local: true, startDateTime: true, status: true } },
+  preVisita: {
+    select: {
+      id: true, osNumber: true, formData: true, status: true,
+      tipo: { select: { id: true, name: true, color: true } },
+    },
+  },
 };
 
-// Full include used for detail/mutation queries (includes checklist items + preVisita tecnicos)
 const osInclude = {
+  tipo:      true,
   unit:      true,
   createdBy: { select: { id: true, name: true } },
   tecnicos:  { include: { user: { select: { id: true, name: true, unitId: true } } } },
   tickets:   { include: { ticket: { select: { id: true, ticketNumber: true, requesterName: true, department: true, status: true } } } },
   checklist: { include: { items: { include: { unit: { include: { item: { select: { id: true, name: true, unitMeasure: true } } } } } } } },
-  preVisita: { include: { tecnicos: { include: { user: { select: { id: true, name: true } } } } } },
+  preVisita: {
+    include: {
+      tipo:     { select: { id: true, name: true, color: true } },
+      tecnicos: { include: { user: { select: { id: true, name: true } } } },
+    },
+  },
 };
 
-const OS_TIPOS = ["VISITA_TECNICA","TROCA_EQUIPAMENTO","ENTREGA","MANUTENCAO_REDE","MANUTENCAO_CAMERA","RECOLHIMENTO_EQUIPAMENTO","ACAO","OUTRO"];
-
 export async function createWorkOrder(req, res) {
-  const checklistSchema = z.object({
-    title:   z.string().min(2).max(300),
-    nucleo:  z.enum(["NMT", "NIR", "NSS"]),
-    note:    z.string().max(1000).optional().nullable(),
-    unitIds: z.array(z.number().int().positive()).min(1),
-  });
-
-  const preVisitaSchema = z.object({
-    local:         z.string().min(2).max(300),
-    startDateTime: z.string().datetime({ offset: true }),
-    tecnicoIds:    z.array(z.number().int().positive()).optional(),
-    problema:      z.string().max(2000).optional().nullable(),
-  });
-
   const schema = z.object({
-    tipo:          z.enum(OS_TIPOS),
-    local:         z.string().min(2).max(300),
-    problema:      z.string().max(2000).optional().nullable(),
-    materiais:     z.string().max(1000).optional().nullable(),
-    prazo:         z.string().datetime({ offset: true }).optional().nullable(),
-    unitId:        z.number().int().positive().optional().nullable(),
-    ticketId:      z.number().int().positive().optional().nullable(),
-    // Ação-specific
-    nomeEvento:    z.string().min(2).max(300).optional().nullable(),
-    startDateTime: z.string().datetime({ offset: true }).optional().nullable(),
-    endDateTime:   z.string().datetime({ offset: true }).optional().nullable(),
-    tecnicoIds:    z.array(z.number().int().positive()).optional(),
-    checklist:     checklistSchema.optional().nullable(),
-    preVisita:     preVisitaSchema.optional().nullable(),
+    tipoId:      z.number().int().positive(),
+    formData:    z.record(z.unknown()).default({}),
+    unitId:      z.number().int().positive().optional().nullable(),
+    ticketId:    z.number().int().positive().optional().nullable(),
+    tecnicoIds:  z.array(z.number().int().positive()).optional(),
+    preVisitaId: z.number().int().positive().optional().nullable(),
   });
 
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Dados inválidos", details: parsed.error.issues });
   const data = parsed.data;
 
-  if (data.tipo === "ACAO") {
-    if (!data.nomeEvento)    return res.status(400).json({ error: "Nome do evento é obrigatório para Ações" });
-    if (!data.startDateTime) return res.status(400).json({ error: "Data/hora de início é obrigatória para Ações" });
-    if (!data.endDateTime)   return res.status(400).json({ error: "Data/hora de término é obrigatória para Ações" });
+  const tipo = await prisma.workOrderType.findUnique({ where: { id: data.tipoId } });
+  if (!tipo || !tipo.active) return res.status(400).json({ error: "Tipo de OS não encontrado ou inativo" });
+
+  const fields = Array.isArray(tipo.fields) ? tipo.fields : [];
+  for (const field of fields) {
+    if (field.required) {
+      const val = data.formData[field.key];
+      if (val === undefined || val === null || val === "") {
+        return res.status(400).json({ error: `Campo "${field.label}" é obrigatório` });
+      }
+    }
   }
 
   const seq = await nextOsSeq();
   const osNumber = buildOsNumber(seq);
 
-  const os = await prisma.$transaction(async (tx) => {
-    // 1. Create main WorkOrder
-    const created = await tx.workOrder.create({
-      data: {
-        osNumber,
-        tipo:          data.tipo,
-        local:         data.local,
-        problema:      data.problema ?? null,
-        materiais:     data.materiais ?? null,
-        prazo:         data.prazo ? new Date(data.prazo) : null,
-        unitId:        data.unitId ?? null,
-        createdById:   req.user.id,
-        nomeEvento:    data.nomeEvento ?? null,
-        startDateTime: data.startDateTime ? new Date(data.startDateTime) : null,
-        endDateTime:   data.endDateTime   ? new Date(data.endDateTime)   : null,
-        history:       { create: { toStatus: "ABERTA", actorId: req.user.id } },
-        ...(data.ticketId ? { tickets: { create: { ticketId: data.ticketId } } } : {}),
-        ...(data.tecnicoIds?.length ? { tecnicos: { createMany: { data: data.tecnicoIds.map((uid) => ({ userId: uid })), skipDuplicates: true } } } : {}),
-      },
-      include: osInclude,
-    });
-
-    // 2. Inline checklist creation (optional, for Ação)
-    if (data.checklist) {
-      const cl = data.checklist;
-      const checklist = await tx.inventoryChecklist.create({
-        data: {
-          title:       cl.title,
-          nucleo:      cl.nucleo,
-          note:        cl.note ?? null,
-          createdById: req.user.id,
-          items:       { createMany: { data: cl.unitIds.map((uid) => ({ unitId: uid })) } },
-        },
-      });
-      // Mark units as EM_USO
-      await tx.inventoryUnit.updateMany({ where: { id: { in: cl.unitIds } }, data: { status: "EM_USO" } });
-      // Link checklist to the work order
-      await tx.workOrder.update({ where: { id: created.id }, data: { checklistId: checklist.id } });
-    }
-
-    // 3. Pre-visit work order creation (optional, for Ação)
-    if (data.preVisita) {
-      const pv = data.preVisita;
-      const pvSeq = await nextOsSeq();
-      const pvNumber = buildOsNumber(pvSeq);
-      const preVisitaOs = await tx.workOrder.create({
-        data: {
-          osNumber:      pvNumber,
-          tipo:          "VISITA_TECNICA",
-          local:         pv.local,
-          problema:      pv.problema ?? null,
-          createdById:   req.user.id,
-          startDateTime: new Date(pv.startDateTime),
-          history:       { create: { toStatus: "ABERTA", actorId: req.user.id } },
-          ...(pv.tecnicoIds?.length ? { tecnicos: { createMany: { data: pv.tecnicoIds.map((uid) => ({ userId: uid })), skipDuplicates: true } } } : {}),
-        },
-      });
-      await tx.workOrder.update({ where: { id: created.id }, data: { preVisitaId: preVisitaOs.id } });
-    }
-
-    // Re-fetch with all relations
-    return tx.workOrder.findUnique({ where: { id: created.id }, include: osInclude });
+  const os = await prisma.workOrder.create({
+    data: {
+      osNumber,
+      tipoId:      data.tipoId,
+      formData:    data.formData,
+      unitId:      data.unitId ?? null,
+      createdById: req.user.id,
+      preVisitaId: data.preVisitaId ?? null,
+      history:     { create: { toStatus: "ABERTA", actorId: req.user.id } },
+      ...(data.ticketId ? { tickets: { create: { ticketId: data.ticketId } } } : {}),
+      ...(data.tecnicoIds?.length
+        ? { tecnicos: { createMany: { data: data.tecnicoIds.map((uid) => ({ userId: uid })), skipDuplicates: true } } }
+        : {}),
+    },
+    include: osInclude,
   });
 
   req.app.get("io")?.emit("workorder:created", { osNumber: os.osNumber });
@@ -216,11 +150,11 @@ export async function createWorkOrder(req, res) {
 
 export async function listWorkOrders(req, res) {
   try {
-    const { status, unitId, tipo, limit, offset, ticketId, from, to } = req.query;
+    const { status, unitId, tipoId, limit, offset, ticketId, from, to } = req.query;
     const where = {};
-    if (status && ["ABERTA","EM_ANDAMENTO","CONCLUIDA","CANCELADA"].includes(status)) where.status = status;
-    if (unitId && !isNaN(Number(unitId))) where.unitId = Number(unitId);
-    if (tipo   && OS_TIPOS.includes(tipo)) where.tipo  = tipo;
+    if (status  && ["ABERTA","EM_ANDAMENTO","CONCLUIDA","CANCELADA"].includes(status)) where.status  = status;
+    if (unitId  && !isNaN(Number(unitId)))  where.unitId  = Number(unitId);
+    if (tipoId  && !isNaN(Number(tipoId)))  where.tipoId  = Number(tipoId);
     if (ticketId && !isNaN(Number(ticketId))) where.tickets = { some: { ticketId: Number(ticketId) } };
     if (from || to) {
       where.createdAt = {};
@@ -272,16 +206,12 @@ export async function updateWorkOrder(req, res) {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
+
     const schema = z.object({
-      local:         z.string().min(2).max(300).optional(),
-      problema:      z.string().max(2000).optional().nullable(),
-      materiais:     z.string().max(1000).optional().nullable(),
-      prazo:         z.string().datetime({ offset: true }).optional().nullable(),
-      unitId:        z.number().int().positive().optional().nullable(),
-      tipo:          z.enum(OS_TIPOS).optional(),
-      nomeEvento:    z.string().min(2).max(300).optional().nullable(),
-      startDateTime: z.string().datetime({ offset: true }).optional().nullable(),
-      endDateTime:   z.string().datetime({ offset: true }).optional().nullable(),
+      formData:    z.record(z.unknown()).optional(),
+      unitId:      z.number().int().positive().optional().nullable(),
+      tipoId:      z.number().int().positive().optional(),
+      preVisitaId: z.number().int().positive().optional().nullable(),
     });
 
     const parsed = schema.safeParse(req.body);
@@ -294,18 +224,20 @@ export async function updateWorkOrder(req, res) {
     }
 
     const data = parsed.data;
+
+    // Merge formData with existing (partial update)
+    let newFormData = undefined;
+    if (data.formData !== undefined) {
+      newFormData = { ...(os.formData ?? {}), ...data.formData };
+    }
+
     const updated = await prisma.workOrder.update({
       where: { id },
       data: {
-        ...(data.local         !== undefined ? { local: data.local }                 : {}),
-        ...(data.problema      !== undefined ? { problema: data.problema }           : {}),
-        ...(data.materiais     !== undefined ? { materiais: data.materiais }         : {}),
-        ...(data.unitId        !== undefined ? { unitId: data.unitId }               : {}),
-        ...(data.tipo          !== undefined ? { tipo: data.tipo }                   : {}),
-        ...(data.nomeEvento    !== undefined ? { nomeEvento: data.nomeEvento }       : {}),
-        ...(data.startDateTime !== undefined ? { startDateTime: data.startDateTime ? new Date(data.startDateTime) : null } : {}),
-        ...(data.endDateTime   !== undefined ? { endDateTime: data.endDateTime   ? new Date(data.endDateTime)   : null } : {}),
-        prazo: data.prazo !== undefined ? (data.prazo ? new Date(data.prazo) : null) : undefined,
+        ...(newFormData !== undefined ? { formData: newFormData } : {}),
+        ...(data.unitId      !== undefined ? { unitId: data.unitId }           : {}),
+        ...(data.tipoId      !== undefined ? { tipoId: data.tipoId }           : {}),
+        ...(data.preVisitaId !== undefined ? { preVisitaId: data.preVisitaId } : {}),
       },
       include: osInclude,
     });
@@ -331,11 +263,11 @@ export async function transitionWorkOrder(req, res) {
       return res.status(400).json({ error: `Transição inválida: ${os.status} → ${toStatus}` });
     }
 
-    // Ação só pode iniciar depois que a visita técnica prévia estiver concluída
-    if (os.tipo === "ACAO" && toStatus === "EM_ANDAMENTO" && os.preVisitaId) {
+    // Any OS with a pre-requisite must wait for it to be concluded
+    if (toStatus === "EM_ANDAMENTO" && os.preVisitaId) {
       const preVisita = await prisma.workOrder.findUnique({ where: { id: os.preVisitaId }, select: { status: true } });
       if (preVisita && preVisita.status !== "CONCLUIDA") {
-        return res.status(400).json({ error: "A visita técnica prévia precisa ser concluída antes de iniciar a Ação" });
+        return res.status(400).json({ error: "A OS pré-requisito precisa ser concluída antes de iniciar esta OS" });
       }
     }
 
@@ -429,7 +361,7 @@ export async function linkTicket(req, res) {
     if (!ticket) return res.status(404).json({ error: "Chamado não encontrado" });
 
     await prisma.ticketWorkOrder.upsert({
-      where: { ticketId_workOrderId: { ticketId, workOrderId: id } },
+      where:  { ticketId_workOrderId: { ticketId, workOrderId: id } },
       create: { ticketId, workOrderId: id },
       update: {},
     });

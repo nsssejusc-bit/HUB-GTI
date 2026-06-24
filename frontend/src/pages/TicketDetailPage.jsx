@@ -1446,21 +1446,26 @@ function TransferModal({ units, techs, form, setForm, onClose, onConfirm, loadin
 }
 
 // ── Modal criar OS e vincular ao chamado ──────────────────────────────────────
-const OS_TIPOS = [
-  { value: "VISITA_TECNICA",           label: "Visita Técnica"             },
-  { value: "TROCA_EQUIPAMENTO",        label: "Troca de Equipamento"       },
-  { value: "ENTREGA",                  label: "Entrega"                    },
-  { value: "MANUTENCAO_REDE",          label: "Manutenção de Rede"         },
-  { value: "MANUTENCAO_CAMERA",        label: "Manutenção de Câmera"       },
-  { value: "RECOLHIMENTO_EQUIPAMENTO", label: "Recolhimento de Equipamento"},
-  { value: "ACAO",                     label: "Ação"                       },
-  { value: "OUTRO",                    label: "Outro"                      },
-];
-
 function CreateOsModal({ onClose, onCreate }) {
-  const [form, setForm] = useState({ tipo: "VISITA_TECNICA", local: "", problema: "" });
-  const [saving, setSaving] = useState(false);
-  const [err, setErr] = useState("");
+  const [types, setTypes]     = useState([]);
+  const [tipoId, setTipoId]   = useState("");
+  const [formData, setFormData] = useState({});
+  const [saving, setSaving]   = useState(false);
+  const [err, setErr]         = useState("");
+
+  useEffect(() => {
+    api.get("/work-order-types").then((r) => {
+      setTypes(r.data);
+      if (r.data.length > 0) setTipoId(String(r.data[0].id));
+    });
+  }, []);
+
+  const selectedType = types.find((t) => t.id === Number(tipoId));
+  const fields = selectedType?.fields ?? [];
+
+  function setField(key, val) {
+    setFormData((prev) => ({ ...prev, [key]: val }));
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -1468,9 +1473,8 @@ function CreateOsModal({ onClose, onCreate }) {
     setErr("");
     try {
       const res = await api.post("/work-orders", {
-        tipo:     form.tipo,
-        local:    form.local,
-        problema: form.problema || null,
+        tipoId:   Number(tipoId),
+        formData,
       });
       await onCreate(res.data);
     } catch (ex) {
@@ -1484,7 +1488,7 @@ function CreateOsModal({ onClose, onCreate }) {
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="card w-full max-w-md p-4 sm:p-6 space-y-4">
+      <div className="card w-full max-w-md p-4 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-100 dark:bg-brand-900/40 text-brand-600 dark:text-brand-400">
@@ -1500,55 +1504,79 @@ function CreateOsModal({ onClose, onCreate }) {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <div>
-            <label className="field-label">Tipo *</label>
-            <select
-              value={form.tipo}
-              onChange={(e) => setForm({ ...form, tipo: e.target.value })}
-              className="field-input"
-            >
-              {OS_TIPOS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="field-label">Local / Destino *</label>
-            <input
-              required
-              type="text"
-              value={form.local}
-              onChange={(e) => setForm({ ...form, local: e.target.value })}
-              placeholder="Ex: Setor de RH — Bloco B"
-              className="field-input"
-            />
-          </div>
-          <div>
-            <label className="field-label">Descrição da atividade</label>
-            <textarea
-              rows={3}
-              value={form.problema}
-              onChange={(e) => setForm({ ...form, problema: e.target.value })}
-              placeholder="O que precisa ser feito..."
-              className="field-input resize-none"
-            />
-          </div>
+        {types.length === 0 ? (
+          <div className="flex justify-center py-6"><Spinner className="h-5 w-5" /></div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-3">
+            <div>
+              <label className="field-label">Tipo *</label>
+              <select
+                value={tipoId}
+                onChange={(e) => { setTipoId(e.target.value); setFormData({}); }}
+                className="field-input"
+                required
+              >
+                {types.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </div>
 
-          {err && <p className="text-xs text-red-600 dark:text-red-400">{err}</p>}
+            {fields.map((field) => {
+              const val = formData[field.key] ?? "";
+              const cls = "field-input text-sm";
+              if (field.type === "textarea") {
+                return (
+                  <div key={field.key}>
+                    <label className="field-label">{field.label}{field.required && " *"}</label>
+                    <textarea rows={3} value={val} onChange={(e) => setField(field.key, e.target.value)}
+                      required={field.required} className={`${cls} resize-none`} />
+                  </div>
+                );
+              }
+              if (field.type === "select") {
+                return (
+                  <div key={field.key}>
+                    <label className="field-label">{field.label}{field.required && " *"}</label>
+                    <select value={val} onChange={(e) => setField(field.key, e.target.value)} required={field.required} className={cls}>
+                      <option value="">Selecione...</option>
+                      {(field.options || []).map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                    </select>
+                  </div>
+                );
+              }
+              const inputType = field.type === "date" ? "date" : field.type === "datetime" ? "datetime-local" : field.type === "number" ? "number" : "text";
+              if (field.type === "checkbox") {
+                return (
+                  <div key={field.key} className="flex items-center gap-2">
+                    <input type="checkbox" checked={!!val} onChange={(e) => setField(field.key, e.target.checked)} className="h-4 w-4 rounded" />
+                    <label className="text-sm text-slate-700 dark:text-gray-300">{field.label}</label>
+                  </div>
+                );
+              }
+              return (
+                <div key={field.key}>
+                  <label className="field-label">{field.label}{field.required && " *"}</label>
+                  <input type={inputType} value={val} onChange={(e) => setField(field.key, e.target.value)} required={field.required} className={cls} />
+                </div>
+              );
+            })}
 
-          <div className="flex gap-2 justify-end pt-1">
-            <button type="button" onClick={onClose} className="btn-secondary text-sm py-2 px-4">
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={saving || !form.local.trim()}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 text-sm font-semibold transition disabled:opacity-60"
-            >
-              {saving ? <Spinner className="h-4 w-4" /> : <Plus size={14} />}
-              Criar e vincular
-            </button>
-          </div>
-        </form>
+            {err && <p className="text-xs text-red-600 dark:text-red-400">{err}</p>}
+
+            <div className="flex gap-2 justify-end pt-1">
+              <button type="button" onClick={onClose} className="btn-secondary text-sm py-2 px-4">
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={saving || !tipoId}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 text-sm font-semibold transition disabled:opacity-60"
+              >
+                {saving ? <Spinner className="h-4 w-4" /> : <Plus size={14} />}
+                Criar e vincular
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );

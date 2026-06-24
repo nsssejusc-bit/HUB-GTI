@@ -23,6 +23,10 @@ import {
 } from "../controllers/departmentController.js";
 import { listAuditLogs } from "../controllers/auditController.js";
 import { subscribePush, unsubscribePush } from "../controllers/pushController.js";
+import {
+  listWorkOrderTypes, createWorkOrderType, updateWorkOrderType,
+  deleteWorkOrderType, reorderWorkOrderTypes,
+} from "../controllers/workOrderTypeController.js";
 import { getAdminFlags, setAdminFlags } from "../controllers/configController.js";
 import {
   ticketsByUnit, ticketsByTechnician, ticketsByDepartment,
@@ -154,6 +158,13 @@ router.get("/tickets/:id/messages/:msgId/image", authRequired, requireRole("TECH
 router.post("/tickets/:id/messages",  authRequired, requireRole("TECHNICIAN", "ADMIN"), sendMessage);
 router.post("/tickets/:id/feedback",  authRequired, submitFeedbackAuth);
 router.delete("/tickets/:id", authRequired, requireRole("ADMIN"), deleteTicket);
+
+// ── Tipos de OS (configuráveis pelo ADMIN) ─────────────────────────────────────
+router.get("/work-order-types",                   authRequired, listWorkOrderTypes);
+router.post("/work-order-types",                  authRequired, requireRole("ADMIN"), createWorkOrderType);
+router.patch("/work-order-types/reorder",         authRequired, requireRole("ADMIN"), reorderWorkOrderTypes);
+router.patch("/work-order-types/:id",             authRequired, requireRole("ADMIN"), updateWorkOrderType);
+router.delete("/work-order-types/:id",            authRequired, requireRole("ADMIN"), deleteWorkOrderType);
 
 // ── Ordens de Serviço ──────────────────────────────────────────────────────────
 const staffAccess = [authRequired, requireRole("TECHNICIAN", "ADMIN")];

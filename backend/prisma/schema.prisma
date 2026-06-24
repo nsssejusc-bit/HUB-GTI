@@ -43,16 +43,6 @@ enum OsStatus {
   CANCELADA
 }
 
-enum OsTipo {
-  VISITA_TECNICA
-  TROCA_EQUIPAMENTO
-  ENTREGA
-  MANUTENCAO_REDE
-  MANUTENCAO_CAMERA
-  RECOLHIMENTO_EQUIPAMENTO
-  ACAO
-  OUTRO
-}
 
 enum InventoryStatus {
   ATIVO
@@ -369,15 +359,27 @@ model DailyCounter {
   osCount     Int      @default(0)
 }
 
+model WorkOrderType {
+  id         Int         @id @default(autoincrement())
+  name       String
+  color      String      @default("#6366f1")
+  active     Boolean     @default(true)
+  sortOrder  Int         @default(0)
+  nucleos    Json?
+  fields     Json        @default("[]")
+  createdAt  DateTime    @default(now())
+  workOrders WorkOrder[]
+
+  @@index([active, sortOrder])
+}
+
 model WorkOrder {
   id            Int                @id @default(autoincrement())
   osNumber      String             @unique
-  tipo          OsTipo
+  tipoId        Int
+  tipo          WorkOrderType      @relation(fields: [tipoId], references: [id], onDelete: Restrict)
   status        OsStatus           @default(ABERTA)
-  local         String
-  problema      String?            @db.Text
-  materiais     String?            @db.Text
-  prazo         DateTime?
+  formData      Json?
   relatorio     String?            @db.Text
   unitId        Int?
   unit          Unit?              @relation(fields: [unitId], references: [id])
@@ -392,22 +394,18 @@ model WorkOrder {
   concludedAt   DateTime?
   cancelledAt   DateTime?
 
-  // Ação-specific fields
-  nomeEvento    String?            @db.Text
-  startDateTime DateTime?
-  endDateTime   DateTime?
-
   // Link to inventory checklist (1:1)
   checklistId   Int?               @unique
   checklist     InventoryChecklist? @relation("OsChecklist", fields: [checklistId], references: [id])
 
-  // Link to pre-visit work order (self-reference)
+  // Link to pre-requisite work order (self-reference)
   preVisitaId   Int?
   preVisita     WorkOrder?         @relation("OsPreVisita", fields: [preVisitaId], references: [id])
   linkedAcoes   WorkOrder[]        @relation("OsPreVisita")
 
   @@index([status])
   @@index([unitId])
+  @@index([tipoId])
   @@index([preVisitaId])
 }
 

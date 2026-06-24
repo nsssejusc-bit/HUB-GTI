@@ -442,17 +442,6 @@ function parseOsRange(q) {
   return where;
 }
 
-const OS_TIPO_LABELS = {
-  VISITA_TECNICA:           "Visita Técnica",
-  TROCA_EQUIPAMENTO:        "Troca de Equipamento",
-  ENTREGA:                  "Entrega",
-  MANUTENCAO_REDE:          "Manutenção de Rede",
-  MANUTENCAO_CAMERA:        "Manutenção de Câmera",
-  RECOLHIMENTO_EQUIPAMENTO: "Recolhimento de Equipamento",
-  ACAO:                     "Ação",
-  OUTRO:                    "Outro",
-};
-
 const OS_STATUS_LABELS = {
   ABERTA:       "Aberta",
   EM_ANDAMENTO: "Em Andamento",
@@ -477,15 +466,21 @@ export async function osByStatus(req, res) {
 export async function osByTipo(req, res) {
   const where = { ...parseOsRange(req.query), ...osUnitScope(req.user) };
   const data = await prisma.workOrder.groupBy({
-    by: ["tipo"],
+    by: ["tipoId"],
     where,
     _count: { _all: true },
-    orderBy: { _count: { tipo: "desc" } },
+    orderBy: { _count: { tipoId: "desc" } },
   });
+  const tipoIds = data.map((d) => d.tipoId).filter(Boolean);
+  const tipos = tipoIds.length > 0
+    ? await prisma.workOrderType.findMany({ where: { id: { in: tipoIds } }, select: { id: true, name: true, color: true } })
+    : [];
+  const tipoMap = Object.fromEntries(tipos.map((t) => [t.id, t]));
   res.json(data.map((d) => ({
-    tipo:  d.tipo,
-    label: OS_TIPO_LABELS[d.tipo] || d.tipo,
-    total: d._count._all,
+    tipoId: d.tipoId,
+    label:  tipoMap[d.tipoId]?.name || `Tipo #${d.tipoId}`,
+    color:  tipoMap[d.tipoId]?.color || "#6366f1",
+    total:  d._count._all,
   })));
 }
 

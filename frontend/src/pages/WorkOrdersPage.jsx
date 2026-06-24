@@ -3,25 +3,19 @@ import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useSocket } from "../context/SocketContext";
 import { Spinner } from "../components/ui";
-import DateInput from "../components/DateInput";
 import AppHeader from "../components/AppHeader";
-import AcaoFormModal from "../components/AcaoFormModal";
-import { TIPO_LABELS, TIPO_OPTIONS, OS_STATUS_LABEL, OS_STATUS_STYLE } from "../lib/osConstants";
+import { OS_STATUS_LABEL, OS_STATUS_STYLE } from "../lib/osConstants";
 import {
-  ClipboardList, Plus, ChevronRight, Calendar, MapPin,
-  Users, Filter, RefreshCw, Clock, Zap,
+  ClipboardList, Plus, ChevronRight, MapPin,
+  Users, Filter, RefreshCw, Clock,
 } from "lucide-react";
 
-const STATUS_STYLE = OS_STATUS_STYLE;
-const STATUS_LABEL = OS_STATUS_LABEL;
-
 const STATUS_TABS = [
-  { key: "",             label: "Todas"       },
-  { key: "ABERTA",       label: "Abertas"     },
-  { key: "EM_ANDAMENTO", label: "Em Andamento"},
-  { key: "CONCLUIDA",    label: "Concluídas"  },
+  { key: "",             label: "Todas"        },
+  { key: "ABERTA",       label: "Abertas"      },
+  { key: "EM_ANDAMENTO", label: "Em Andamento" },
+  { key: "CONCLUIDA",    label: "Concluídas"   },
 ];
-
 
 function fmtDate(d) {
   if (!d) return null;
@@ -30,35 +24,114 @@ function fmtDate(d) {
 
 function OsStatusBadge({ status }) {
   return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_STYLE[status] || "bg-slate-100 text-slate-600"}`}>
-      {STATUS_LABEL[status] || status}
+    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${OS_STATUS_STYLE[status] || "bg-slate-100 text-slate-600"}`}>
+      {OS_STATUS_LABEL[status] || status}
     </span>
   );
 }
 
-// ── Create OS modal ───────────────────────────────────────────────────────────
-function CreateOsModal({ onClose, onCreate, units }) {
-  const [form, setForm] = useState({
-    tipo: "VISITA_TECNICA", local: "", problema: "",
-    materiais: "", prazo: "", unitId: "",
-  });
-  const [saving, setSaving] = useState(false);
-  const [err, setErr] = useState("");
+function TipoBadge({ tipo }) {
+  if (!tipo) return null;
+  return (
+    <span
+      className="text-xs rounded px-1.5 py-0.5 font-medium"
+      style={{ backgroundColor: tipo.color + "22", color: tipo.color }}
+    >
+      {tipo.name}
+    </span>
+  );
+}
+
+// ── Campo dinâmico ────────────────────────────────────────────────────────────
+function DynamicField({ field, value, onChange }) {
+  const cls = "field-input text-sm";
+  const val = value ?? "";
+
+  if (field.type === "textarea") {
+    return (
+      <div>
+        <label className="field-label">{field.label}{field.required && " *"}</label>
+        <textarea rows={3} value={val} onChange={(e) => onChange(e.target.value)}
+          required={field.required} className={`${cls} resize-none`} />
+      </div>
+    );
+  }
+  if (field.type === "select") {
+    return (
+      <div>
+        <label className="field-label">{field.label}{field.required && " *"}</label>
+        <select value={val} onChange={(e) => onChange(e.target.value)} required={field.required} className={cls}>
+          <option value="">Selecione...</option>
+          {(field.options || []).map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+        </select>
+      </div>
+    );
+  }
+  if (field.type === "date") {
+    return (
+      <div>
+        <label className="field-label">{field.label}{field.required && " *"}</label>
+        <input type="date" value={val} onChange={(e) => onChange(e.target.value)} required={field.required} className={cls} />
+      </div>
+    );
+  }
+  if (field.type === "datetime") {
+    return (
+      <div>
+        <label className="field-label">{field.label}{field.required && " *"}</label>
+        <input type="datetime-local" value={val} onChange={(e) => onChange(e.target.value)} required={field.required} className={cls} />
+      </div>
+    );
+  }
+  if (field.type === "number") {
+    return (
+      <div>
+        <label className="field-label">{field.label}{field.required && " *"}</label>
+        <input type="number" value={val} onChange={(e) => onChange(e.target.value)} required={field.required} className={cls} />
+      </div>
+    );
+  }
+  if (field.type === "checkbox") {
+    return (
+      <div className="flex items-center gap-2 pt-1">
+        <input type="checkbox" id={`field-${field.key}`} checked={!!val} onChange={(e) => onChange(e.target.checked)} className="h-4 w-4 rounded" />
+        <label htmlFor={`field-${field.key}`} className="text-sm text-slate-700 dark:text-gray-300">{field.label}</label>
+      </div>
+    );
+  }
+  return (
+    <div>
+      <label className="field-label">{field.label}{field.required && " *"}</label>
+      <input type="text" value={val} onChange={(e) => onChange(e.target.value)} required={field.required} className={cls} />
+    </div>
+  );
+}
+
+// ── Modal de criação ──────────────────────────────────────────────────────────
+function CreateOsModal({ onClose, onCreate, units, types }) {
+  const [tipoId, setTipoId]   = useState(types[0]?.id ?? "");
+  const [formData, setFormData] = useState({});
+  const [unitId, setUnitId]   = useState("");
+  const [saving, setSaving]   = useState(false);
+  const [err, setErr]         = useState("");
+
+  const selectedType = types.find((t) => t.id === Number(tipoId));
+  const fields = selectedType?.fields ?? [];
+
+  function setField(key, val) {
+    setFormData((prev) => ({ ...prev, [key]: val }));
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
     setSaving(true);
     setErr("");
     try {
-      const payload = {
-        tipo:      form.tipo,
-        local:     form.local,
-        problema:  form.problema || null,
-        materiais: form.materiais || null,
-        prazo:     form.prazo ? new Date(form.prazo).toISOString() : null,
-        unitId:    form.unitId ? Number(form.unitId) : null,
-      };
-      const res = await api.post("/work-orders", payload);
+      const res = await api.post("/work-orders", {
+        tipoId:   Number(tipoId),
+        formData,
+        unitId:   unitId ? Number(unitId) : null,
+      });
       onCreate(res.data);
     } catch (e) {
       setErr(e.response?.data?.error || "Erro ao criar OS");
@@ -72,14 +145,14 @@ function CreateOsModal({ onClose, onCreate, units }) {
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="card w-full max-w-lg p-6 space-y-4">
+      <div className="card w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-100 dark:bg-brand-900/40 text-brand-600 dark:text-brand-400">
             <ClipboardList size={20} />
           </span>
           <div>
             <h3 className="font-semibold text-slate-900 dark:text-gray-100">Nova Ordem de Serviço</h3>
-            <p className="text-xs text-slate-500 dark:text-gray-400">Campos marcados com * são obrigatórios</p>
+            <p className="text-xs text-slate-500 dark:text-gray-400">Campos com * são obrigatórios</p>
           </div>
         </div>
 
@@ -87,67 +160,41 @@ function CreateOsModal({ onClose, onCreate, units }) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="field-label">Tipo *</label>
-              <select value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })} className="field-input">
-                {TIPO_OPTIONS.slice(1).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              <select
+                value={tipoId}
+                onChange={(e) => { setTipoId(e.target.value); setFormData({}); }}
+                className="field-input"
+                required
+              >
+                {types.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
               </select>
             </div>
             <div>
               <label className="field-label">Núcleo responsável</label>
-              <select value={form.unitId} onChange={(e) => setForm({ ...form, unitId: e.target.value })} className="field-input">
+              <select value={unitId} onChange={(e) => setUnitId(e.target.value)} className="field-input">
                 <option value="">A definir</option>
                 {units.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
               </select>
             </div>
           </div>
 
-          <div>
-            <label className="field-label">Local / Destino *</label>
-            <input
-              type="text" required
-              value={form.local}
-              onChange={(e) => setForm({ ...form, local: e.target.value })}
-              placeholder="Ex: Setor de RH — Bloco B, ou Órgão X — Rua Y"
-              className="field-input"
+          {fields.map((field) => (
+            <DynamicField
+              key={field.key}
+              field={field}
+              value={formData[field.key]}
+              onChange={(val) => setField(field.key, val)}
             />
-          </div>
-
-          <div>
-            <label className="field-label">Descrição do problema / atividade</label>
-            <textarea
-              rows={3}
-              value={form.problema}
-              onChange={(e) => setForm({ ...form, problema: e.target.value })}
-              placeholder="O que precisa ser feito..."
-              className="field-input resize-none"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="field-label">Materiais / equipamentos</label>
-              <input
-                type="text"
-                value={form.materiais}
-                onChange={(e) => setForm({ ...form, materiais: e.target.value })}
-                placeholder="Ex: Cabo UTP, Switch 8p..."
-                className="field-input"
-              />
-            </div>
-            <div>
-              <label className="field-label">Prazo</label>
-              <DateInput
-                value={form.prazo}
-                onChange={(v) => setForm({ ...form, prazo: v })}
-              />
-            </div>
-          </div>
+          ))}
 
           {err && <p className="text-xs text-red-600 dark:text-red-400">{err}</p>}
 
           <div className="flex gap-2 justify-end pt-1">
             <button type="button" onClick={onClose} className="btn-secondary text-sm py-2 px-4">Cancelar</button>
             <button
-              type="submit" disabled={saving}
+              type="submit" disabled={saving || !tipoId}
               className="inline-flex items-center gap-1.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 text-sm font-semibold transition disabled:opacity-60"
             >
               {saving ? <Spinner className="h-4 w-4" /> : <Plus size={14} />}
@@ -160,26 +207,26 @@ function CreateOsModal({ onClose, onCreate, units }) {
   );
 }
 
-// ── Page ─────────────────────────────────────────────────────────────────────
+// ── Página ─────────────────────────────────────────────────────────────────────
 export default function WorkOrdersPage() {
   const socket = useSocket();
-  const nav = useNavigate();
+  const nav    = useNavigate();
 
-  const [orders, setOrders]       = useState([]);
-  const [units, setUnits]         = useState([]);
-  const [loading, setLoading]     = useState(true);
-  const [statusFilter, setStatus] = useState("");
-  const [tipoFilter, setTipo]     = useState("");
-  const [unitFilter, setUnit]     = useState("");
+  const [orders, setOrders]         = useState([]);
+  const [units, setUnits]           = useState([]);
+  const [types, setTypes]           = useState([]);
+  const [loading, setLoading]       = useState(true);
+  const [statusFilter, setStatus]   = useState("");
+  const [tipoFilter, setTipo]       = useState("");
+  const [unitFilter, setUnit]       = useState("");
   const [dateFilter, setDateFilter] = useState("");
   const [showCreate, setShowCreate] = useState(false);
-  const [showCreateAcao, setShowCreateAcao] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const params = {};
-      if (tipoFilter)  params.tipo   = tipoFilter;
+      if (tipoFilter)  params.tipoId = tipoFilter;
       if (unitFilter)  params.unitId = unitFilter;
       if (dateFilter) {
         params.from = new Date(dateFilter + "T00:00:00").toISOString();
@@ -193,7 +240,10 @@ export default function WorkOrdersPage() {
   }, [tipoFilter, unitFilter, dateFilter]);
 
   useEffect(() => {
-    api.get("/units").then((r) => setUnits(r.data));
+    Promise.all([api.get("/units"), api.get("/work-order-types")]).then(([u, t]) => {
+      setUnits(u.data);
+      setTypes(t.data);
+    });
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -244,12 +294,6 @@ export default function WorkOrdersPage() {
               <RefreshCw size={13} /> Atualizar
             </button>
             <button
-              onClick={() => setShowCreateAcao(true)}
-              className="flex items-center gap-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white px-3.5 py-2 text-sm font-semibold transition"
-            >
-              <Zap size={15} /> Nova Ação
-            </button>
-            <button
               onClick={() => setShowCreate(true)}
               className="flex items-center gap-1.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white px-3.5 py-2 text-sm font-semibold transition"
             >
@@ -258,7 +302,7 @@ export default function WorkOrdersPage() {
           </div>
         </div>
 
-        {/* Filtros */}
+        {/* Tabs de status */}
         <div className="space-y-2">
           <div className="flex items-center gap-2 border-b border-slate-200 dark:border-gray-700 pb-1">
             {STATUS_TABS.map((tab) => (
@@ -291,10 +335,12 @@ export default function WorkOrdersPage() {
             <span className="ml-auto text-xs text-slate-400 dark:text-gray-500">{visible.length} OS</span>
           </div>
 
+          {/* Filtros */}
           <div className="flex items-center gap-2 flex-wrap">
             <Filter size={13} className="text-slate-400 dark:text-gray-500 shrink-0" />
             <select value={tipoFilter} onChange={(e) => setTipo(e.target.value)} className="field-input py-1.5 text-xs w-auto min-w-0 max-w-[220px]">
-              {TIPO_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              <option value="">Todos os tipos</option>
+              {types.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
             <select value={unitFilter} onChange={(e) => setUnit(e.target.value)} className="field-input py-1.5 text-xs w-auto min-w-0 max-w-[180px]">
               <option value="">Todos os núcleos</option>
@@ -328,29 +374,18 @@ export default function WorkOrdersPage() {
         {/* Empty */}
         {!loading && visible.length === 0 && (
           <div className="card p-14 text-center">
-            <div className="flex justify-center mb-4">
-              <ClipboardList size={44} className="text-slate-300 dark:text-gray-700" />
-            </div>
+            <ClipboardList size={44} className="mx-auto text-slate-300 dark:text-gray-700 mb-4" />
             <div className="font-semibold text-slate-700 dark:text-gray-300">
               {(hasFilters || statusFilter) ? "Nenhuma OS encontrada com os filtros ativos" : "Nenhuma OS encontrada"}
             </div>
-            <div className="text-sm text-slate-400 dark:text-gray-500 mt-2">
-              {(hasFilters || statusFilter) ? (
-                <div className="space-y-1">
-                  {statusFilter && <p>Status: <strong className="text-slate-600 dark:text-gray-300">{STATUS_LABEL[statusFilter]}</strong></p>}
-                  {tipoFilter && <p>Tipo: <strong className="text-slate-600 dark:text-gray-300">{TIPO_LABELS[tipoFilter]}</strong></p>}
-                  {unitFilter && <p>Núcleo: <strong className="text-slate-600 dark:text-gray-300">{units.find((u) => String(u.id) === unitFilter)?.name}</strong></p>}
-                  <button
-                    onClick={() => { setTipo(""); setUnit(""); setStatus(""); }}
-                    className="mt-2 text-brand-600 dark:text-brand-400 hover:underline font-medium"
-                  >
-                    Limpar filtros
-                  </button>
-                </div>
-              ) : (
-                'Crie uma nova ordem de serviço clicando em "Nova OS"'
-              )}
-            </div>
+            {(hasFilters || statusFilter) && (
+              <button
+                onClick={() => { setTipo(""); setUnit(""); setStatus(""); setDateFilter(""); }}
+                className="mt-3 text-brand-600 dark:text-brand-400 hover:underline text-sm font-medium"
+              >
+                Limpar filtros
+              </button>
+            )}
           </div>
         )}
 
@@ -358,92 +393,83 @@ export default function WorkOrdersPage() {
         {!loading && visible.length > 0 && (
           <div className="card divide-y divide-slate-100 dark:divide-gray-700/60">
             {visible.map((os) => {
-              const overdue = os.prazo && new Date(os.prazo) < new Date() && !["CONCLUIDA", "CANCELADA"].includes(os.status);
+              const prazo = os.formData?.prazo;
+              const local = os.formData?.local || os.formData?.nomeEvento || "";
+              const overdue = prazo && new Date(prazo) < new Date() && !["CONCLUIDA","CANCELADA"].includes(os.status);
               return (
-              <Link
-                key={os.id}
-                to={`/painel/os/${os.id}`}
-                className={`group flex items-center gap-3 px-4 py-3.5 transition ${
-                  overdue
-                    ? "bg-red-50/60 dark:bg-red-900/10 hover:bg-red-50 dark:hover:bg-red-900/20"
-                    : "hover:bg-slate-50 dark:hover:bg-gray-800/60"
-                }`}
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-mono text-slate-400 dark:text-gray-500">{os.osNumber}</span>
-                    <OsStatusBadge status={os.status} />
-                    <span className={`text-xs rounded px-1.5 py-0.5 ${
-                      os.tipo === "ACAO"
-                        ? "bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300"
-                        : "bg-slate-100 dark:bg-gray-800 text-slate-400 dark:text-gray-500"
-                    }`}>
-                      {TIPO_LABELS[os.tipo]}
-                    </span>
-                  </div>
-                  {os.tipo === "ACAO" && os.nomeEvento && (
-                    <div className="text-sm font-semibold text-slate-800 dark:text-gray-100 mt-0.5 truncate flex items-center gap-1.5">
-                      <Zap size={11} className="text-purple-500 shrink-0" />
-                      {os.nomeEvento}
-                    </div>
+                <Link
+                  key={os.id}
+                  to={`/painel/os/${os.id}`}
+                  className={`group flex items-center gap-3 px-4 py-3.5 transition ${
+                    overdue
+                      ? "bg-red-50/60 dark:bg-red-900/10 hover:bg-red-50 dark:hover:bg-red-900/20"
+                      : "hover:bg-slate-50 dark:hover:bg-gray-800/60"
+                  }`}
+                >
+                  {/* Cor do tipo */}
+                  {os.tipo && (
+                    <div
+                      className="w-1 self-stretch rounded-full shrink-0"
+                      style={{ backgroundColor: os.tipo.color }}
+                    />
                   )}
-                  <div className="text-sm font-medium text-slate-800 dark:text-gray-100 mt-0.5 truncate flex items-center gap-1.5">
-                    <MapPin size={11} className="text-slate-400 shrink-0" />
-                    {os.local}
-                  </div>
-                  <div className="flex items-center gap-3 mt-0.5">
-                    {os.unit && (
-                      <span className="text-xs text-slate-400 dark:text-gray-500">{os.unit.name}</span>
-                    )}
-                    {os.tecnicos.length > 0 && (
-                      <span className="text-xs text-slate-400 dark:text-gray-500 flex items-center gap-1">
-                        <Users size={10} />
-                        {os.tecnicos.length} técnico{os.tecnicos.length !== 1 ? "s" : ""}
-                      </span>
-                    )}
-                    {os.tickets.length > 0 && (
-                      <span className="text-xs text-slate-400 dark:text-gray-500">
-                        {os.tickets.length} chamado{os.tickets.length !== 1 ? "s" : ""}
-                      </span>
-                    )}
-                  </div>
-                </div>
 
-                <div className="text-right shrink-0 space-y-1">
-                  {os.prazo && (() => {
-                    const overdue = new Date(os.prazo) < new Date() && !["CONCLUIDA", "CANCELADA"].includes(os.status);
-                    return (
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-mono text-slate-400 dark:text-gray-500">{os.osNumber}</span>
+                      <OsStatusBadge status={os.status} />
+                      <TipoBadge tipo={os.tipo} />
+                    </div>
+                    {local && (
+                      <div className="text-sm font-medium text-slate-800 dark:text-gray-100 mt-0.5 truncate flex items-center gap-1.5">
+                        <MapPin size={11} className="text-slate-400 shrink-0" />
+                        {local}
+                      </div>
+                    )}
+                    <div className="flex items-center gap-3 mt-0.5">
+                      {os.unit && (
+                        <span className="text-xs text-slate-400 dark:text-gray-500">{os.unit.name}</span>
+                      )}
+                      {os.tecnicos.length > 0 && (
+                        <span className="text-xs text-slate-400 dark:text-gray-500 flex items-center gap-1">
+                          <Users size={10} />
+                          {os.tecnicos.length} técnico{os.tecnicos.length !== 1 ? "s" : ""}
+                        </span>
+                      )}
+                      {os.tickets.length > 0 && (
+                        <span className="text-xs text-slate-400 dark:text-gray-500">
+                          {os.tickets.length} chamado{os.tickets.length !== 1 ? "s" : ""}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="text-right shrink-0 space-y-1">
+                    {prazo && (
                       <div className={`text-xs flex items-center gap-1 justify-end ${overdue ? "text-red-500 dark:text-red-400 font-medium" : "text-slate-500 dark:text-gray-400"}`}>
                         <Clock size={10} />
-                        {fmtDate(os.prazo)}
+                        {fmtDate(prazo)}
                         {overdue && <span className="text-[10px] uppercase tracking-wide">vencido</span>}
                       </div>
-                    );
-                  })()}
-                  <div className="text-xs text-slate-400 dark:text-gray-500">
-                    {fmtDate(os.createdAt)}
+                    )}
+                    <div className="text-xs text-slate-400 dark:text-gray-500">
+                      {fmtDate(os.createdAt)}
+                    </div>
                   </div>
-                </div>
 
-                <ChevronRight size={16} className="text-slate-300 dark:text-gray-600 group-hover:text-brand-500 dark:group-hover:text-brand-400 shrink-0 transition" />
-              </Link>
+                  <ChevronRight size={16} className="text-slate-300 dark:text-gray-600 group-hover:text-brand-500 transition shrink-0" />
+                </Link>
               );
             })}
           </div>
         )}
       </main>
 
-      {showCreate && (
+      {showCreate && types.length > 0 && (
         <CreateOsModal
           units={units}
+          types={types}
           onClose={() => setShowCreate(false)}
-          onCreate={handleCreated}
-        />
-      )}
-
-      {showCreateAcao && (
-        <AcaoFormModal
-          onClose={() => setShowCreateAcao(false)}
           onCreate={handleCreated}
         />
       )}

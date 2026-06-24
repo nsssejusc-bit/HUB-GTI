@@ -1,20 +1,16 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { StatusBadge, Spinner } from "../components/ui";
-import DateInput from "../components/DateInput";
 import AppHeader from "../components/AppHeader";
-import { TIPO_LABELS, TIPO_OPTIONS as TIPO_OPTIONS_LIST, OS_STATUS_LABEL, OS_STATUS_STYLE } from "../lib/osConstants";
-import DateTimeInput from "../components/DateTimeInput";
+import { OS_STATUS_LABEL, OS_STATUS_STYLE } from "../lib/osConstants";
 import {
-  ArrowLeft, ChevronRight, MapPin, Users, Clock,
-  Wrench, Edit2, Check, X, Plus, Trash2, Link2, Unlink,
-  AlertTriangle, CheckCircle2, Play, XCircle,
-  Zap, Package, ClipboardCheck, CalendarRange, ExternalLink,
+  ArrowLeft, ChevronRight, Users, Wrench, Edit2, Check, X,
+  Plus, Trash2, Link2, Unlink, AlertTriangle, CheckCircle2,
+  Play, XCircle, Package, ClipboardCheck, ExternalLink,
 } from "lucide-react";
 
-const TIPO_OPTIONS = TIPO_OPTIONS_LIST.filter(o => o.value).map(o => o.value);
 const STATUS_STYLE = OS_STATUS_STYLE;
 const STATUS_LABEL = OS_STATUS_LABEL;
 
@@ -26,19 +22,27 @@ const CHECKLIST_STATUS_STYLE = {
 const CHECKLIST_STATUS_LABEL = { PENDENTE: "Pendente", APROVADO: "Aprovado", REJEITADO: "Rejeitado" };
 
 const TRANSITION_CONFIG = {
-  EM_ANDAMENTO: { label: "Iniciar",   icon: Play,        cls: "bg-blue-600 hover:bg-blue-700 text-white" },
-  CONCLUIDA:    { label: "Concluir",  icon: CheckCircle2, cls: "bg-emerald-600 hover:bg-emerald-700 text-white" },
-  CANCELADA:    { label: "Cancelar",  icon: XCircle,     cls: "bg-red-600 hover:bg-red-700 text-white" },
+  EM_ANDAMENTO: { label: "Iniciar",  icon: Play,         cls: "bg-blue-600 hover:bg-blue-700 text-white" },
+  CONCLUIDA:    { label: "Concluir", icon: CheckCircle2,  cls: "bg-emerald-600 hover:bg-emerald-700 text-white" },
+  CANCELADA:    { label: "Cancelar", icon: XCircle,       cls: "bg-red-600 hover:bg-red-700 text-white" },
 };
 
 function fmtDate(d) {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  return new Date(d).toLocaleDateString("pt-BR", {
+    day: "2-digit", month: "2-digit", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
 }
 
-function fmtDateInput(d) {
-  if (!d) return "";
-  return new Date(d).toISOString().slice(0, 10);
+function fmtFieldValue(field, raw) {
+  if (raw === undefined || raw === null || raw === "") return "—";
+  if (field.type === "checkbox") return raw ? "Sim" : "Não";
+  if (field.type === "date" && raw)
+    return new Date(raw + "T00:00:00").toLocaleDateString("pt-BR");
+  if (field.type === "datetime" && raw)
+    return new Date(raw).toLocaleString("pt-BR");
+  return String(raw);
 }
 
 function OsStatusBadge({ status }) {
@@ -58,6 +62,71 @@ function InfoRow({ label, value }) {
   );
 }
 
+// ── Campo dinâmico ────────────────────────────────────────────────────────────
+function DynamicField({ field, value, onChange }) {
+  const cls = "field-input text-sm";
+  const val = value ?? "";
+
+  if (field.type === "textarea") {
+    return (
+      <div>
+        <label className="field-label">{field.label}{field.required && " *"}</label>
+        <textarea rows={3} value={val} onChange={(e) => onChange(e.target.value)}
+          required={field.required} className={`${cls} resize-none`} />
+      </div>
+    );
+  }
+  if (field.type === "select") {
+    return (
+      <div>
+        <label className="field-label">{field.label}{field.required && " *"}</label>
+        <select value={val} onChange={(e) => onChange(e.target.value)} required={field.required} className={cls}>
+          <option value="">Selecione...</option>
+          {(field.options || []).map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+        </select>
+      </div>
+    );
+  }
+  if (field.type === "date") {
+    return (
+      <div>
+        <label className="field-label">{field.label}{field.required && " *"}</label>
+        <input type="date" value={val} onChange={(e) => onChange(e.target.value)} required={field.required} className={cls} />
+      </div>
+    );
+  }
+  if (field.type === "datetime") {
+    return (
+      <div>
+        <label className="field-label">{field.label}{field.required && " *"}</label>
+        <input type="datetime-local" value={val} onChange={(e) => onChange(e.target.value)} required={field.required} className={cls} />
+      </div>
+    );
+  }
+  if (field.type === "number") {
+    return (
+      <div>
+        <label className="field-label">{field.label}{field.required && " *"}</label>
+        <input type="number" value={val} onChange={(e) => onChange(e.target.value)} required={field.required} className={cls} />
+      </div>
+    );
+  }
+  if (field.type === "checkbox") {
+    return (
+      <div className="flex items-center gap-2 pt-1">
+        <input type="checkbox" id={`field-${field.key}`} checked={!!val} onChange={(e) => onChange(e.target.checked)} className="h-4 w-4 rounded" />
+        <label htmlFor={`field-${field.key}`} className="text-sm text-slate-700 dark:text-gray-300">{field.label}</label>
+      </div>
+    );
+  }
+  return (
+    <div>
+      <label className="field-label">{field.label}{field.required && " *"}</label>
+      <input type="text" value={val} onChange={(e) => onChange(e.target.value)} required={field.required} className={cls} />
+    </div>
+  );
+}
+
 // ── Transition modal ──────────────────────────────────────────────────────────
 function TransitionModal({ toStatus, onConfirm, onClose }) {
   const [note, setNote]           = useState("");
@@ -71,7 +140,7 @@ function TransitionModal({ toStatus, onConfirm, onClose }) {
     finally { setSaving(false); }
   }
 
-  const cfg = TRANSITION_CONFIG[toStatus];
+  const cfg  = TRANSITION_CONFIG[toStatus];
   const Icon = cfg?.icon;
 
   return (
@@ -128,24 +197,23 @@ function TransitionModal({ toStatus, onConfirm, onClose }) {
 
 // ── Link ticket modal ─────────────────────────────────────────────────────────
 function LinkTicketModal({ onLink, onClose }) {
-  const [q, setQ] = useState("");
-  const [results, setResults] = useState([]);
+  const [q, setQ]               = useState("");
+  const [results, setResults]   = useState([]);
   const [searching, setSearching] = useState(false);
 
-  async function search() {
-    if (!q.trim()) return;
-    setSearching(true);
-    try {
-      const res = await api.get("/tickets", { params: { limit: 20 } });
-      const filtered = res.data.tickets.filter((t) =>
-        t.ticketNumber.toLowerCase().includes(q.toLowerCase()) ||
-        t.requesterName.toLowerCase().includes(q.toLowerCase())
-      );
-      setResults(filtered);
-    } finally { setSearching(false); }
-  }
-
   useEffect(() => {
+    async function search() {
+      if (!q.trim()) { setResults([]); return; }
+      setSearching(true);
+      try {
+        const res = await api.get("/tickets", { params: { limit: 20 } });
+        const lower = q.toLowerCase();
+        setResults(res.data.tickets.filter((t) =>
+          t.ticketNumber.toLowerCase().includes(lower) ||
+          t.requesterName.toLowerCase().includes(lower)
+        ));
+      } finally { setSearching(false); }
+    }
     const t = setTimeout(search, 400);
     return () => clearTimeout(t);
   }, [q]);
@@ -160,20 +228,16 @@ function LinkTicketModal({ onLink, onClose }) {
           <Link2 size={16} className="text-brand-600" /> Vincular chamado
         </h3>
         <input
-          type="text"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
+          type="text" value={q} onChange={(e) => setQ(e.target.value)}
           placeholder="Buscar por protocolo ou nome..."
-          className="field-input"
-          autoFocus
+          className="field-input" autoFocus
         />
         {searching && <div className="flex justify-center py-4"><Spinner className="h-5 w-5" /></div>}
         {results.length > 0 && (
           <div className="divide-y divide-slate-100 dark:divide-gray-700/60 max-h-64 overflow-y-auto rounded-xl border border-slate-200 dark:border-gray-700">
             {results.map((t) => (
               <button
-                key={t.id}
-                onClick={() => onLink(t.id)}
+                key={t.id} onClick={() => onLink(t.id)}
                 className="w-full text-left px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-gray-800 transition"
               >
                 <div className="flex items-center gap-2">
@@ -223,8 +287,7 @@ function DeleteOsModal({ osNumber, onConfirm, onClose }) {
         <div className="flex gap-2 justify-end">
           <button onClick={onClose} className="btn-secondary text-sm py-2 px-4">Cancelar</button>
           <button
-            onClick={confirm}
-            disabled={deleting}
+            onClick={confirm} disabled={deleting}
             className="inline-flex items-center gap-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white px-4 py-2 text-sm font-semibold transition disabled:opacity-60"
           >
             {deleting ? <Spinner className="h-4 w-4" /> : <Trash2 size={14} />}
@@ -236,23 +299,24 @@ function DeleteOsModal({ osNumber, onConfirm, onClose }) {
   );
 }
 
-// ── Page ─────────────────────────────────────────────────────────────────────
+// ── Página ────────────────────────────────────────────────────────────────────
 export default function WorkOrderDetailPage() {
-  const { id }  = useParams();
-  const nav     = useNavigate();
+  const { id }   = useParams();
+  const nav      = useNavigate();
   const { user } = useAuth();
 
-  const [os, setOs]               = useState(null);
-  const [loadErr, setLoadErr]     = useState(false);
-  const [units, setUnits]         = useState([]);
-  const [techs, setTechs]         = useState([]);
-  const [transition, setTrans]    = useState(null);
+  const [os, setOs]                   = useState(null);
+  const [loadErr, setLoadErr]         = useState(false);
+  const [units, setUnits]             = useState([]);
+  const [techs, setTechs]             = useState([]);
+  const [transition, setTrans]        = useState(null);
   const [showLinkTicket, setShowLink] = useState(false);
   const [showDelete, setShowDelete]   = useState(false);
-  const [err, setErr]             = useState("");
-  const [editing, setEditing]     = useState(false);
-  const [editForm, setEditForm]   = useState({});
-  const [saving, setSaving]       = useState(false);
+  const [err, setErr]                 = useState("");
+  const [editing, setEditing]         = useState(false);
+  const [editFormData, setEditFormData] = useState({});
+  const [editUnitId, setEditUnitId]   = useState("");
+  const [saving, setSaving]           = useState(false);
 
   const load = useCallback(async () => {
     setLoadErr(false);
@@ -272,43 +336,28 @@ export default function WorkOrderDetailPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const canEdit = os && os.status !== "CONCLUIDA" && os.status !== "CANCELADA";
+  const canEdit = os && !["CONCLUIDA", "CANCELADA"].includes(os.status);
   const isAdmin = user?.role === "ADMIN";
 
   function startEdit() {
-    setEditForm({
-      tipo:          os.tipo,
-      local:         os.local,
-      problema:      os.problema || "",
-      materiais:     os.materiais || "",
-      prazo:         os.prazo ? new Date(os.prazo).toISOString().slice(0, 10) : "",
-      unitId:        os.unit ? String(os.unit.id) : "",
-      nomeEvento:    os.nomeEvento    || "",
-      startDateTime: os.startDateTime ? new Date(os.startDateTime).toISOString().slice(0, 16) : "",
-      endDateTime:   os.endDateTime   ? new Date(os.endDateTime).toISOString().slice(0, 16)   : "",
-    });
+    setEditFormData(os.formData ?? {});
+    setEditUnitId(os.unit ? String(os.unit.id) : "");
     setEditing(true);
     setErr("");
+  }
+
+  function setField(key, val) {
+    setEditFormData((prev) => ({ ...prev, [key]: val }));
   }
 
   async function saveEdit() {
     setSaving(true);
     setErr("");
     try {
-      const payload = {
-        tipo:      editForm.tipo,
-        local:     editForm.local,
-        problema:  editForm.problema  || null,
-        materiais: editForm.materiais || null,
-        prazo:     editForm.prazo ? new Date(editForm.prazo).toISOString() : null,
-        unitId:    editForm.unitId ? Number(editForm.unitId) : null,
-      };
-      if (editForm.tipo === "ACAO") {
-        payload.nomeEvento    = editForm.nomeEvento    || null;
-        payload.startDateTime = editForm.startDateTime ? new Date(editForm.startDateTime).toISOString() : null;
-        payload.endDateTime   = editForm.endDateTime   ? new Date(editForm.endDateTime).toISOString()   : null;
-      }
-      const res = await api.patch(`/work-orders/${id}`, payload);
+      const res = await api.patch(`/work-orders/${id}`, {
+        formData: editFormData,
+        unitId:   editUnitId ? Number(editUnitId) : null,
+      });
       setOs(res.data);
       setEditing(false);
     } catch (e) {
@@ -362,6 +411,7 @@ export default function WorkOrderDetailPage() {
       nav("/painel/os");
     } catch (e) {
       setErr(e.response?.data?.error || "Erro ao excluir OS");
+      setShowDelete(false);
     }
   }
 
@@ -379,13 +429,10 @@ export default function WorkOrderDetailPage() {
     </div>
   );
 
-  const unitOptions = [
-    { value: "", label: "A definir" },
-    ...units.map((u) => ({ value: String(u.id), label: u.name })),
-  ];
-
   const assignedTechIds = new Set(os.tecnicos.map((t) => t.id));
   const availableTechs  = techs.filter((t) => !assignedTechIds.has(t.id));
+  const tipoFields      = os.tipo?.fields ?? [];
+  const formData        = os.formData ?? {};
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-gray-950">
@@ -399,6 +446,17 @@ export default function WorkOrderDetailPage() {
           </Link>
           <ChevronRight size={14} className="text-slate-300 dark:text-gray-600" />
           <span className="font-mono text-slate-600 dark:text-gray-300">{os.osNumber}</span>
+          {os.tipo && (
+            <>
+              <ChevronRight size={14} className="text-slate-300 dark:text-gray-600" />
+              <span
+                className="text-xs rounded px-1.5 py-0.5 font-medium"
+                style={{ backgroundColor: os.tipo.color + "22", color: os.tipo.color }}
+              >
+                {os.tipo.name}
+              </span>
+            </>
+          )}
           <div className="ml-auto flex items-center gap-2">
             <OsStatusBadge status={os.status} />
           </div>
@@ -413,13 +471,13 @@ export default function WorkOrderDetailPage() {
           </div>
         )}
 
-        {/* Progresso da Ação (stepper) */}
-        {os.tipo === "ACAO" && os.preVisita && (() => {
-          const pv = os.preVisita;
+        {/* Stepper de pré-visita (genérico para qualquer OS com preVisita) */}
+        {os.preVisita && (() => {
+          const pv     = os.preVisita;
           const pvDone = pv.status === "CONCLUIDA";
           const stages = [
-            { key: "visita",  label: "Visita Técnica", status: pv.status,  osNumber: pv.osNumber, href: `/painel/os/${pv.id}` },
-            { key: "acao",    label: "Ação",           status: os.status,  osNumber: os.osNumber, href: null },
+            { key: "pre",     label: pv.tipo?.name || "Pré-visita",   status: pv.status,  osNumber: pv.osNumber, href: `/painel/os/${pv.id}` },
+            { key: "current", label: os.tipo?.name  || "OS atual",     status: os.status,  osNumber: os.osNumber, href: null },
           ];
           const activeStage = pvDone ? 1 : 0;
 
@@ -427,9 +485,9 @@ export default function WorkOrderDetailPage() {
             <div className="card p-4">
               <div className="flex items-center gap-0">
                 {stages.map((stage, i) => {
-                  const isActive  = i === activeStage;
-                  const isDone    = stage.status === "CONCLUIDA";
-                  const isLocked  = i > activeStage;
+                  const isActive = i === activeStage;
+                  const isDone   = stage.status === "CONCLUIDA";
+                  const isLocked = i > activeStage;
                   const statusStyle = {
                     ABERTA:       "text-amber-600 dark:text-amber-400",
                     EM_ANDAMENTO: "text-blue-600 dark:text-blue-400",
@@ -472,9 +530,9 @@ export default function WorkOrderDetailPage() {
               {!pvDone && (
                 <div className="mt-3 flex items-center gap-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
                   <AlertTriangle size={13} className="shrink-0" />
-                  A Ação só pode ser iniciada após a conclusão da{" "}
+                  Esta OS só pode ser iniciada após a conclusão de{" "}
                   <Link to={`/painel/os/${pv.id}`} className="font-semibold underline underline-offset-2">
-                    Visita Técnica ({pv.osNumber})
+                    {pv.osNumber}
                   </Link>
                 </div>
               )}
@@ -488,14 +546,13 @@ export default function WorkOrderDetailPage() {
             const cfg = TRANSITION_CONFIG[next];
             if (!cfg) return null;
             const Icon = cfg.icon;
-            // Block "Iniciar" for Ação until pre-visit is done
-            const blocked = next === "EM_ANDAMENTO" && os.tipo === "ACAO" && os.preVisita && os.preVisita.status !== "CONCLUIDA";
+            const blocked = next === "EM_ANDAMENTO" && os.preVisita && os.preVisita.status !== "CONCLUIDA";
             return (
               <button
                 key={next}
                 onClick={() => !blocked && setTrans(next)}
                 disabled={blocked}
-                title={blocked ? "Conclua a visita técnica primeiro" : undefined}
+                title={blocked ? "Conclua a OS pré-requisito primeiro" : undefined}
                 className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold transition ${
                   blocked ? "opacity-40 cursor-not-allowed bg-slate-200 dark:bg-gray-700 text-slate-500 dark:text-gray-400" : cfg.cls
                 }`}
@@ -535,89 +592,41 @@ export default function WorkOrderDetailPage() {
 
               {editing ? (
                 <div className="space-y-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="field-label">Tipo</label>
-                      <select value={editForm.tipo} onChange={(e) => setEditForm({ ...editForm, tipo: e.target.value })} className="field-input text-sm">
-                        {TIPO_OPTIONS.map((t) => <option key={t} value={t}>{TIPO_LABELS[t]}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="field-label">Núcleo responsável</label>
-                      <select value={editForm.unitId} onChange={(e) => setEditForm({ ...editForm, unitId: e.target.value })} className="field-input text-sm">
-                        <option value="">A definir</option>
-                        {units.map((u) => <option key={u.id} value={String(u.id)}>{u.name}</option>)}
-                      </select>
+                  <div>
+                    <label className="field-label">Tipo</label>
+                    <div
+                      className="field-input text-sm flex items-center gap-2 cursor-not-allowed opacity-70"
+                      title="O tipo não pode ser alterado após a criação"
+                    >
+                      {os.tipo && (
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: os.tipo.color }} />
+                      )}
+                      {os.tipo?.name || "—"}
                     </div>
                   </div>
 
                   <div>
-                    <label className="field-label">Local / Destino *</label>
-                    <input
-                      type="text" required
-                      value={editForm.local}
-                      onChange={(e) => setEditForm({ ...editForm, local: e.target.value })}
-                      className="field-input text-sm"
-                    />
+                    <label className="field-label">Núcleo responsável</label>
+                    <select value={editUnitId} onChange={(e) => setEditUnitId(e.target.value)} className="field-input text-sm">
+                      <option value="">A definir</option>
+                      {units.map((u) => <option key={u.id} value={String(u.id)}>{u.name}</option>)}
+                    </select>
                   </div>
 
-                  {editForm.tipo === "ACAO" && (
-                    <>
-                      <div>
-                        <label className="field-label">Nome do evento</label>
-                        <input
-                          type="text"
-                          value={editForm.nomeEvento}
-                          onChange={(e) => setEditForm({ ...editForm, nomeEvento: e.target.value })}
-                          className="field-input text-sm"
-                          placeholder="Nome do evento"
-                        />
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <label className="field-label">Início do evento</label>
-                          <DateTimeInput
-                            value={editForm.startDateTime}
-                            onChange={(v) => setEditForm({ ...editForm, startDateTime: v })}
-                          />
-                        </div>
-                        <div>
-                          <label className="field-label">Término do evento</label>
-                          <DateTimeInput
-                            value={editForm.endDateTime}
-                            onChange={(v) => setEditForm({ ...editForm, endDateTime: v })}
-                          />
-                        </div>
-                      </div>
-                    </>
+                  {tipoFields.map((field) => (
+                    <DynamicField
+                      key={field.key}
+                      field={field}
+                      value={editFormData[field.key]}
+                      onChange={(val) => setField(field.key, val)}
+                    />
+                  ))}
+
+                  {tipoFields.length === 0 && (
+                    <p className="text-xs text-slate-400 dark:text-gray-500 italic">Este tipo não possui campos configurados.</p>
                   )}
 
-                  <div>
-                    <label className="field-label">Descrição / Problema</label>
-                    <textarea
-                      rows={3} value={editForm.problema}
-                      onChange={(e) => setEditForm({ ...editForm, problema: e.target.value })}
-                      className="field-input text-sm resize-none"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="field-label">Materiais / Equipamentos</label>
-                      <input
-                        type="text" value={editForm.materiais}
-                        onChange={(e) => setEditForm({ ...editForm, materiais: e.target.value })}
-                        className="field-input text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="field-label">Prazo</label>
-                      <DateInput
-                        value={editForm.prazo}
-                        onChange={(v) => setEditForm({ ...editForm, prazo: v })}
-                      />
-                    </div>
-                  </div>
+                  {err && <p className="text-xs text-red-600 dark:text-red-400">{err}</p>}
 
                   <div className="flex gap-2 justify-end pt-1">
                     <button
@@ -627,8 +636,7 @@ export default function WorkOrderDetailPage() {
                       Cancelar
                     </button>
                     <button
-                      onClick={saveEdit}
-                      disabled={saving || !editForm.local?.trim()}
+                      onClick={saveEdit} disabled={saving}
                       className="inline-flex items-center gap-1.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 text-sm font-semibold transition disabled:opacity-60"
                     >
                       {saving ? <Spinner className="h-4 w-4" /> : <Check size={14} />}
@@ -639,16 +647,33 @@ export default function WorkOrderDetailPage() {
               ) : (
                 <div className="space-y-3">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <InfoRow label="Tipo" value={TIPO_LABELS[os.tipo]} />
+                    <div>
+                      <div className="text-xs text-slate-400 dark:text-gray-500 mb-0.5">Tipo</div>
+                      {os.tipo ? (
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: os.tipo.color }} />
+                          <span className="text-sm text-slate-800 dark:text-gray-100">{os.tipo.name}</span>
+                        </div>
+                      ) : <div className="text-sm text-slate-400">—</div>}
+                    </div>
                     <InfoRow label="Núcleo responsável" value={os.unit?.name} />
                   </div>
-                  <InfoRow label="Local / Destino" value={os.local} />
-                  <InfoRow label="Descrição / Problema" value={os.problema} />
-                  <InfoRow label="Materiais / Equipamentos" value={os.materiais} />
-                  {os.prazo && <InfoRow label="Prazo" value={fmtDate(os.prazo)} />}
+
+                  {tipoFields.length > 0 ? (
+                    tipoFields.map((field) => (
+                      <InfoRow
+                        key={field.key}
+                        label={field.label}
+                        value={fmtFieldValue(field, formData[field.key])}
+                      />
+                    ))
+                  ) : (
+                    <p className="text-xs text-slate-400 dark:text-gray-500 italic">Nenhum campo configurado para este tipo.</p>
+                  )}
                 </div>
               )}
 
+              {/* Relatório de conclusão */}
               {os.relatorio && (
                 <div>
                   <div className="text-xs text-slate-400 dark:text-gray-500 mb-0.5">Relatório de conclusão</div>
@@ -659,126 +684,108 @@ export default function WorkOrderDetailPage() {
               )}
             </div>
 
-            {/* ── Seção Ação ─────────────────────────────────────────── */}
-            {os.tipo === "ACAO" && (
-              <>
-                {/* Informações do Evento */}
-                <div className="card p-5 space-y-4">
+            {/* Pré-visita (informações detalhadas) */}
+            {os.preVisita && (
+              <div className="card p-5 space-y-3">
+                <div className="flex items-center justify-between">
                   <h2 className="text-sm font-semibold text-slate-700 dark:text-gray-300 flex items-center gap-2">
-                    <Zap size={14} className="text-purple-500" /> Informações do Evento
+                    <ClipboardCheck size={14} className="text-brand-600" />
+                    OS Pré-requisito
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${STATUS_STYLE[os.preVisita.status] ?? "bg-slate-100 text-slate-500"}`}>
+                      {STATUS_LABEL[os.preVisita.status] ?? os.preVisita.status}
+                    </span>
                   </h2>
-                  <div className="space-y-3">
-                    <InfoRow label="Nome do evento" value={os.nomeEvento} />
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <div className="text-xs text-slate-400 dark:text-gray-500 mb-0.5 flex items-center gap-1"><CalendarRange size={11} /> Início</div>
-                        <div className="text-sm text-slate-800 dark:text-gray-100">{os.startDateTime ? fmtDate(os.startDateTime) : "—"}</div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-slate-400 dark:text-gray-500 mb-0.5 flex items-center gap-1"><CalendarRange size={11} /> Término</div>
-                        <div className="text-sm text-slate-800 dark:text-gray-100">{os.endDateTime ? fmtDate(os.endDateTime) : "—"}</div>
-                      </div>
-                    </div>
-                  </div>
+                  <Link
+                    to={`/painel/os/${os.preVisita.id}`}
+                    className="flex items-center gap-1 text-xs text-brand-600 dark:text-brand-400 hover:underline"
+                  >
+                    <span className="font-mono">{os.preVisita.osNumber}</span>
+                    <ExternalLink size={11} />
+                  </Link>
                 </div>
-
-                {/* Lista de Materiais */}
-                {os.checklist && (
-                  <div className="card p-5 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h2 className="text-sm font-semibold text-slate-700 dark:text-gray-300 flex items-center gap-2">
-                        <Package size={14} className="text-brand-600" />
-                        Lista de Materiais
-                        <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${CHECKLIST_STATUS_STYLE[os.checklist.status]}`}>
-                          {CHECKLIST_STATUS_LABEL[os.checklist.status]}
-                        </span>
-                      </h2>
-                      <Link
-                        to={`/painel/inventario/checklists/${os.checklist.id}`}
-                        className="flex items-center gap-1 text-xs text-brand-600 dark:text-brand-400 hover:underline"
-                      >
-                        Ver detalhes <ExternalLink size={11} />
-                      </Link>
-                    </div>
-                    <div className="text-xs text-slate-500 dark:text-gray-400 font-medium">{os.checklist.title}</div>
-                    {os.checklist.items?.length > 0 ? (
-                      <div className="rounded-xl border border-slate-200 dark:border-gray-700 overflow-hidden">
-                        <div className="overflow-x-auto">
-                        <table className="w-full text-xs">
-                          <thead>
-                            <tr className="border-b border-slate-100 dark:border-gray-700/60 bg-slate-50 dark:bg-gray-800/60">
-                              <th className="px-3 py-2 text-left text-slate-400 dark:text-gray-500 font-medium">Item</th>
-                              <th className="px-3 py-2 text-left text-slate-400 dark:text-gray-500 font-medium">Tombo</th>
-                              <th className="px-3 py-2 text-left text-slate-400 dark:text-gray-500 font-medium">Status</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-50 dark:divide-gray-800/60">
-                            {os.checklist.items.map((ci) => (
-                              <tr key={ci.id}>
-                                <td className="px-3 py-2 text-slate-700 dark:text-gray-300">{ci.item?.name ?? "—"}</td>
-                                <td className="px-3 py-2 text-slate-500 dark:text-gray-400 font-mono">{ci.tombo ?? `#${ci.unitId}`}</td>
-                                <td className="px-3 py-2">
-                                  <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
-                                    ci.status === "EM_USO"    ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" :
-                                    ci.status === "DISPONIVEL" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300" :
-                                    "bg-slate-100 text-slate-500 dark:bg-gray-800 dark:text-gray-400"
-                                  }`}>
-                                    {ci.status === "EM_USO" ? "Em uso" : ci.status === "DISPONIVEL" ? "Disponível" : ci.status}
-                                  </span>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                        </div>
+                <div className="space-y-2">
+                  {os.preVisita.tipo && (
+                    <InfoRow label="Tipo" value={os.preVisita.tipo.name} />
+                  )}
+                  {os.preVisita.formData && Object.keys(os.preVisita.formData).length > 0 && (() => {
+                    const pvFields = os.preVisita.tipo?.fields ?? [];
+                    if (pvFields.length > 0) {
+                      return pvFields.slice(0, 3).map((f) => (
+                        <InfoRow key={f.key} label={f.label} value={fmtFieldValue(f, os.preVisita.formData[f.key])} />
+                      ));
+                    }
+                    return null;
+                  })()}
+                  {os.preVisita.tecnicos?.length > 0 && (
+                    <div>
+                      <div className="text-xs text-slate-400 dark:text-gray-500 mb-1">Técnicos</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {os.preVisita.tecnicos.map((t) => (
+                          <span key={t.id} className="text-xs bg-slate-100 dark:bg-gray-800 text-slate-600 dark:text-gray-400 rounded-full px-2 py-0.5">
+                            {t.name}
+                          </span>
+                        ))}
                       </div>
-                    ) : (
-                      <p className="text-sm text-slate-400 dark:text-gray-500">Nenhum material na lista.</p>
-                    )}
-                  </div>
-                )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
-                {/* Visita Técnica Prévia */}
-                {os.preVisita && (
-                  <div className="card p-5 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h2 className="text-sm font-semibold text-slate-700 dark:text-gray-300 flex items-center gap-2">
-                        <ClipboardCheck size={14} className="text-brand-600" /> Visita Técnica Prévia
-                        <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                          STATUS_STYLE[os.preVisita.status] ?? "bg-slate-100 text-slate-500"
-                        }`}>
-                          {STATUS_LABEL[os.preVisita.status] ?? os.preVisita.status}
-                        </span>
-                      </h2>
-                      <Link
-                        to={`/painel/os/${os.preVisita.id}`}
-                        className="flex items-center gap-1 text-xs text-brand-600 dark:text-brand-400 hover:underline"
-                      >
-                        <span className="font-mono">{os.preVisita.osNumber}</span>
-                        <ExternalLink size={11} />
-                      </Link>
-                    </div>
-                    <div className="space-y-2 text-sm">
-                      <InfoRow label="Local da visita" value={os.preVisita.local} />
-                      {os.preVisita.startDateTime && (
-                        <InfoRow label="Data/hora" value={fmtDate(os.preVisita.startDateTime)} />
-                      )}
-                      {os.preVisita.tecnicos?.length > 0 && (
-                        <div>
-                          <div className="text-xs text-slate-400 dark:text-gray-500 mb-1">Técnicos da visita</div>
-                          <div className="flex flex-wrap gap-1.5">
-                            {os.preVisita.tecnicos.map((t) => (
-                              <span key={t.id} className="text-xs bg-slate-100 dark:bg-gray-800 text-slate-600 dark:text-gray-400 rounded-full px-2 py-0.5">
-                                {t.name}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+            {/* Lista de materiais (checklist) */}
+            {os.checklist && (
+              <div className="card p-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-semibold text-slate-700 dark:text-gray-300 flex items-center gap-2">
+                    <Package size={14} className="text-brand-600" />
+                    Lista de Materiais
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${CHECKLIST_STATUS_STYLE[os.checklist.status]}`}>
+                      {CHECKLIST_STATUS_LABEL[os.checklist.status]}
+                    </span>
+                  </h2>
+                  <Link
+                    to={`/painel/inventario/checklists/${os.checklist.id}`}
+                    className="flex items-center gap-1 text-xs text-brand-600 dark:text-brand-400 hover:underline"
+                  >
+                    Ver detalhes <ExternalLink size={11} />
+                  </Link>
+                </div>
+                <div className="text-xs text-slate-500 dark:text-gray-400 font-medium">{os.checklist.title}</div>
+                {os.checklist.items?.length > 0 ? (
+                  <div className="rounded-xl border border-slate-200 dark:border-gray-700 overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="border-b border-slate-100 dark:border-gray-700/60 bg-slate-50 dark:bg-gray-800/60">
+                            <th className="px-3 py-2 text-left text-slate-400 dark:text-gray-500 font-medium">Item</th>
+                            <th className="px-3 py-2 text-left text-slate-400 dark:text-gray-500 font-medium">Tombo</th>
+                            <th className="px-3 py-2 text-left text-slate-400 dark:text-gray-500 font-medium">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50 dark:divide-gray-800/60">
+                          {os.checklist.items.map((ci) => (
+                            <tr key={ci.id}>
+                              <td className="px-3 py-2 text-slate-700 dark:text-gray-300">{ci.item?.name ?? "—"}</td>
+                              <td className="px-3 py-2 text-slate-500 dark:text-gray-400 font-mono">{ci.tombo ?? `#${ci.unitId}`}</td>
+                              <td className="px-3 py-2">
+                                <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
+                                  ci.status === "EM_USO"    ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" :
+                                  ci.status === "DISPONIVEL" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300" :
+                                  "bg-slate-100 text-slate-500 dark:bg-gray-800 dark:text-gray-400"
+                                }`}>
+                                  {ci.status === "EM_USO" ? "Em uso" : ci.status === "DISPONIVEL" ? "Disponível" : ci.status}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
+                ) : (
+                  <p className="text-sm text-slate-400 dark:text-gray-500">Nenhum material na lista.</p>
                 )}
-              </>
+              </div>
             )}
 
             {/* Chamados vinculados */}
@@ -839,21 +846,24 @@ export default function WorkOrderDetailPage() {
             <div className="card p-4 space-y-2">
               <h2 className="text-xs font-semibold text-slate-500 dark:text-gray-400 uppercase tracking-wide">Datas</h2>
               {[
-                { label: "Criada",         val: os.createdAt    },
-                { label: "Iniciada",       val: os.startedAt    },
-                { label: "Concluída",      val: os.concludedAt  },
-                { label: "Cancelada",      val: os.cancelledAt  },
-                { label: "Prazo limite",   val: os.prazo        },
-                ...(os.tipo === "ACAO" ? [
-                  { label: "Início do evento", val: os.startDateTime },
-                  { label: "Fim do evento",    val: os.endDateTime   },
-                ] : []),
+                { label: "Criada",       val: os.createdAt   },
+                { label: "Iniciada",     val: os.startedAt   },
+                { label: "Concluída",    val: os.concludedAt },
+                { label: "Cancelada",    val: os.cancelledAt },
               ].map(({ label, val }) => val ? (
                 <div key={label} className="flex justify-between text-xs">
                   <span className="text-slate-400 dark:text-gray-500">{label}</span>
                   <span className="text-slate-700 dark:text-gray-300 font-medium">{fmtDate(val)}</span>
                 </div>
               ) : null)}
+              {formData.prazo && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-400 dark:text-gray-500">Prazo</span>
+                  <span className="text-slate-700 dark:text-gray-300 font-medium">
+                    {new Date(formData.prazo + "T00:00:00").toLocaleDateString("pt-BR")}
+                  </span>
+                </div>
+              )}
               {os.createdBy && (
                 <div className="flex justify-between text-xs pt-1 border-t border-slate-100 dark:border-gray-700/60 mt-1">
                   <span className="text-slate-400 dark:text-gray-500">Aberta por</span>
@@ -864,11 +874,9 @@ export default function WorkOrderDetailPage() {
 
             {/* Técnicos */}
             <div className="card p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xs font-semibold text-slate-500 dark:text-gray-400 uppercase tracking-wide flex items-center gap-1.5">
-                  <Users size={12} /> Equipe
-                </h2>
-              </div>
+              <h2 className="text-xs font-semibold text-slate-500 dark:text-gray-400 uppercase tracking-wide flex items-center gap-1.5">
+                <Users size={12} /> Equipe
+              </h2>
 
               {os.tecnicos.length === 0 && (
                 <p className="text-sm text-slate-400 dark:text-gray-500">Nenhum técnico atribuído.</p>
@@ -888,18 +896,16 @@ export default function WorkOrderDetailPage() {
               </div>
 
               {canEdit && availableTechs.length > 0 && (
-                <div>
-                  <select
-                    defaultValue=""
-                    onChange={(e) => { if (e.target.value) { addTecnico(Number(e.target.value)); e.target.value = ""; } }}
-                    className="field-input py-1.5 text-xs w-full"
-                  >
-                    <option value="">+ Adicionar técnico</option>
-                    {availableTechs.map((t) => (
-                      <option key={t.id} value={t.id}>{t.name}</option>
-                    ))}
-                  </select>
-                </div>
+                <select
+                  defaultValue=""
+                  onChange={(e) => { if (e.target.value) { addTecnico(Number(e.target.value)); e.target.value = ""; } }}
+                  className="field-input py-1.5 text-xs w-full"
+                >
+                  <option value="">+ Adicionar técnico</option>
+                  {availableTechs.map((t) => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
               )}
             </div>
 
@@ -910,13 +916,17 @@ export default function WorkOrderDetailPage() {
                 <div className="space-y-2">
                   {os.history.map((h) => (
                     <div key={h.id} className="text-xs">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="text-slate-400">{new Date(h.createdAt).toLocaleDateString("pt-BR")}</span>
                         {h.fromStatus && <span className="text-slate-400">{STATUS_LABEL[h.fromStatus]} →</span>}
                         <span className="font-medium text-slate-700 dark:text-gray-300">{STATUS_LABEL[h.toStatus]}</span>
                         {h.actor && <span className="text-slate-400">por {h.actor.name.split(" ")[0]}</span>}
                       </div>
-                      {h.note && <div className="text-slate-500 dark:text-gray-400 mt-0.5 pl-2 border-l border-slate-200 dark:border-gray-700">{h.note}</div>}
+                      {h.note && (
+                        <div className="text-slate-500 dark:text-gray-400 mt-0.5 pl-2 border-l border-slate-200 dark:border-gray-700">
+                          {h.note}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -927,26 +937,13 @@ export default function WorkOrderDetailPage() {
       </main>
 
       {transition && (
-        <TransitionModal
-          toStatus={transition}
-          onConfirm={doTransition}
-          onClose={() => setTrans(null)}
-        />
+        <TransitionModal toStatus={transition} onConfirm={doTransition} onClose={() => setTrans(null)} />
       )}
-
       {showLinkTicket && (
-        <LinkTicketModal
-          onLink={linkTicket}
-          onClose={() => setShowLink(false)}
-        />
+        <LinkTicketModal onLink={linkTicket} onClose={() => setShowLink(false)} />
       )}
-
       {showDelete && (
-        <DeleteOsModal
-          osNumber={os.osNumber}
-          onConfirm={deleteOs}
-          onClose={() => setShowDelete(false)}
-        />
+        <DeleteOsModal osNumber={os.osNumber} onConfirm={deleteOs} onClose={() => setShowDelete(false)} />
       )}
     </div>
   );
