@@ -30,6 +30,8 @@ const DashboardPage      = lazy(() => import("./pages/DashboardPage"));
 const TicketDetailPage        = lazy(() => import("./pages/TicketDetailPage"));
 const WorkOrdersPage          = lazy(() => import("./pages/WorkOrdersPage"));
 const WorkOrderDetailPage     = lazy(() => import("./pages/WorkOrderDetailPage"));
+const AssetsPage              = lazy(() => import("./pages/AssetsPage"));
+const AssetDetailPage         = lazy(() => import("./pages/AssetDetailPage"));
 const InventoryPage           = lazy(() => import("./pages/InventoryPage"));
 const InventoryItemDetailPage = lazy(() => import("./pages/InventoryItemDetailPage"));
 const ChecklistDetailPage     = lazy(() => import("./pages/ChecklistDetailPage"));
@@ -131,6 +133,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(
                       <Route path="/painel/relatorios"  element={<Protected fullStaffOnly><AnalyticsPage /></Protected>} />
                       <Route path="/painel/os"          element={<Protected fullStaffOnly><WorkOrdersPage /></Protected>} />
                       <Route path="/painel/os/:id"      element={<Protected fullStaffOnly><WorkOrderDetailPage /></Protected>} />
+                      <Route path="/painel/ativos"      element={<Protected fullStaffOnly><AssetsPage /></Protected>} />
+                      <Route path="/painel/ativos/:id"  element={<Protected fullStaffOnly><AssetDetailPage /></Protected>} />
 
                       {/* Inventário */}
                       <Route path="/painel/inventario"     element={<Protected fullStaffOnly><InventoryPage /></Protected>} />

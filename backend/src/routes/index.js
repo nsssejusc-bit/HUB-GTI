@@ -41,6 +41,9 @@ import {
   deleteWorkOrder,
 } from "../controllers/workOrderController.js";
 import {
+  listAssets, getAsset, createAsset, updateAsset, deleteAsset, allocateAsset,
+} from "../controllers/assetController.js";
+import {
   listInventory, getInventoryItem, createInventoryItem, updateInventoryItem,
   deleteInventoryItem, listInventoryCategories,
   listUnits as listInventoryUnits,
@@ -179,6 +182,14 @@ router.post("/work-orders/:id/tecnicos",            ...staffAccess, addTecnico);
 router.delete("/work-orders/:id/tecnicos/:userId",  ...staffAccess, removeTecnico);
 router.post("/work-orders/:id/tickets",             ...staffAccess, linkTicket);
 router.delete("/work-orders/:id/tickets/:ticketId", ...staffAccess, unlinkTicket);
+
+// ── Ativos ─────────────────────────────────────────────────────────────────────
+router.get("/assets",                   ...staffAccess, listAssets);
+router.post("/assets",                  ...staffAccess, createAsset);
+router.get("/assets/:id",               ...staffAccess, getAsset);
+router.patch("/assets/:id",             ...staffAccess, updateAsset);
+router.delete("/assets/:id",            ...adminOnly,   deleteAsset);
+router.post("/assets/:id/allocate",     ...staffAccess, allocateAsset);
 
 // ── Inventário ─────────────────────────────────────────────────────────────────
 router.get("/inventory/categories",                       ...staffAccess, listInventoryCategories);

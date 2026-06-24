@@ -6,7 +6,7 @@ import { useSocketConnected, useUnreadCount } from "../context/SocketContext";
 import { api } from "../lib/api";
 import {
   LayoutDashboard, BarChart2, LogOut, Users,
-  Crown, Sun, Moon, Building2, ChevronDown, UserCircle, Ticket, KeyRound, ClipboardList, Settings, Tag, Shield, Package, SlidersHorizontal,
+  Crown, Sun, Moon, Building2, ChevronDown, UserCircle, Ticket, KeyRound, ClipboardList, Settings, Tag, Shield, Package, SlidersHorizontal, Monitor,
 } from "lucide-react";
 
 // Slot da logo — quando /logo.png existir, a imagem aparece automaticamente;
@@ -166,6 +166,13 @@ export default function AppHeader() {
               )}
               <ClipboardList size={15} />
               <span className="hidden sm:inline">OS</span>
+            </Link>
+          )}
+
+          {isFullStaff && (
+            <Link to="/painel/ativos" className={navCls(loc.pathname.startsWith("/painel/ativos"))}>
+              <Monitor size={15} />
+              <span className="hidden sm:inline">Ativos</span>
             </Link>
           )}
 

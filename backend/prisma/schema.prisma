@@ -44,6 +44,13 @@ enum OsStatus {
 }
 
 
+enum AssetStatus {
+  ATIVO
+  INATIVO
+  MANUTENCAO
+  RECOLHIDO
+}
+
 enum InventoryStatus {
   ATIVO
   INATIVO
@@ -135,6 +142,8 @@ model User {
   checklistsApproved InventoryChecklist[] @relation("ChecklistApprover")
   ticketMessages     TicketMessage[]      @relation("MessageAuthor")
   pushSubscription   PushSubscription?
+  assetsCreated      Asset[]              @relation("AssetCreatedBy")
+  assetAllocations   AssetAllocation[]    @relation("AssetAllocationCreatedBy")
 
   @@index([departmentId])
   @@index([role, active])
@@ -439,6 +448,45 @@ model OsHistory {
   createdAt  DateTime  @default(now())
 
   @@index([osId])
+}
+
+model Asset {
+  id              Int               @id @default(autoincrement())
+  tombo           String            @unique
+  hostname        String
+  cpu             String
+  ram             String
+  storage         String
+  operatingSystem String
+  status          AssetStatus       @default(ATIVO)
+  setor           String?
+  responsavel     String?
+  notes           String?           @db.Text
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  createdById     Int?
+  createdBy       User?             @relation("AssetCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  allocations     AssetAllocation[]
+
+  @@index([status])
+  @@index([createdById])
+}
+
+model AssetAllocation {
+  id          Int       @id @default(autoincrement())
+  assetId     Int
+  asset       Asset     @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  setor       String?
+  responsavel String?
+  notes       String?   @db.Text
+  startedAt   DateTime  @default(now())
+  endedAt     DateTime?
+  createdById Int?
+  createdBy   User?     @relation("AssetAllocationCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([assetId])
+  @@index([endedAt])
+  @@index([createdById])
 }
 
 model InventoryItem {
