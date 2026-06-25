@@ -53,6 +53,8 @@ function formatOs(os) {
     status:      os.status,
     formData:    os.formData ?? {},
     relatorio:   os.relatorio,
+    problema:    os.problema ?? null,
+    solucao:     os.solucao  ?? null,
     asset:       os.asset ? {
       id:              os.asset.id,
       tombo:           os.asset.tombo,
@@ -279,6 +281,8 @@ export async function updateWorkOrder(req, res) {
       tipoId:      z.number().int().positive().optional(),
       preVisitaId: z.number().int().positive().optional().nullable(),
       assetId:     z.number().int().positive().optional().nullable(),
+      problema:    z.string().max(10000).optional().nullable(),
+      solucao:     z.string().max(10000).optional().nullable(),
     });
 
     const parsed = schema.safeParse(req.body);
@@ -306,6 +310,8 @@ export async function updateWorkOrder(req, res) {
         ...(data.tipoId      !== undefined ? { tipoId: data.tipoId }           : {}),
         ...(data.preVisitaId !== undefined ? { preVisitaId: data.preVisitaId } : {}),
         ...(data.assetId     !== undefined ? { assetId: data.assetId }         : {}),
+        ...(data.problema    !== undefined ? { problema: data.problema }       : {}),
+        ...(data.solucao     !== undefined ? { solucao: data.solucao }         : {}),
       },
       include: osInclude,
     });
@@ -322,7 +328,7 @@ export async function transitionWorkOrder(req, res) {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
-    const { toStatus, relatorio, note } = req.body || {};
+    const { toStatus, relatorio, note, problema, solucao } = req.body || {};
 
     const os = await prisma.workOrder.findUnique({ where: { id } });
     if (!os) return res.status(404).json({ error: "OS não encontrada" });
@@ -351,7 +357,9 @@ export async function transitionWorkOrder(req, res) {
         data: {
           status: toStatus,
           ...timeFields,
-          ...(relatorio !== undefined ? { relatorio } : {}),
+          ...(relatorio !== undefined ? { relatorio }           : {}),
+          ...(problema  !== undefined ? { problema: problema }  : {}),
+          ...(solucao   !== undefined ? { solucao:  solucao  }  : {}),
           history: { create: { fromStatus: os.status, toStatus, actorId: req.user.id, note: note || null } },
         },
         include: osInclude,

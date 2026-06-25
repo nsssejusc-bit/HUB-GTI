@@ -2,7 +2,7 @@ import { z } from "zod";
 import { prisma } from "../config/prisma.js";
 
 const assetSchema = z.object({
-  tombo:           z.string().min(1).max(100).trim(),
+  tombo:           z.string().min(1).max(100).trim().nullish(),
   hostname:        z.string().min(1).max(200).trim(),
   cpu:             z.string().min(1).max(200).trim(),
   ram:             z.string().min(1).max(100).trim(),
@@ -27,6 +27,11 @@ const include = {
     orderBy:  { startedAt: "desc" },
     include:  { createdBy: { select: { id: true, name: true } } },
   },
+  workOrders: {
+    orderBy: { createdAt: "desc" },
+    take:    20,
+    include: { tipo: { select: { id: true, name: true, color: true } } },
+  },
   _count: { select: { allocations: true } },
 };
 
@@ -48,6 +53,13 @@ function fmt(a) {
     createdBy:       a.createdBy ?? null,
     allocations:     a.allocations ?? [],
     allocationCount: a._count?.allocations ?? 0,
+    workOrders:      (a.workOrders ?? []).map((os) => ({
+      id:        os.id,
+      osNumber:  os.osNumber,
+      status:    os.status,
+      tipo:      os.tipo ? { id: os.tipo.id, name: os.tipo.name, color: os.tipo.color } : null,
+      createdAt: os.createdAt,
+    })),
   };
 }
 
@@ -100,12 +112,14 @@ export async function createAsset(req, res) {
 
   const { tombo, setor, responsavel, ...rest } = parsed.data;
 
-  const dup = await prisma.asset.findUnique({ where: { tombo } });
-  if (dup) return res.status(400).json({ error: `Tombo "${tombo}" já está cadastrado` });
+  if (tombo) {
+    const dup = await prisma.asset.findUnique({ where: { tombo } });
+    if (dup) return res.status(400).json({ error: `Tombo "${tombo}" já está cadastrado` });
+  }
 
   const asset = await prisma.$transaction(async (tx) => {
     const a = await tx.asset.create({
-      data: { tombo, setor: setor ?? null, responsavel: responsavel ?? null, ...rest, createdById: req.user.id },
+      data: { tombo: tombo ?? null, setor: setor ?? null, responsavel: responsavel ?? null, ...rest, createdById: req.user.id },
       include,
     });
     if (setor || responsavel) {

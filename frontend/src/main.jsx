@@ -45,6 +45,7 @@ const DepartmentsPage   = lazy(() => import("./pages/DepartmentsPage"));
 const CategoriesPage    = lazy(() => import("./pages/CategoriesPage"));
 const AuditPage         = lazy(() => import("./pages/AuditPage"));
 const SystemConfigPage  = lazy(() => import("./pages/SystemConfigPage"));
+const AdminOsTypesPage  = lazy(() => import("./pages/AdminOsTypesPage"));
 
 // ── Hierarquia de roles ───────────────────────────────────────────────────────
 const STAFF_ROLES      = ["TECHNICIAN", "ADMIN", "CHEFE_SETOR"];
@@ -142,11 +143,12 @@ ReactDOM.createRoot(document.getElementById("root")).render(
                       <Route path="/painel/checklists/:id" element={<Protected fullStaffOnly><ChecklistDetailPage /></Protected>} />
 
                       {/* Admin only */}
-                      <Route path="/painel/usuarios"   element={<Protected adminOnly><UsersPage /></Protected>} />
-                      <Route path="/painel/setores"    element={<Protected adminOnly><DepartmentsPage /></Protected>} />
-                      <Route path="/painel/categorias" element={<Protected adminOnly><CategoriesPage /></Protected>} />
-                      <Route path="/painel/auditoria"  element={<Protected adminOnly><AuditPage /></Protected>} />
-                      <Route path="/painel/sistema"    element={<Protected adminOnly><SystemConfigPage /></Protected>} />
+                      <Route path="/painel/usuarios"         element={<Protected adminOnly><UsersPage /></Protected>} />
+                      <Route path="/painel/setores"          element={<Protected adminOnly><DepartmentsPage /></Protected>} />
+                      <Route path="/painel/categorias"       element={<Protected adminOnly><CategoriesPage /></Protected>} />
+                      <Route path="/painel/auditoria"        element={<Protected adminOnly><AuditPage /></Protected>} />
+                      <Route path="/painel/sistema"          element={<Protected adminOnly><SystemConfigPage /></Protected>} />
+                      <Route path="/painel/admin/tipos-os"   element={<Protected adminOnly><AdminOsTypesPage /></Protected>} />
 
                       <Route path="/manual"  element={<ManualPage />} />
                       <Route path="/equipe" element={<TeamPage />} />

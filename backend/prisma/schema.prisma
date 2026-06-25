@@ -391,6 +391,8 @@ model WorkOrder {
   status        OsStatus           @default(ABERTA)
   formData      Json?
   relatorio     String?            @db.Text
+  problema      String?            @db.Text
+  solucao       String?            @db.Text
   unitId        Int?
   unit          Unit?              @relation(fields: [unitId], references: [id])
   createdById   Int?
@@ -460,7 +462,7 @@ model OsHistory {
 
 model Asset {
   id              Int               @id @default(autoincrement())
-  tombo           String            @unique
+  tombo           String?           @unique
   hostname        String
   cpu             String
   ram             String

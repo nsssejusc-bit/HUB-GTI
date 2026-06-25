@@ -4,9 +4,11 @@ import { api } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { Spinner } from "../components/ui";
 import AppHeader from "../components/AppHeader";
+import { OS_STATUS_LABEL, OS_STATUS_STYLE } from "../lib/osConstants";
 import {
   ArrowLeft, ChevronRight, Monitor, Edit2, Check, X, Trash2,
   AlertTriangle, MapPin, User, Clock, Plus, History,
+  ClipboardList, ExternalLink,
 } from "lucide-react";
 
 const STATUS_LABEL = {
@@ -163,6 +165,136 @@ function DeleteModal({ asset, onClose, onDeleted }) {
   );
 }
 
+// ── Modal criar OS para este ativo ────────────────────────────────────────────
+function CreateOsModal({ asset, types, onClose, onCreate }) {
+  const [tipoId,   setTipoId]   = useState(types[0]?.id ?? "");
+  const [formData, setFormData] = useState({});
+  const [unitId,   setUnitId]   = useState("");
+  const [units,    setUnits]    = useState([]);
+  const [saving,   setSaving]   = useState(false);
+  const [err,      setErr]      = useState("");
+
+  useEffect(() => {
+    api.get("/units").then((r) => setUnits(r.data)).catch(() => {});
+  }, []);
+
+  const selectedType = types.find((t) => t.id === Number(tipoId));
+  const fields = selectedType?.fields ?? [];
+
+  function setField(k, v) { setFormData((p) => ({ ...p, [k]: v })); }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setSaving(true); setErr("");
+    try {
+      const res = await api.post("/work-orders", {
+        tipoId:  Number(tipoId),
+        formData,
+        unitId:  unitId ? Number(unitId) : null,
+        assetId: asset.id,
+      });
+      onCreate(res.data);
+    } catch (ex) {
+      setErr(ex.response?.data?.error || "Erro ao criar OS");
+    } finally { setSaving(false); }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="card w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-100 dark:bg-brand-900/40 text-brand-600">
+            <ClipboardList size={20} />
+          </span>
+          <div>
+            <h3 className="font-semibold text-slate-900 dark:text-gray-100">Nova OS para este ativo</h3>
+            <p className="text-xs text-slate-500 dark:text-gray-400 font-mono">{asset.tombo} · {asset.hostname}</p>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="field-label">Tipo *</label>
+              <select value={tipoId} onChange={(e) => { setTipoId(e.target.value); setFormData({}); }}
+                className="field-input" required>
+                {types.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="field-label">Núcleo responsável</label>
+              <select value={unitId} onChange={(e) => setUnitId(e.target.value)} className="field-input">
+                <option value="">A definir</option>
+                {units.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {fields.map((field) => {
+            const cls = "field-input text-sm";
+            const val = formData[field.key] ?? "";
+            if (field.type === "textarea") return (
+              <div key={field.key}>
+                <label className="field-label">{field.label}{field.required && " *"}</label>
+                <textarea rows={3} value={val} onChange={(e) => setField(field.key, e.target.value)}
+                  required={field.required} className={`${cls} resize-none`} />
+              </div>
+            );
+            if (field.type === "select") return (
+              <div key={field.key}>
+                <label className="field-label">{field.label}{field.required && " *"}</label>
+                <select value={val} onChange={(e) => setField(field.key, e.target.value)} required={field.required} className={cls}>
+                  <option value="">Selecione...</option>
+                  {(field.options || []).map((o) => <option key={o} value={o}>{o}</option>)}
+                </select>
+              </div>
+            );
+            if (field.type === "checkbox") return (
+              <div key={field.key} className="flex items-center gap-2 pt-1">
+                <input type="checkbox" checked={!!val} onChange={(e) => setField(field.key, e.target.checked)} className="h-4 w-4 rounded" />
+                <label className="text-sm text-slate-700 dark:text-gray-300">{field.label}</label>
+              </div>
+            );
+            const inputType = field.type === "datetime" ? "datetime-local" : field.type === "date" ? "date" : field.type === "number" ? "number" : "text";
+            return (
+              <div key={field.key}>
+                <label className="field-label">{field.label}{field.required && " *"}</label>
+                <input type={inputType} value={val} onChange={(e) => setField(field.key, e.target.value)}
+                  required={field.required} className={cls} />
+              </div>
+            );
+          })}
+
+          {err && <p className="text-xs text-red-600 dark:text-red-400">{err}</p>}
+
+          <div className="flex gap-2 justify-end pt-1">
+            <button type="button" onClick={onClose} className="btn-secondary text-sm py-2 px-4">Cancelar</button>
+            <button type="submit" disabled={saving || !tipoId}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 text-sm font-semibold transition disabled:opacity-60">
+              {saving ? <Spinner className="h-4 w-4" /> : <Plus size={14} />}
+              Criar OS
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function InputField({ label, value, onChange, required, placeholder }) {
+  return (
+    <div>
+      <label className="field-label">{label}{required && " *"}</label>
+      <input
+        type="text" value={value ?? ""} onChange={(e) => onChange(e.target.value)}
+        required={required} placeholder={placeholder}
+        className="field-input text-sm"
+      />
+    </div>
+  );
+}
+
 // ── Página ────────────────────────────────────────────────────────────────────
 export default function AssetDetailPage() {
   const { id }    = useParams();
@@ -175,16 +307,22 @@ export default function AssetDetailPage() {
   const [editForm, setEditForm] = useState({});
   const [saving, setSaving]     = useState(false);
   const [err, setErr]           = useState("");
-  const [showAlloc, setAlloc]   = useState(false);
-  const [showDelete, setDelete] = useState(false);
+  const [showAlloc,    setAlloc]    = useState(false);
+  const [showDelete,   setDelete]   = useState(false);
+  const [showCreateOs, setCreateOs] = useState(false);
+  const [types,        setTypes]    = useState([]);
 
   const isAdmin = user?.role === "ADMIN";
 
   const load = useCallback(async () => {
     setLoadErr(false);
     try {
-      const res = await api.get(`/assets/${id}`);
-      setAsset(res.data);
+      const [assetRes, typesRes] = await Promise.all([
+        api.get(`/assets/${id}`),
+        api.get("/work-order-types"),
+      ]);
+      setAsset(assetRes.data);
+      setTypes(typesRes.data);
     } catch { setLoadErr(true); }
   }, [id]);
 
@@ -242,17 +380,6 @@ export default function AssetDetailPage() {
   const currentAlloc = asset.allocations.find((a) => !a.endedAt);
   const historyAllocs = asset.allocations.filter((a) => a.endedAt);
 
-  const InputField = ({ label, k, required, placeholder }) => (
-    <div>
-      <label className="field-label">{label}{required && " *"}</label>
-      <input
-        type="text" value={editForm[k]} onChange={(e) => setEF(k, e.target.value)}
-        required={required} placeholder={placeholder}
-        className="field-input text-sm"
-      />
-    </div>
-  );
-
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-gray-950">
       <AppHeader />
@@ -291,6 +418,14 @@ export default function AssetDetailPage() {
           >
             <Plus size={14} /> Registrar Movimentação
           </button>
+          {types.length > 0 && (
+            <button
+              onClick={() => setCreateOs(true)}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-brand-300 dark:border-brand-700 bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300 hover:bg-brand-100 dark:hover:bg-brand-900/50 px-4 py-2 text-sm font-semibold transition"
+            >
+              <ClipboardList size={14} /> Nova OS
+            </button>
+          )}
           {!editing && (
             <button
               onClick={startEdit}
@@ -323,15 +458,15 @@ export default function AssetDetailPage() {
               {editing ? (
                 <div className="space-y-3">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <InputField label="Tombo"    k="tombo"    required />
-                    <InputField label="Hostname" k="hostname" required />
+                    <InputField label="Tombo"    value={editForm.tombo}    onChange={(v) => setEF("tombo", v)}    required />
+                    <InputField label="Hostname" value={editForm.hostname}  onChange={(v) => setEF("hostname", v)}  required />
                   </div>
-                  <InputField label="Processador (CPU)" k="cpu" required />
+                  <InputField label="Processador (CPU)" value={editForm.cpu} onChange={(v) => setEF("cpu", v)} required />
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <InputField label="Memória RAM" k="ram"     required />
-                    <InputField label="HD / SSD"    k="storage" required />
+                    <InputField label="Memória RAM" value={editForm.ram}     onChange={(v) => setEF("ram", v)}     required />
+                    <InputField label="HD / SSD"    value={editForm.storage} onChange={(v) => setEF("storage", v)} required />
                   </div>
-                  <InputField label="Sistema Operacional" k="operatingSystem" required />
+                  <InputField label="Sistema Operacional" value={editForm.operatingSystem} onChange={(v) => setEF("operatingSystem", v)} required />
 
                   <div className="border-t border-slate-100 dark:border-gray-700 pt-3">
                     <p className="text-xs font-medium text-slate-500 dark:text-gray-400 mb-2">Status e localização</p>
@@ -342,8 +477,8 @@ export default function AssetDetailPage() {
                           {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
                         </select>
                       </div>
-                      <InputField label="Setor"       k="setor" />
-                      <InputField label="Responsável" k="responsavel" />
+                      <InputField label="Setor"       value={editForm.setor}       onChange={(v) => setEF("setor", v)} />
+                      <InputField label="Responsável" value={editForm.responsavel} onChange={(v) => setEF("responsavel", v)} />
                     </div>
                   </div>
 
@@ -414,6 +549,45 @@ export default function AssetDetailPage() {
                 </div>
               )}
             </div>
+
+            {/* Ordens de Serviço vinculadas */}
+            {asset.workOrders?.length > 0 && (
+              <div className="card p-5 space-y-3">
+                <h2 className="text-sm font-semibold text-slate-700 dark:text-gray-300 flex items-center gap-2">
+                  <ClipboardList size={14} className="text-brand-600" />
+                  Ordens de Serviço
+                  <span className="text-xs font-normal text-slate-400">({asset.workOrders.length})</span>
+                </h2>
+                <div className="divide-y divide-slate-100 dark:divide-gray-700/60 rounded-xl border border-slate-200 dark:border-gray-700 overflow-hidden">
+                  {asset.workOrders.map((os) => (
+                    <Link
+                      key={os.id}
+                      to={`/painel/os/${os.id}`}
+                      className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-gray-800/60 transition"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-mono text-slate-400">{os.osNumber}</span>
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${OS_STATUS_STYLE[os.status] ?? ""}`}>
+                            {OS_STATUS_LABEL[os.status] ?? os.status}
+                          </span>
+                          {os.tipo && (
+                            <span className="text-[11px] rounded px-1.5 py-0.5 font-medium"
+                              style={{ backgroundColor: os.tipo.color + "22", color: os.tipo.color }}>
+                              {os.tipo.name}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-slate-400 dark:text-gray-500 mt-0.5">
+                          {new Date(os.createdAt).toLocaleDateString("pt-BR")}
+                        </div>
+                      </div>
+                      <ExternalLink size={13} className="text-slate-300 dark:text-gray-600 shrink-0" />
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Histórico de movimentações */}
             <div className="card p-5 space-y-3">
@@ -529,6 +703,15 @@ export default function AssetDetailPage() {
           asset={asset}
           onClose={() => setDelete(false)}
           onDeleted={() => nav("/painel/ativos")}
+        />
+      )}
+
+      {showCreateOs && types.length > 0 && (
+        <CreateOsModal
+          asset={asset}
+          types={types}
+          onClose={() => setCreateOs(false)}
+          onCreate={(os) => nav(`/painel/os/${os.id}`)}
         />
       )}
     </div>

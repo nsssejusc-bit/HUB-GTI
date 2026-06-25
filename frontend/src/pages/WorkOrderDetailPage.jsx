@@ -137,16 +137,25 @@ function DynamicField({ field, value, onChange }) {
 }
 
 // ── Transition modal ──────────────────────────────────────────────────────────
-function TransitionModal({ toStatus, onConfirm, onClose }) {
+function TransitionModal({ toStatus, onConfirm, onClose, initialProblema = "", initialSolucao = "" }) {
   const [note, setNote]           = useState("");
   const [relatorio, setRelatorio] = useState("");
+  const [problema, setProblema]   = useState(initialProblema);
+  const [solucao, setSolucao]     = useState(initialSolucao);
   const [saving, setSaving]       = useState(false);
-  const needsRelatorio = toStatus === "CONCLUIDA";
+  const isConcluida = toStatus === "CONCLUIDA";
 
   async function confirm() {
     setSaving(true);
-    try { await onConfirm({ toStatus, note: note || null, relatorio: relatorio || null }); }
-    finally { setSaving(false); }
+    try {
+      await onConfirm({
+        toStatus,
+        note:      note     || null,
+        relatorio: relatorio || null,
+        problema:  problema  || null,
+        solucao:   solucao   || null,
+      });
+    } finally { setSaving(false); }
   }
 
   const cfg  = TRANSITION_CONFIG[toStatus];
@@ -167,20 +176,40 @@ function TransitionModal({ toStatus, onConfirm, onClose }) {
           <h3 className="font-semibold text-slate-900 dark:text-gray-100">{cfg?.label} OS</h3>
         </div>
 
-        {needsRelatorio && (
-          <div>
-            <label className="field-label">Relatório de conclusão</label>
-            <textarea
-              rows={3} value={relatorio}
-              onChange={(e) => setRelatorio(e.target.value)}
-              placeholder="Descreva o que foi realizado (opcional)..."
-              className="field-input resize-none text-sm"
-            />
-          </div>
+        {isConcluida && (
+          <>
+            <div>
+              <label className="field-label">Problema identificado</label>
+              <textarea
+                rows={2} value={problema}
+                onChange={(e) => setProblema(e.target.value)}
+                placeholder="Qual foi o problema encontrado?..."
+                className="field-input resize-none text-sm"
+              />
+            </div>
+            <div>
+              <label className="field-label">Solução aplicada</label>
+              <textarea
+                rows={2} value={solucao}
+                onChange={(e) => setSolucao(e.target.value)}
+                placeholder="O que foi feito para resolver?..."
+                className="field-input resize-none text-sm"
+              />
+            </div>
+            <div>
+              <label className="field-label">Relatório de conclusão <span className="text-slate-400 font-normal">(opcional)</span></label>
+              <textarea
+                rows={2} value={relatorio}
+                onChange={(e) => setRelatorio(e.target.value)}
+                placeholder="Observações adicionais..."
+                className="field-input resize-none text-sm"
+              />
+            </div>
+          </>
         )}
 
         <div>
-          <label className="field-label">Observação {needsRelatorio ? "(opcional)" : ""}</label>
+          <label className="field-label">Observação {isConcluida ? "(histórico)" : ""}</label>
           <textarea
             rows={2} value={note}
             onChange={(e) => setNote(e.target.value)}
@@ -317,14 +346,18 @@ export default function WorkOrderDetailPage() {
   const [os, setOs]                   = useState(null);
   const [loadErr, setLoadErr]         = useState(false);
   const [units, setUnits]             = useState([]);
+  const [types, setTypes]             = useState([]);
   const [techs, setTechs]             = useState([]);
   const [transition, setTrans]        = useState(null);
   const [showLinkTicket, setShowLink] = useState(false);
   const [showDelete, setShowDelete]   = useState(false);
+  const [showCreateNext, setShowCreateNext] = useState(false);
   const [err, setErr]                 = useState("");
   const [editing, setEditing]         = useState(false);
   const [editFormData, setEditFormData] = useState({});
   const [editUnitId, setEditUnitId]   = useState("");
+  const [editProblema, setEditProblema] = useState("");
+  const [editSolucao, setEditSolucao]   = useState("");
   const [saving, setSaving]           = useState(false);
   const [lightbox, setLightbox]       = useState(null);
   const [uploading, setUploading]     = useState(false);
@@ -332,14 +365,16 @@ export default function WorkOrderDetailPage() {
   const load = useCallback(async () => {
     setLoadErr(false);
     try {
-      const [osRes, unitsRes, techsRes] = await Promise.all([
+      const [osRes, unitsRes, techsRes, typesRes] = await Promise.all([
         api.get(`/work-orders/${id}`),
         api.get("/units"),
         api.get("/technicians"),
+        api.get("/work-order-types"),
       ]);
       setOs(osRes.data);
       setUnits(unitsRes.data);
       setTechs(techsRes.data);
+      setTypes(typesRes.data);
     } catch {
       setLoadErr(true);
     }
@@ -353,6 +388,8 @@ export default function WorkOrderDetailPage() {
   function startEdit() {
     setEditFormData(os.formData ?? {});
     setEditUnitId(os.unit ? String(os.unit.id) : "");
+    setEditProblema(os.problema ?? "");
+    setEditSolucao(os.solucao  ?? "");
     setEditing(true);
     setErr("");
   }
@@ -368,6 +405,8 @@ export default function WorkOrderDetailPage() {
       const res = await api.patch(`/work-orders/${id}`, {
         formData: editFormData,
         unitId:   editUnitId ? Number(editUnitId) : null,
+        problema: editProblema || null,
+        solucao:  editSolucao  || null,
       });
       setOs(res.data);
       setEditing(false);
@@ -378,10 +417,10 @@ export default function WorkOrderDetailPage() {
     }
   }
 
-  async function doTransition({ toStatus, note, relatorio }) {
+  async function doTransition({ toStatus, note, relatorio, problema, solucao }) {
     setErr("");
     try {
-      const res = await api.post(`/work-orders/${id}/transition`, { toStatus, note, relatorio });
+      const res = await api.post(`/work-orders/${id}/transition`, { toStatus, note, relatorio, problema, solucao });
       setOs(res.data);
       setTrans(null);
     } catch (e) { setErr(e.response?.data?.error || "Erro na transição"); }
@@ -609,6 +648,17 @@ export default function WorkOrderDetailPage() {
               <Edit2 size={14} /> Editar OS
             </button>
           )}
+          {os.status === "CONCLUIDA" && os.tickets.length > 0 && (
+            <button
+              onClick={() => {
+                const ticketId = os.tickets[0].id;
+                nav(`/painel/os?newOs=1&ticketId=${ticketId}`);
+              }}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 px-4 py-2 text-sm font-semibold transition"
+            >
+              <Plus size={14} /> Criar OS de Acompanhamento
+            </button>
+          )}
           {isAdmin && (
             <button
               onClick={() => setShowDelete(true)}
@@ -666,6 +716,25 @@ export default function WorkOrderDetailPage() {
                     <p className="text-xs text-slate-400 dark:text-gray-500 italic">Este tipo não possui campos configurados.</p>
                   )}
 
+                  <div>
+                    <label className="field-label">Problema identificado</label>
+                    <textarea
+                      rows={3} value={editProblema}
+                      onChange={(e) => setEditProblema(e.target.value)}
+                      placeholder="Descreva o problema encontrado..."
+                      className="field-input resize-none text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="field-label">Solução aplicada</label>
+                    <textarea
+                      rows={3} value={editSolucao}
+                      onChange={(e) => setEditSolucao(e.target.value)}
+                      placeholder="Descreva o que foi feito..."
+                      className="field-input resize-none text-sm"
+                    />
+                  </div>
+
                   {err && <p className="text-xs text-red-600 dark:text-red-400">{err}</p>}
 
                   <div className="flex gap-2 justify-end pt-1">
@@ -709,6 +778,28 @@ export default function WorkOrderDetailPage() {
                     ))
                   ) : (
                     <p className="text-xs text-slate-400 dark:text-gray-500 italic">Nenhum campo configurado para este tipo.</p>
+                  )}
+                </div>
+              )}
+
+              {/* Problema / Solução */}
+              {(os.problema || os.solucao) && (
+                <div className="space-y-3 pt-1 border-t border-slate-100 dark:border-gray-700/60">
+                  {os.problema && (
+                    <div>
+                      <div className="text-xs text-slate-400 dark:text-gray-500 mb-0.5">Problema identificado</div>
+                      <div className="text-sm text-slate-800 dark:text-gray-100 whitespace-pre-wrap bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-lg p-3">
+                        {os.problema}
+                      </div>
+                    </div>
+                  )}
+                  {os.solucao && (
+                    <div>
+                      <div className="text-xs text-slate-400 dark:text-gray-500 mb-0.5">Solução aplicada</div>
+                      <div className="text-sm text-slate-800 dark:text-gray-100 whitespace-pre-wrap bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-800 rounded-lg p-3">
+                        {os.solucao}
+                      </div>
+                    </div>
                   )}
                 </div>
               )}
@@ -814,7 +905,7 @@ export default function WorkOrderDetailPage() {
                     </span>
                   </h2>
                   <Link
-                    to={`/painel/inventario/checklists/${os.checklist.id}`}
+                    to={`/painel/checklists/${os.checklist.id}`}
                     className="flex items-center gap-1 text-xs text-brand-600 dark:text-brand-400 hover:underline"
                   >
                     Ver detalhes <ExternalLink size={11} />
@@ -1074,7 +1165,13 @@ export default function WorkOrderDetailPage() {
       </main>
 
       {transition && (
-        <TransitionModal toStatus={transition} onConfirm={doTransition} onClose={() => setTrans(null)} />
+        <TransitionModal
+          toStatus={transition}
+          onConfirm={doTransition}
+          onClose={() => setTrans(null)}
+          initialProblema={os.problema ?? ""}
+          initialSolucao={os.solucao   ?? ""}
+        />
       )}
       {showLinkTicket && (
         <LinkTicketModal onLink={linkTicket} onClose={() => setShowLink(false)} />

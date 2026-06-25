@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { api } from "../lib/api";
 import { useSocket } from "../context/SocketContext";
 import { Spinner } from "../components/ui";
@@ -7,7 +7,7 @@ import AppHeader from "../components/AppHeader";
 import { OS_STATUS_LABEL, OS_STATUS_STYLE } from "../lib/osConstants";
 import {
   ClipboardList, Plus, ChevronRight, MapPin,
-  Users, Filter, RefreshCw, Clock, Monitor, X,
+  Users, Filter, RefreshCw, Clock, Monitor, X, Check,
 } from "lucide-react";
 
 const STATUS_TABS = [
@@ -108,7 +108,9 @@ function DynamicField({ field, value, onChange }) {
 }
 
 // ── Modal de criação ──────────────────────────────────────────────────────────
-function CreateOsModal({ onClose, onCreate, units, types }) {
+const EMPTY_NEW_ASSET = { tombo: "", hostname: "", cpu: "", ram: "", storage: "", operatingSystem: "", setor: "", responsavel: "" };
+
+function CreateOsModal({ onClose, onCreate, units, types, preTicketId = null }) {
   const [tipoId, setTipoId]       = useState(types[0]?.id ?? "");
   const [formData, setFormData]   = useState({});
   const [unitId, setUnitId]       = useState("");
@@ -118,12 +120,16 @@ function CreateOsModal({ onClose, onCreate, units, types }) {
   const [assetResults, setAssetResults] = useState([]);
   const [assetLoading, setAssetLoading] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState(null);
+  const [showNewAsset, setShowNewAsset]   = useState(false);
+  const [newAssetForm, setNewAssetForm]   = useState(EMPTY_NEW_ASSET);
+  const [creatingAsset, setCreatingAsset] = useState(false);
+  const [assetErr, setAssetErr]           = useState("");
 
   const selectedType = types.find((t) => t.id === Number(tipoId));
   const fields = selectedType?.fields ?? [];
 
   useEffect(() => {
-    if (!assetSearch.trim()) { setAssetResults([]); return; }
+    if (!assetSearch.trim()) { setAssetResults([]); setAssetLoading(false); return; }
     setAssetLoading(true);
     const t = setTimeout(async () => {
       try {
@@ -138,16 +144,52 @@ function CreateOsModal({ onClose, onCreate, units, types }) {
     setFormData((prev) => ({ ...prev, [key]: val }));
   }
 
+  async function handleCreateAsset() {
+    const f = newAssetForm;
+    if (!f.hostname.trim())        { setAssetErr("Hostname é obrigatório"); return; }
+    if (!f.cpu.trim())             { setAssetErr("CPU é obrigatória"); return; }
+    if (!f.ram.trim())             { setAssetErr("RAM é obrigatória"); return; }
+    if (!f.storage.trim())         { setAssetErr("Armazenamento é obrigatório"); return; }
+    if (!f.operatingSystem.trim()) { setAssetErr("Sistema Operacional é obrigatório"); return; }
+
+    setCreatingAsset(true);
+    setAssetErr("");
+    try {
+      const payload = {
+        hostname:        f.hostname.trim(),
+        cpu:             f.cpu.trim(),
+        ram:             f.ram.trim(),
+        storage:         f.storage.trim(),
+        operatingSystem: f.operatingSystem.trim(),
+      };
+      if (f.tombo.trim())       payload.tombo       = f.tombo.trim();
+      if (f.setor.trim())       payload.setor       = f.setor.trim();
+      if (f.responsavel.trim()) payload.responsavel = f.responsavel.trim();
+
+      const res = await api.post("/assets", payload);
+      setSelectedAsset(res.data);
+      setShowNewAsset(false);
+      setAssetSearch("");
+      setAssetResults([]);
+      setNewAssetForm(EMPTY_NEW_ASSET);
+    } catch (e) {
+      setAssetErr(e.response?.data?.error || "Erro ao cadastrar ativo");
+    } finally {
+      setCreatingAsset(false);
+    }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     setSaving(true);
     setErr("");
     try {
       const res = await api.post("/work-orders", {
-        tipoId:  Number(tipoId),
+        tipoId:   Number(tipoId),
         formData,
-        unitId:  unitId ? Number(unitId) : null,
-        assetId: selectedAsset?.id ?? null,
+        unitId:   unitId ? Number(unitId) : null,
+        assetId:  selectedAsset?.id ?? null,
+        ticketId: preTicketId ? Number(preTicketId) : null,
       });
       onCreate(res.data);
     } catch (e) {
@@ -204,7 +246,7 @@ function CreateOsModal({ onClose, onCreate, units, types }) {
               <div className="flex items-center justify-between rounded-xl border border-slate-200 dark:border-gray-700 bg-slate-50 dark:bg-gray-800 px-3 py-2">
                 <div className="flex items-center gap-2">
                   <Monitor size={13} className="text-brand-500 shrink-0" />
-                  <span className="text-xs font-mono text-slate-500 dark:text-gray-400">{selectedAsset.tombo}</span>
+                  {selectedAsset.tombo && <span className="text-xs font-mono text-slate-500 dark:text-gray-400">{selectedAsset.tombo}</span>}
                   <span className="text-sm font-medium text-slate-800 dark:text-gray-100">{selectedAsset.hostname}</span>
                 </div>
                 <button type="button" onClick={() => setSelectedAsset(null)} className="text-slate-400 hover:text-red-500 transition">
@@ -212,37 +254,107 @@ function CreateOsModal({ onClose, onCreate, units, types }) {
                 </button>
               </div>
             ) : (
-              <div className="relative">
-                <input
-                  type="text"
-                  value={assetSearch}
-                  onChange={(e) => setAssetSearch(e.target.value)}
-                  placeholder="Buscar por tombo ou hostname..."
-                  className="field-input pr-8"
-                />
-                {assetLoading && (
-                  <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
-                    <Spinner className="h-4 w-4" />
+              <div>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={assetSearch}
+                    onChange={(e) => { setAssetSearch(e.target.value); setShowNewAsset(false); }}
+                    placeholder="Buscar por tombo ou hostname..."
+                    className="field-input pr-8"
+                  />
+                  {assetLoading && (
+                    <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                      <Spinner className="h-4 w-4" />
+                    </div>
+                  )}
+                  {assetResults.length > 0 && (
+                    <div className="absolute z-20 left-0 right-0 top-full mt-1 rounded-xl border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg max-h-48 overflow-y-auto">
+                      {assetResults.map((a) => (
+                        <button
+                          type="button"
+                          key={a.id}
+                          onClick={() => { setSelectedAsset(a); setAssetSearch(""); setAssetResults([]); }}
+                          className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-gray-800 transition flex items-center gap-2"
+                        >
+                          {a.tombo && <span className="text-xs font-mono text-slate-400 dark:text-gray-500">{a.tombo}</span>}
+                          <span className="text-sm text-slate-700 dark:text-gray-300">{a.hostname}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* "Nenhum encontrado" + botão cadastrar */}
+                {!assetLoading && assetSearch.trim() && assetResults.length === 0 && !showNewAsset && (
+                  <div className="mt-1.5 flex items-center justify-between">
+                    <span className="text-xs text-slate-400 dark:text-gray-500">Nenhum ativo encontrado.</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowNewAsset(true)}
+                      className="text-xs font-semibold text-brand-600 dark:text-brand-400 hover:underline flex items-center gap-0.5"
+                    >
+                      <Plus size={11} /> Cadastrar novo
+                    </button>
                   </div>
                 )}
-                {assetResults.length > 0 && (
-                  <div className="absolute z-20 left-0 right-0 top-full mt-1 rounded-xl border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg max-h-48 overflow-y-auto">
-                    {assetResults.map((a) => (
-                      <button
-                        type="button"
-                        key={a.id}
-                        onClick={() => { setSelectedAsset(a); setAssetSearch(""); setAssetResults([]); }}
-                        className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-gray-800 transition flex items-center gap-2"
-                      >
-                        <span className="text-xs font-mono text-slate-400 dark:text-gray-500">{a.tombo}</span>
-                        <span className="text-sm text-slate-700 dark:text-gray-300">{a.hostname}</span>
+
+                {/* Formulário inline de novo ativo */}
+                {showNewAsset && (
+                  <div className="mt-2 rounded-xl border border-brand-200 dark:border-brand-800 bg-brand-50 dark:bg-brand-900/20 p-3 space-y-2">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-semibold text-brand-700 dark:text-brand-300 flex items-center gap-1">
+                        <Monitor size={11} /> Novo ativo
+                      </span>
+                      <button type="button" onClick={() => { setShowNewAsset(false); setAssetErr(""); }} className="text-slate-400 hover:text-red-500 transition">
+                        <X size={13} />
                       </button>
-                    ))}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { k: "tombo",           label: "Tombo",              optional: true  },
+                        { k: "hostname",        label: "Hostname",           optional: false },
+                        { k: "cpu",             label: "Processador (CPU)",  optional: false },
+                        { k: "ram",             label: "Memória RAM",        optional: false },
+                        { k: "storage",         label: "HD / SSD",           optional: false },
+                        { k: "operatingSystem", label: "Sistema Operacional",optional: false },
+                        { k: "setor",           label: "Setor",              optional: true  },
+                        { k: "responsavel",     label: "Responsável",        optional: true  },
+                      ].map(({ k, label, optional }) => (
+                        <div key={k}>
+                          <label className="field-label text-xs">
+                            {label}{optional ? <span className="text-slate-400 font-normal ml-0.5">(opc.)</span> : " *"}
+                          </label>
+                          <input
+                            type="text"
+                            value={newAssetForm[k]}
+                            onChange={(e) => setNewAssetForm((p) => ({ ...p, [k]: e.target.value }))}
+                            className="field-input text-xs py-1.5"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    {assetErr && <p className="text-xs text-red-600 dark:text-red-400">{assetErr}</p>}
+                    <button
+                      type="button" onClick={handleCreateAsset} disabled={creatingAsset}
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-brand-700 dark:text-brand-300 hover:text-brand-900 dark:hover:text-brand-100 disabled:opacity-50 transition"
+                    >
+                      {creatingAsset ? <Spinner className="h-3.5 w-3.5" /> : <Check size={12} />}
+                      Cadastrar e selecionar
+                    </button>
                   </div>
                 )}
               </div>
             )}
           </div>
+
+          {/* Chamado vinculado (quando vindo de uma OS anterior) */}
+          {preTicketId && (
+            <div className="flex items-center gap-2 rounded-xl bg-brand-50 dark:bg-brand-900/20 border border-brand-200 dark:border-brand-800 px-3 py-2 text-xs text-brand-700 dark:text-brand-300">
+              <Check size={13} className="shrink-0" />
+              OS será vinculada ao chamado selecionado
+            </div>
+          )}
 
           {fields.map((field) => (
             <DynamicField
@@ -273,8 +385,9 @@ function CreateOsModal({ onClose, onCreate, units, types }) {
 
 // ── Página ─────────────────────────────────────────────────────────────────────
 export default function WorkOrdersPage() {
-  const socket = useSocket();
-  const nav    = useNavigate();
+  const socket   = useSocket();
+  const nav      = useNavigate();
+  const location = useLocation();
 
   const [orders, setOrders]         = useState([]);
   const [units, setUnits]           = useState([]);
@@ -285,6 +398,11 @@ export default function WorkOrdersPage() {
   const [unitFilter, setUnit]       = useState("");
   const [dateFilter, setDateFilter] = useState("");
   const [showCreate, setShowCreate] = useState(false);
+
+  // Auto-abre o modal quando vindo de outra OS (?newOs=1)
+  useEffect(() => {
+    if (new URLSearchParams(location.search).get("newOs")) setShowCreate(true);
+  }, [location.search]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -541,6 +659,7 @@ export default function WorkOrdersPage() {
           types={types}
           onClose={() => setShowCreate(false)}
           onCreate={handleCreated}
+          preTicketId={new URLSearchParams(location.search).get("ticketId")}
         />
       )}
     </div>
