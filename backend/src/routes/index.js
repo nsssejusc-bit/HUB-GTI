@@ -38,7 +38,7 @@ import {
 import {
   createWorkOrder, listWorkOrders, getWorkOrder, updateWorkOrder,
   transitionWorkOrder, addTecnico, removeTecnico, linkTicket, unlinkTicket,
-  deleteWorkOrder,
+  deleteWorkOrder, uploadMiddleware, uploadImages, deleteImage,
 } from "../controllers/workOrderController.js";
 import {
   listAssets, getAsset, createAsset, updateAsset, deleteAsset, allocateAsset,
@@ -182,6 +182,8 @@ router.post("/work-orders/:id/tecnicos",            ...staffAccess, addTecnico);
 router.delete("/work-orders/:id/tecnicos/:userId",  ...staffAccess, removeTecnico);
 router.post("/work-orders/:id/tickets",             ...staffAccess, linkTicket);
 router.delete("/work-orders/:id/tickets/:ticketId", ...staffAccess, unlinkTicket);
+router.post("/work-orders/:id/images",              ...staffAccess, uploadMiddleware, uploadImages);
+router.delete("/work-orders/:id/images/:imageId",   ...staffAccess, deleteImage);
 
 // ── Ativos ─────────────────────────────────────────────────────────────────────
 router.get("/assets",                   ...staffAccess, listAssets);

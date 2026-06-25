@@ -8,11 +8,20 @@ import { OS_STATUS_LABEL, OS_STATUS_STYLE } from "../lib/osConstants";
 import {
   ArrowLeft, ChevronRight, Users, Wrench, Edit2, Check, X,
   Plus, Trash2, Link2, Unlink, AlertTriangle, CheckCircle2,
-  Play, XCircle, Package, ClipboardCheck, ExternalLink,
+  Play, XCircle, Package, ClipboardCheck, ExternalLink, Monitor,
+  ImageIcon, Upload, ZoomIn,
 } from "lucide-react";
 
 const STATUS_STYLE = OS_STATUS_STYLE;
 const STATUS_LABEL = OS_STATUS_LABEL;
+
+const ASSET_STATUS_LABEL = { ATIVO: "Ativo", INATIVO: "Inativo", MANUTENCAO: "Em manutenção", RECOLHIDO: "Recolhido" };
+const ASSET_STATUS_STYLE = {
+  ATIVO:      "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+  INATIVO:    "bg-slate-100 text-slate-500 dark:bg-gray-800 dark:text-gray-400",
+  MANUTENCAO: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
+  RECOLHIDO:  "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
+};
 
 const CHECKLIST_STATUS_STYLE = {
   PENDENTE:  "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
@@ -317,6 +326,8 @@ export default function WorkOrderDetailPage() {
   const [editFormData, setEditFormData] = useState({});
   const [editUnitId, setEditUnitId]   = useState("");
   const [saving, setSaving]           = useState(false);
+  const [lightbox, setLightbox]       = useState(null);
+  const [uploading, setUploading]     = useState(false);
 
   const load = useCallback(async () => {
     setLoadErr(false);
@@ -412,6 +423,35 @@ export default function WorkOrderDetailPage() {
     } catch (e) {
       setErr(e.response?.data?.error || "Erro ao excluir OS");
       setShowDelete(false);
+    }
+  }
+
+  async function handleImageUpload(e) {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+    setUploading(true);
+    setErr("");
+    try {
+      const form = new FormData();
+      files.forEach((f) => form.append("images", f));
+      const res = await api.post(`/work-orders/${id}/images`, form, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setOs((prev) => ({ ...prev, images: [...(prev.images ?? []), ...res.data] }));
+    } catch (e) {
+      setErr(e.response?.data?.error || "Erro ao enviar imagens");
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  }
+
+  async function handleDeleteImage(imgId) {
+    try {
+      await api.delete(`/work-orders/${id}/images/${imgId}`);
+      setOs((prev) => ({ ...prev, images: prev.images.filter((i) => i.id !== imgId) }));
+    } catch (e) {
+      setErr(e.response?.data?.error || "Erro ao excluir imagem");
     }
   }
 
@@ -684,6 +724,36 @@ export default function WorkOrderDetailPage() {
               )}
             </div>
 
+            {/* Ativo vinculado */}
+            {os.asset && (
+              <div className="card p-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-semibold text-slate-700 dark:text-gray-300 flex items-center gap-2">
+                    <Monitor size={14} className="text-brand-600" />
+                    Ativo vinculado
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${ASSET_STATUS_STYLE[os.asset.status] ?? "bg-slate-100 text-slate-500"}`}>
+                      {ASSET_STATUS_LABEL[os.asset.status] ?? os.asset.status}
+                    </span>
+                  </h2>
+                  <Link
+                    to={`/painel/ativos/${os.asset.id}`}
+                    className="flex items-center gap-1 text-xs text-brand-600 dark:text-brand-400 hover:underline"
+                  >
+                    <span className="font-mono">{os.asset.tombo}</span>
+                    <ExternalLink size={11} />
+                  </Link>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <InfoRow label="Hostname" value={os.asset.hostname} />
+                  <InfoRow label="Sistema Operacional" value={os.asset.operatingSystem} />
+                  <InfoRow label="CPU" value={os.asset.cpu} />
+                  <InfoRow label="RAM / Armazenamento" value={`${os.asset.ram} / ${os.asset.storage}`} />
+                  {os.asset.setor      && <InfoRow label="Setor"       value={os.asset.setor} />}
+                  {os.asset.responsavel && <InfoRow label="Responsável" value={os.asset.responsavel} />}
+                </div>
+              </div>
+            )}
+
             {/* Pré-visita (informações detalhadas) */}
             {os.preVisita && (
               <div className="card p-5 space-y-3">
@@ -787,6 +857,73 @@ export default function WorkOrderDetailPage() {
                 )}
               </div>
             )}
+
+            {/* Imagens */}
+            <div className="card p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-slate-700 dark:text-gray-300 flex items-center gap-2">
+                  <ImageIcon size={14} className="text-brand-600" />
+                  Imagens
+                  {os.images?.length > 0 && (
+                    <span className="text-xs font-normal text-slate-400">({os.images.length})</span>
+                  )}
+                </h2>
+                <label className={`flex items-center gap-1 text-xs cursor-pointer transition ${
+                  uploading
+                    ? "text-slate-300 dark:text-gray-600 pointer-events-none"
+                    : "text-brand-600 dark:text-brand-400 hover:underline"
+                }`}>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="sr-only"
+                    onChange={handleImageUpload}
+                    disabled={uploading}
+                  />
+                  {uploading ? <Spinner className="h-3.5 w-3.5" /> : <Upload size={12} />}
+                  {uploading ? "Enviando..." : "Adicionar"}
+                </label>
+              </div>
+
+              {(!os.images || os.images.length === 0) && (
+                <p className="text-sm text-slate-400 dark:text-gray-500">Nenhuma imagem anexada.</p>
+              )}
+
+              {os.images?.length > 0 && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {os.images.map((img) => (
+                    <div key={img.id} className="group relative aspect-video rounded-lg overflow-hidden bg-slate-100 dark:bg-gray-800">
+                      <img
+                        src={img.url}
+                        alt={img.originalName}
+                        className="w-full h-full object-cover transition group-hover:brightness-90 cursor-pointer"
+                        onClick={() => setLightbox(img)}
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition">
+                        <button
+                          onClick={() => setLightbox(img)}
+                          className="flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80 transition"
+                        >
+                          <ZoomIn size={13} />
+                        </button>
+                        {isAdmin && (
+                          <button
+                            onClick={() => handleDeleteImage(img.id)}
+                            className="flex h-7 w-7 items-center justify-center rounded-full bg-red-600/80 text-white hover:bg-red-600 transition"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                      </div>
+                      <div className="absolute bottom-0 left-0 right-0 px-1.5 py-1 bg-gradient-to-t from-black/50 to-transparent">
+                        <p className="text-[10px] text-white/80 truncate">{img.originalName}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
             {/* Chamados vinculados */}
             <div className="card p-5 space-y-3">
@@ -944,6 +1081,29 @@ export default function WorkOrderDetailPage() {
       )}
       {showDelete && (
         <DeleteOsModal osNumber={os.osNumber} onConfirm={deleteOs} onClose={() => setShowDelete(false)} />
+      )}
+
+      {lightbox && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4"
+          onClick={() => setLightbox(null)}
+        >
+          <button
+            onClick={() => setLightbox(null)}
+            className="absolute top-4 right-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition"
+          >
+            <X size={18} />
+          </button>
+          <img
+            src={lightbox.url}
+            alt={lightbox.originalName}
+            className="max-h-[90vh] max-w-[95vw] rounded-xl object-contain shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-xs text-white/60 truncate max-w-xs text-center">
+            {lightbox.originalName} · {(lightbox.size / 1024).toFixed(0)} KB
+          </div>
+        </div>
       )}
     </div>
   );

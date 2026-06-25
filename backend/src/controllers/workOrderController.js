@@ -1,7 +1,36 @@
 import { z } from "zod";
+import multer from "multer";
+import sharp from "sharp";
+import fs from "fs/promises";
+import path from "path";
+import { fileURLToPath } from "url";
 import { prisma } from "../config/prisma.js";
 import { allowedOsNext, canOsTransition } from "../utils/osStateMachine.js";
 import { nextOsSeq } from "../utils/nextSequence.js";
+
+const __dirname  = path.dirname(fileURLToPath(import.meta.url));
+const UPLOADS_OS = path.join(__dirname, "../../../uploads/os");
+
+const _multer = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024 },
+  fileFilter(req, file, cb) {
+    if (!file.mimetype.startsWith("image/")) return cb(new Error("Apenas imagens são permitidas"));
+    cb(null, true);
+  },
+});
+export const uploadMiddleware = _multer.array("images", 10);
+
+function fmtImage(img) {
+  return {
+    id:           img.id,
+    url:          `/uploads/os/${img.workOrderId}/${img.filename}`,
+    originalName: img.originalName,
+    size:         img.size,
+    createdBy:    img.createdBy ? { id: img.createdBy.id, name: img.createdBy.name } : null,
+    createdAt:    img.createdAt,
+  };
+}
 
 function buildOsNumber(seq) {
   const d = new Date();
@@ -24,6 +53,19 @@ function formatOs(os) {
     status:      os.status,
     formData:    os.formData ?? {},
     relatorio:   os.relatorio,
+    asset:       os.asset ? {
+      id:              os.asset.id,
+      tombo:           os.asset.tombo,
+      hostname:        os.asset.hostname,
+      cpu:             os.asset.cpu,
+      ram:             os.asset.ram,
+      storage:         os.asset.storage,
+      operatingSystem: os.asset.operatingSystem,
+      status:          os.asset.status,
+      setor:           os.asset.setor,
+      responsavel:     os.asset.responsavel,
+    } : null,
+    images:      os.images?.map(fmtImage) ?? [],
     checklist:   os.checklist ? {
       id:        os.checklist.id,
       title:     os.checklist.title,
@@ -67,6 +109,8 @@ function formatOs(os) {
 
 const tipoSelect = { id: true, name: true, color: true, fields: true };
 
+const assetSelect = { id: true, tombo: true, hostname: true, cpu: true, ram: true, storage: true, operatingSystem: true, status: true, setor: true, responsavel: true };
+
 const osListInclude = {
   tipo:      { select: tipoSelect },
   unit:      { select: { id: true, name: true } },
@@ -74,6 +118,7 @@ const osListInclude = {
   tecnicos:  { include: { user: { select: { id: true, name: true, unitId: true } } } },
   tickets:   { include: { ticket: { select: { id: true, ticketNumber: true, requesterName: true, department: true, status: true } } } },
   checklist: { select: { id: true, title: true, status: true, nucleo: true } },
+  asset:     { select: assetSelect },
   preVisita: {
     select: {
       id: true, osNumber: true, formData: true, status: true,
@@ -89,6 +134,8 @@ const osInclude = {
   tecnicos:  { include: { user: { select: { id: true, name: true, unitId: true } } } },
   tickets:   { include: { ticket: { select: { id: true, ticketNumber: true, requesterName: true, department: true, status: true } } } },
   checklist: { include: { items: { include: { unit: { include: { item: { select: { id: true, name: true, unitMeasure: true } } } } } } } },
+  asset:     { select: assetSelect },
+  images:    { select: { id: true, workOrderId: true, filename: true, originalName: true, size: true, createdAt: true, createdBy: { select: { id: true, name: true } } }, orderBy: { createdAt: "asc" } },
   preVisita: {
     include: {
       tipo:     { select: { id: true, name: true, color: true } },
@@ -105,6 +152,7 @@ export async function createWorkOrder(req, res) {
     ticketId:    z.number().int().positive().optional().nullable(),
     tecnicoIds:  z.array(z.number().int().positive()).optional(),
     preVisitaId: z.number().int().positive().optional().nullable(),
+    assetId:     z.number().int().positive().optional().nullable(),
   });
 
   const parsed = schema.safeParse(req.body);
@@ -124,24 +172,42 @@ export async function createWorkOrder(req, res) {
     }
   }
 
+  if (data.assetId) {
+    const asset = await prisma.asset.findUnique({ where: { id: data.assetId } });
+    if (!asset) return res.status(400).json({ error: "Ativo não encontrado" });
+  }
+
   const seq = await nextOsSeq();
   const osNumber = buildOsNumber(seq);
 
-  const os = await prisma.workOrder.create({
-    data: {
-      osNumber,
-      tipoId:      data.tipoId,
-      formData:    data.formData,
-      unitId:      data.unitId ?? null,
-      createdById: req.user.id,
-      preVisitaId: data.preVisitaId ?? null,
-      history:     { create: { toStatus: "ABERTA", actorId: req.user.id } },
-      ...(data.ticketId ? { tickets: { create: { ticketId: data.ticketId } } } : {}),
-      ...(data.tecnicoIds?.length
-        ? { tecnicos: { createMany: { data: data.tecnicoIds.map((uid) => ({ userId: uid })), skipDuplicates: true } } }
-        : {}),
-    },
-    include: osInclude,
+  const os = await prisma.$transaction(async (tx) => {
+    const created = await tx.workOrder.create({
+      data: {
+        osNumber,
+        tipoId:      data.tipoId,
+        formData:    data.formData,
+        unitId:      data.unitId      ?? null,
+        assetId:     data.assetId     ?? null,
+        createdById: req.user.id,
+        preVisitaId: data.preVisitaId ?? null,
+        history:     { create: { toStatus: "ABERTA", actorId: req.user.id } },
+        ...(data.ticketId ? { tickets: { create: { ticketId: data.ticketId } } } : {}),
+        ...(data.tecnicoIds?.length
+          ? { tecnicos: { createMany: { data: data.tecnicoIds.map((uid) => ({ userId: uid })), skipDuplicates: true } } }
+          : {}),
+      },
+      include: osInclude,
+    });
+
+    if (data.assetId) {
+      await tx.assetAllocation.updateMany({ where: { assetId: data.assetId, endedAt: null }, data: { endedAt: new Date() } });
+      await tx.assetAllocation.create({
+        data: { assetId: data.assetId, workOrderId: created.id, notes: `Recolhido — ${created.osNumber}`, createdById: req.user.id },
+      });
+      await tx.asset.update({ where: { id: data.assetId }, data: { status: "RECOLHIDO" } });
+    }
+
+    return created;
   });
 
   req.app.get("io")?.emit("workorder:created", { osNumber: os.osNumber });
@@ -212,6 +278,7 @@ export async function updateWorkOrder(req, res) {
       unitId:      z.number().int().positive().optional().nullable(),
       tipoId:      z.number().int().positive().optional(),
       preVisitaId: z.number().int().positive().optional().nullable(),
+      assetId:     z.number().int().positive().optional().nullable(),
     });
 
     const parsed = schema.safeParse(req.body);
@@ -234,10 +301,11 @@ export async function updateWorkOrder(req, res) {
     const updated = await prisma.workOrder.update({
       where: { id },
       data: {
-        ...(newFormData !== undefined ? { formData: newFormData } : {}),
+        ...(newFormData !== undefined   ? { formData: newFormData }             : {}),
         ...(data.unitId      !== undefined ? { unitId: data.unitId }           : {}),
         ...(data.tipoId      !== undefined ? { tipoId: data.tipoId }           : {}),
         ...(data.preVisitaId !== undefined ? { preVisitaId: data.preVisitaId } : {}),
+        ...(data.assetId     !== undefined ? { assetId: data.assetId }         : {}),
       },
       include: osInclude,
     });
@@ -277,15 +345,30 @@ export async function transitionWorkOrder(req, res) {
     if (toStatus === "CONCLUIDA")    timeFields.concludedAt = now;
     if (toStatus === "CANCELADA")    timeFields.cancelledAt = now;
 
-    const updated = await prisma.workOrder.update({
-      where: { id },
-      data: {
-        status: toStatus,
-        ...timeFields,
-        ...(relatorio !== undefined ? { relatorio } : {}),
-        history: { create: { fromStatus: os.status, toStatus, actorId: req.user.id, note: note || null } },
-      },
-      include: osInclude,
+    const updated = await prisma.$transaction(async (tx) => {
+      const result = await tx.workOrder.update({
+        where: { id },
+        data: {
+          status: toStatus,
+          ...timeFields,
+          ...(relatorio !== undefined ? { relatorio } : {}),
+          history: { create: { fromStatus: os.status, toStatus, actorId: req.user.id, note: note || null } },
+        },
+        include: osInclude,
+      });
+
+      if (os.assetId && (toStatus === "CONCLUIDA" || toStatus === "CANCELADA")) {
+        const noteText = toStatus === "CONCLUIDA"
+          ? `Concluído — ${os.osNumber}`
+          : `Cancelado — ${os.osNumber}`;
+        await tx.assetAllocation.updateMany({ where: { assetId: os.assetId, endedAt: null }, data: { endedAt: now } });
+        await tx.assetAllocation.create({
+          data: { assetId: os.assetId, workOrderId: id, notes: noteText, createdById: req.user.id },
+        });
+        await tx.asset.update({ where: { id: os.assetId }, data: { status: "ATIVO" } });
+      }
+
+      return result;
     });
 
     req.app.get("io")?.emit("workorder:updated", { id });
@@ -407,5 +490,62 @@ export async function deleteWorkOrder(req, res) {
   } catch (e) {
     console.error("deleteWorkOrder:", e);
     res.status(500).json({ error: "Erro ao excluir OS" });
+  }
+}
+
+export async function uploadImages(req, res) {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
+
+    const os = await prisma.workOrder.findUnique({ where: { id } });
+    if (!os) return res.status(404).json({ error: "OS não encontrada" });
+    if (!req.files?.length) return res.status(400).json({ error: "Nenhuma imagem enviada" });
+
+    const dir = path.join(UPLOADS_OS, String(id));
+    await fs.mkdir(dir, { recursive: true });
+
+    const created = await Promise.all(req.files.map(async (file) => {
+      const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
+      const outPath  = path.join(dir, filename);
+
+      const info = await sharp(file.buffer)
+        .rotate()
+        .resize({ width: 1920, height: 1080, fit: "inside", withoutEnlargement: true })
+        .jpeg({ quality: 82 })
+        .toFile(outPath);
+
+      return prisma.workOrderImage.create({
+        data: { workOrderId: id, filename, originalName: file.originalname, size: info.size, createdById: req.user.id },
+        include: { createdBy: { select: { id: true, name: true } } },
+      });
+    }));
+
+    req.app.get("io")?.emit("workorder:updated", { id });
+    res.status(201).json(created.map(fmtImage));
+  } catch (e) {
+    console.error("uploadImages:", e);
+    res.status(500).json({ error: "Erro ao fazer upload das imagens" });
+  }
+}
+
+export async function deleteImage(req, res) {
+  try {
+    const osId  = Number(req.params.id);
+    const imgId = Number(req.params.imageId);
+    if (isNaN(osId) || isNaN(imgId)) return res.status(400).json({ error: "ID inválido" });
+
+    const img = await prisma.workOrderImage.findFirst({ where: { id: imgId, workOrderId: osId } });
+    if (!img) return res.status(404).json({ error: "Imagem não encontrada" });
+
+    const filePath = path.join(UPLOADS_OS, String(osId), img.filename);
+    await fs.unlink(filePath).catch(() => {});
+    await prisma.workOrderImage.delete({ where: { id: imgId } });
+
+    req.app.get("io")?.emit("workorder:updated", { id: osId });
+    res.status(204).end();
+  } catch (e) {
+    console.error("deleteImage:", e);
+    res.status(500).json({ error: "Erro ao excluir imagem" });
   }
 }

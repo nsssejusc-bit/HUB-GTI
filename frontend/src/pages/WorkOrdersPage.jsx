@@ -7,7 +7,7 @@ import AppHeader from "../components/AppHeader";
 import { OS_STATUS_LABEL, OS_STATUS_STYLE } from "../lib/osConstants";
 import {
   ClipboardList, Plus, ChevronRight, MapPin,
-  Users, Filter, RefreshCw, Clock,
+  Users, Filter, RefreshCw, Clock, Monitor, X,
 } from "lucide-react";
 
 const STATUS_TABS = [
@@ -109,14 +109,30 @@ function DynamicField({ field, value, onChange }) {
 
 // ── Modal de criação ──────────────────────────────────────────────────────────
 function CreateOsModal({ onClose, onCreate, units, types }) {
-  const [tipoId, setTipoId]   = useState(types[0]?.id ?? "");
-  const [formData, setFormData] = useState({});
-  const [unitId, setUnitId]   = useState("");
-  const [saving, setSaving]   = useState(false);
-  const [err, setErr]         = useState("");
+  const [tipoId, setTipoId]       = useState(types[0]?.id ?? "");
+  const [formData, setFormData]   = useState({});
+  const [unitId, setUnitId]       = useState("");
+  const [saving, setSaving]       = useState(false);
+  const [err, setErr]             = useState("");
+  const [assetSearch, setAssetSearch]   = useState("");
+  const [assetResults, setAssetResults] = useState([]);
+  const [assetLoading, setAssetLoading] = useState(false);
+  const [selectedAsset, setSelectedAsset] = useState(null);
 
   const selectedType = types.find((t) => t.id === Number(tipoId));
   const fields = selectedType?.fields ?? [];
+
+  useEffect(() => {
+    if (!assetSearch.trim()) { setAssetResults([]); return; }
+    setAssetLoading(true);
+    const t = setTimeout(async () => {
+      try {
+        const res = await api.get("/assets", { params: { search: assetSearch, limit: 10 } });
+        setAssetResults(res.data.assets ?? res.data);
+      } catch {} finally { setAssetLoading(false); }
+    }, 350);
+    return () => clearTimeout(t);
+  }, [assetSearch]);
 
   function setField(key, val) {
     setFormData((prev) => ({ ...prev, [key]: val }));
@@ -128,9 +144,10 @@ function CreateOsModal({ onClose, onCreate, units, types }) {
     setErr("");
     try {
       const res = await api.post("/work-orders", {
-        tipoId:   Number(tipoId),
+        tipoId:  Number(tipoId),
         formData,
-        unitId:   unitId ? Number(unitId) : null,
+        unitId:  unitId ? Number(unitId) : null,
+        assetId: selectedAsset?.id ?? null,
       });
       onCreate(res.data);
     } catch (e) {
@@ -178,6 +195,53 @@ function CreateOsModal({ onClose, onCreate, units, types }) {
                 {units.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
               </select>
             </div>
+          </div>
+
+          {/* Ativo */}
+          <div>
+            <label className="field-label flex items-center gap-1.5"><Monitor size={12} /> Ativo <span className="text-slate-400 font-normal">(opcional)</span></label>
+            {selectedAsset ? (
+              <div className="flex items-center justify-between rounded-xl border border-slate-200 dark:border-gray-700 bg-slate-50 dark:bg-gray-800 px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <Monitor size={13} className="text-brand-500 shrink-0" />
+                  <span className="text-xs font-mono text-slate-500 dark:text-gray-400">{selectedAsset.tombo}</span>
+                  <span className="text-sm font-medium text-slate-800 dark:text-gray-100">{selectedAsset.hostname}</span>
+                </div>
+                <button type="button" onClick={() => setSelectedAsset(null)} className="text-slate-400 hover:text-red-500 transition">
+                  <X size={14} />
+                </button>
+              </div>
+            ) : (
+              <div className="relative">
+                <input
+                  type="text"
+                  value={assetSearch}
+                  onChange={(e) => setAssetSearch(e.target.value)}
+                  placeholder="Buscar por tombo ou hostname..."
+                  className="field-input pr-8"
+                />
+                {assetLoading && (
+                  <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                    <Spinner className="h-4 w-4" />
+                  </div>
+                )}
+                {assetResults.length > 0 && (
+                  <div className="absolute z-20 left-0 right-0 top-full mt-1 rounded-xl border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg max-h-48 overflow-y-auto">
+                    {assetResults.map((a) => (
+                      <button
+                        type="button"
+                        key={a.id}
+                        onClick={() => { setSelectedAsset(a); setAssetSearch(""); setAssetResults([]); }}
+                        className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-gray-800 transition flex items-center gap-2"
+                      >
+                        <span className="text-xs font-mono text-slate-400 dark:text-gray-500">{a.tombo}</span>
+                        <span className="text-sm text-slate-700 dark:text-gray-300">{a.hostname}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {fields.map((field) => (
@@ -439,6 +503,12 @@ export default function WorkOrdersPage() {
                       {os.tickets.length > 0 && (
                         <span className="text-xs text-slate-400 dark:text-gray-500">
                           {os.tickets.length} chamado{os.tickets.length !== 1 ? "s" : ""}
+                        </span>
+                      )}
+                      {os.asset && (
+                        <span className="text-xs font-mono text-slate-400 dark:text-gray-500 flex items-center gap-1">
+                          <Monitor size={10} className="shrink-0" />
+                          {os.asset.tombo}
                         </span>
                       )}
                     </div>

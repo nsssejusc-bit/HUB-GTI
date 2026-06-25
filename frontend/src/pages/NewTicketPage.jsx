@@ -1113,12 +1113,12 @@ export default function NewTicketPage() {
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="field-label">Matrícula</label>
+                        <label className="field-label">Telefone</label>
                         <input
                           className="field-input"
                           placeholder="Ex: 123456"
-                          value={beneficiary.matricula}
-                          onChange={(e) => setBeneficiary({ ...beneficiary, matricula: e.target.value })}
+                          value={beneficiary.telefone}
+                          onChange={(e) => setBeneficiary({ ...beneficiary, telefone: e.target.value })}
                         />
                       </div>
                       <div>

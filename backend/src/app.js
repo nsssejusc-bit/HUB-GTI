@@ -2,7 +2,11 @@ import "express-async-errors";
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import { fileURLToPath } from "url";
+import path from "path";
 import routes from "./routes/index.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export function createApp() {
   const app = express();
@@ -20,6 +24,7 @@ export function createApp() {
   app.use(cookieParser());
   app.use(express.json({ limit: "5mb" }));
 
+  app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
   app.get("/api/health", (_, res) => res.json({ ok: true, service: "helpdesk-sejusc" }));
   app.use("/api", routes);
 

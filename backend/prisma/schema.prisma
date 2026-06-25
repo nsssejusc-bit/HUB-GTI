@@ -144,6 +144,7 @@ model User {
   pushSubscription   PushSubscription?
   assetsCreated      Asset[]              @relation("AssetCreatedBy")
   assetAllocations   AssetAllocation[]    @relation("AssetAllocationCreatedBy")
+  workOrderImages    WorkOrderImage[]     @relation("WorkOrderImageCreatedBy")
 
   @@index([departmentId])
   @@index([role, active])
@@ -407,6 +408,12 @@ model WorkOrder {
   checklistId   Int?               @unique
   checklist     InventoryChecklist? @relation("OsChecklist", fields: [checklistId], references: [id])
 
+  // Link to asset being serviced
+  assetId       Int?
+  asset         Asset?             @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  assetAllocations AssetAllocation[]
+  images        WorkOrderImage[]
+
   // Link to pre-requisite work order (self-reference)
   preVisitaId   Int?
   preVisita     WorkOrder?         @relation("OsPreVisita", fields: [preVisitaId], references: [id])
@@ -415,6 +422,7 @@ model WorkOrder {
   @@index([status])
   @@index([unitId])
   @@index([tipoId])
+  @@index([assetId])
   @@index([preVisitaId])
 }
 
@@ -467,26 +475,44 @@ model Asset {
   createdById     Int?
   createdBy       User?             @relation("AssetCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   allocations     AssetAllocation[]
+  workOrders      WorkOrder[]
 
   @@index([status])
   @@index([createdById])
 }
 
 model AssetAllocation {
-  id          Int       @id @default(autoincrement())
-  assetId     Int
-  asset       Asset     @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  setor       String?
-  responsavel String?
-  notes       String?   @db.Text
-  startedAt   DateTime  @default(now())
-  endedAt     DateTime?
-  createdById Int?
-  createdBy   User?     @relation("AssetAllocationCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  id            Int        @id @default(autoincrement())
+  assetId       Int
+  asset         Asset      @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  setor         String?
+  responsavel   String?
+  notes         String?    @db.Text
+  startedAt     DateTime   @default(now())
+  endedAt       DateTime?
+  createdById   Int?
+  createdBy     User?      @relation("AssetAllocationCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  workOrderId   Int?
+  workOrder     WorkOrder? @relation(fields: [workOrderId], references: [id], onDelete: SetNull)
 
   @@index([assetId])
   @@index([endedAt])
   @@index([createdById])
+  @@index([workOrderId])
+}
+
+model WorkOrderImage {
+  id           Int       @id @default(autoincrement())
+  workOrderId  Int
+  workOrder    WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  filename     String
+  originalName String
+  size         Int
+  createdById  Int?
+  createdBy    User?     @relation("WorkOrderImageCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt    DateTime  @default(now())
+
+  @@index([workOrderId])
 }
 
 model InventoryItem {
