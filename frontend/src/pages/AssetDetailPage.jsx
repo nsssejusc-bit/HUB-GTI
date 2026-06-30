@@ -80,7 +80,7 @@ function AllocateModal({ asset, onClose, onSaved }) {
           </span>
           <div>
             <h3 className="font-semibold text-slate-900 dark:text-gray-100">Registrar Movimentação</h3>
-            <p className="text-xs text-slate-500 dark:text-gray-400 font-mono">{asset.tombo} · {asset.hostname}</p>
+            <p className="text-xs text-slate-500 dark:text-gray-400 font-mono">{[asset.tombo, asset.hostname].filter(Boolean).join(" · ")}</p>
           </div>
         </div>
 
@@ -148,7 +148,7 @@ function DeleteModal({ asset, onClose, onDeleted }) {
           </div>
         </div>
         <p className="text-sm text-slate-700 dark:text-gray-300">
-          Excluir <span className="font-mono font-medium">{asset.tombo}</span> ({asset.hostname})? Todo o histórico será removido.
+          Excluir <span className="font-mono font-medium">{asset.tombo ?? asset.hostname}</span>? Todo o histórico será removido.
         </p>
         <div className="flex gap-2 justify-end">
           <button onClick={onClose} className="btn-secondary text-sm py-2 px-4">Cancelar</button>
@@ -209,7 +209,7 @@ function CreateOsModal({ asset, types, onClose, onCreate }) {
           </span>
           <div>
             <h3 className="font-semibold text-slate-900 dark:text-gray-100">Nova OS para este ativo</h3>
-            <p className="text-xs text-slate-500 dark:text-gray-400 font-mono">{asset.tombo} · {asset.hostname}</p>
+            <p className="text-xs text-slate-500 dark:text-gray-400 font-mono">{[asset.tombo, asset.hostname].filter(Boolean).join(" · ")}</p>
           </div>
         </div>
 
@@ -352,6 +352,7 @@ export default function AssetDetailPage() {
     try {
       const res = await api.patch(`/assets/${id}`, {
         ...editForm,
+        tombo:       editForm.tombo       || null,
         setor:       editForm.setor       || null,
         responsavel: editForm.responsavel || null,
         notes:       editForm.notes       || null,
@@ -391,7 +392,7 @@ export default function AssetDetailPage() {
             <ArrowLeft size={14} /> Ativos
           </Link>
           <ChevronRight size={14} className="text-slate-300 dark:text-gray-600" />
-          <span className="font-mono text-slate-600 dark:text-gray-300">{asset.tombo}</span>
+          <span className="font-mono text-slate-600 dark:text-gray-300">{asset.tombo ?? "—"}</span>
           <ChevronRight size={14} className="text-slate-300 dark:text-gray-600" />
           <span className="text-slate-700 dark:text-gray-200 truncate">{asset.hostname}</span>
           <div className="ml-auto">
@@ -458,7 +459,7 @@ export default function AssetDetailPage() {
               {editing ? (
                 <div className="space-y-3">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <InputField label="Tombo"    value={editForm.tombo}    onChange={(v) => setEF("tombo", v)}    required />
+                    <InputField label="Tombo" value={editForm.tombo} onChange={(v) => setEF("tombo", v)} />
                     <InputField label="Hostname" value={editForm.hostname}  onChange={(v) => setEF("hostname", v)}  required />
                   </div>
                   <InputField label="Processador (CPU)" value={editForm.cpu} onChange={(v) => setEF("cpu", v)} required />
