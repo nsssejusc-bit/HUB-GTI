@@ -2,7 +2,7 @@ import { z } from "zod";
 import { prisma } from "../config/prisma.js";
 import { maskCpf } from "../utils/cpf.js";
 import { buildTicketNumber } from "../utils/ticketNumber.js";
-import { nextTicketSeq } from "../utils/nextSequence.js";
+import { nextTicketSeq, nextOsSeq } from "../utils/nextSequence.js";
 import { STATUS, canTransition, allowedNext, canReopen } from "../utils/ticketStateMachine.js";
 import { IMG_PREFIX, saveImageFromDataUrl, resolveImagePath, mimeForFilename, deleteTicketImages } from "../utils/messageImages.js";
 import { sendPushToUser, buildStatusPush } from "./pushController.js";
@@ -78,15 +78,17 @@ export async function createTicket(req, res) {
   const dualApproval          = selectedSub?.dualApproval           ?? false;
   const requiresPresential    = isRemote ? false : (selectedSub?.requiresPresential    ?? true);
   const requiresCauseSolution = isRemote ? true  : (selectedSub?.requiresCauseSolution ?? true);
+  // Subcategoria com OS vinculada → fluxo de Solicitação de Evento (aprovação dupla: setor + GTI)
+  const isEvento = !!(selectedSub?.linkedOsTypeId);
 
-  // Para aprovação dupla (SIGED_SECTOR_MOVE), o targetDeptId vem em extraData
+  // Para aprovação dupla padrão (ex: remanejamento de setor), o targetDeptId vem em extraData
   const extraData   = data.extraData ?? null;
-  const targetDeptId = dualApproval && extraData?.targetDeptId
+  const targetDeptId = (dualApproval && !isEvento && extraData?.targetDeptId)
     ? Number(extraData.targetDeptId)
     : null;
 
-  // Valida setor alvo para aprovação dupla
-  if (dualApproval && !targetDeptId) {
+  // Valida setor alvo para aprovação dupla padrão
+  if (dualApproval && !isEvento && !targetDeptId) {
     return res.status(400).json({ error: "Selecione o setor de destino para a realocação" });
   }
   if (targetDeptId) {
@@ -97,15 +99,22 @@ export async function createTicket(req, res) {
   }
 
   // ── Monta registros de aprovação ────────────────────────────────────────
-  const approvalDeptId = dualApproval && targetDeptId ? targetDeptId : deptId;
-  // Se o próprio chefe/admin responsável abre o chamado, aprova automaticamente
-  const selfApproval = requiresApproval
+  const approvalDeptId = (dualApproval && !isEvento && targetDeptId) ? targetDeptId : deptId;
+  // Evento: sem auto-aprovação (requer deliberação explícita do setor + GTI)
+  const selfApproval = requiresApproval && !isEvento
     && (req.user.role === "CHEFE_SETOR" || req.user.role === "ADMIN")
     && req.user.departmentId === approvalDeptId;
 
-  const approvalRecords = (requiresApproval && !selfApproval)
-    ? [{ chefDeptId: approvalDeptId }]
-    : [];
+  let approvalRecords = [];
+  if (isEvento && requiresApproval) {
+    // Solicitação de Evento: chefe do setor solicitante + chefe da GTI
+    approvalRecords = [
+      { chefDeptId: deptId, isGtiApproval: false },
+      { chefDeptId: null,   isGtiApproval: true  },
+    ];
+  } else if (requiresApproval && !selfApproval) {
+    approvalRecords = [{ chefDeptId: approvalDeptId, isGtiApproval: false }];
+  }
 
   // SLA: subcategoria tem precedência; REMOTE sempre usa categoria; fallback para categoria
   const effectiveSlaHours = isRemote
@@ -171,6 +180,14 @@ export async function createTicket(req, res) {
       category:     category.name,
       subcategory:  selectedSub?.name ?? null,
     });
+    if (isEvento) {
+      io?.emit("ticket:gti-approval-needed", {
+        ticketNumber: ticket.ticketNumber,
+        department:   ticket.department,
+        category:     category.name,
+        subcategory:  selectedSub?.name ?? null,
+      });
+    }
   }
 
   res.status(201).json({
@@ -233,7 +250,35 @@ export async function getTicketPublic(req, res) {
 
 // ── LIST ─────────────────────────────────────────────────────────────────────
 export async function listTickets(req, res) {
-  const { status, unitId, technicianId, from, to, categoryId, cursor, limit, search, pendingForDept, department } = req.query;
+  const { status, unitId, technicianId, from, to, categoryId, cursor, limit, search, pendingForDept, department, pendingGti } = req.query;
+
+  // Retorno antecipado para Chefe da GTI buscando aprovações de eventos pendentes
+  if (pendingGti === "true") {
+    const gtiUser = await prisma.user.findUnique({ where: { id: req.user.id }, select: { isGtiChief: true } });
+    if (!gtiUser?.isGtiChief) return res.json({ tickets: [], nextCursor: null });
+    const gtiTickets = await prisma.ticket.findMany({
+      where: {
+        approvalStatus: "PENDING",
+        approvals: { some: { isGtiApproval: true, status: "PENDING" } },
+      },
+      include: {
+        category:    true,
+        subcategory: true,
+        unit:        { select: { id: true, name: true } },
+        assignedTech: { select: { id: true, name: true } },
+        approvals: {
+          include: {
+            chefDept: { select: { id: true, name: true } },
+            chefUser: { select: { name: true } },
+          },
+        },
+      },
+      orderBy: { openedAt: "asc" },
+      take: Math.min(Number(limit) || 100, 100),
+    });
+    return res.json({ tickets: gtiTickets.map(formatTicket), nextCursor: null });
+  }
+
   const where = {};
 
   if (status)       where.status      = status;
@@ -281,18 +326,23 @@ export async function listTickets(req, res) {
     }
     // ADMIN sem pendingForDept vê tudo (sem filtro adicional)
   } else if (req.user.role === "TECHNICIAN") {
-    // Técnico não vê chamados aguardando aprovação
-    where.approvalStatus = { not: "PENDING" };
-    const techUser = await prisma.user.findUnique({ where: { id: req.user.id }, select: { unitId: true, nucleoResponsavel: true } });
+    const techUser = await prisma.user.findUnique({ where: { id: req.user.id }, select: { unitId: true, nucleoResponsavel: true, isGtiChief: true } });
+    // Técnico padrão não vê chamados aguardando aprovação; Chefe da GTI pode ver os de evento
+    if (!techUser?.isGtiChief) {
+      where.approvalStatus = { not: "PENDING" };
+    }
     const orConditions = [
       { assignedTechId: req.user.id },
       { unitId: techUser?.unitId || -1 },
       // Cancelados por rejeição do chefe não têm atribuição — visíveis para todos os técnicos
       { status: STATUS.CANCELADO },
     ];
-    // Técnico com núcleo definido vê todos os chamados do seu núcleo
     if (techUser?.nucleoResponsavel) {
       orConditions.push({ nucleoResponsavel: techUser.nucleoResponsavel });
+    }
+    if (techUser?.isGtiChief) {
+      // Chefe da GTI também vê tickets de evento aguardando sua aprovação
+      orConditions.push({ approvals: { some: { isGtiApproval: true } } });
     }
     andClauses.push({ OR: orConditions });
   }
@@ -338,7 +388,7 @@ export async function listTickets(req, res) {
       assignedTech: { select: { id: true, name: true } },
       approvals: {
         select: {
-          id: true, chefDeptId: true, status: true, note: true, decidedAt: true,
+          id: true, chefDeptId: true, isGtiApproval: true, status: true, note: true, decidedAt: true,
           chefDept: { select: { name: true } },
           chefUser: { select: { name: true } },
         },
@@ -397,13 +447,23 @@ export async function getTicket(req, res) {
   });
 }
 
-// ── APPROVE / REJECT (Chefe de Setor ou Admin) ────────────────────────────────
+// ── APPROVE / REJECT (Chefe de Setor, Admin, ou Chefe da GTI) ────────────────
 export async function approveTicket(req, res) {
   const id = Number(req.params.id);
   const { status, note } = req.body || {};
 
   if (!["APPROVED", "REJECTED"].includes(status)) {
     return res.status(400).json({ error: "Status inválido. Use APPROVED ou REJECTED." });
+  }
+
+  // Verifica permissão: CHEFE_SETOR, ADMIN ou Chefe da GTI
+  const actorUser = await prisma.user.findUnique({
+    where: { id: req.user.id },
+    select: { role: true, departmentId: true, isGtiChief: true },
+  });
+  const canApprove = ["CHEFE_SETOR", "ADMIN"].includes(actorUser?.role) || actorUser?.isGtiChief;
+  if (!canApprove) {
+    return res.status(403).json({ error: "Sem permissão para aprovar chamados." });
   }
 
   const ticket = await prisma.ticket.findUnique({
@@ -418,20 +478,19 @@ export async function approveTicket(req, res) {
   // Determina qual registro de aprovação atualizar
   let targetApproval = null;
 
-  if (req.user.role === "ADMIN") {
+  if (actorUser.role === "ADMIN") {
     // Admin pode aprovar qualquer pendência
     targetApproval = ticket.approvals.find((a) => a.status === "PENDING");
+  } else if (actorUser.isGtiChief) {
+    // Chefe da GTI: aprova o registro de aprovação GTI
+    targetApproval = ticket.approvals.find((a) => a.isGtiApproval && a.status === "PENDING");
   } else {
     // Chefe de Setor: busca o registro do seu departamento
-    const chefeUser = await prisma.user.findUnique({
-      where: { id: req.user.id },
-      select: { departmentId: true },
-    });
-    if (!chefeUser?.departmentId) {
+    if (!actorUser.departmentId) {
       return res.status(403).json({ error: "Você não está associado a nenhum setor." });
     }
     targetApproval = ticket.approvals.find(
-      (a) => a.chefDeptId === chefeUser.departmentId && a.status === "PENDING"
+      (a) => !a.isGtiApproval && a.chefDeptId === actorUser.departmentId && a.status === "PENDING"
     );
   }
 
@@ -443,8 +502,8 @@ export async function approveTicket(req, res) {
     where: { id: targetApproval.id },
     data: {
       status,
-      note:      note || null,
-      decidedAt: new Date(),
+      note:       note || null,
+      decidedAt:  new Date(),
       chefUserId: req.user.id,
     },
   });
@@ -457,15 +516,38 @@ export async function approveTicket(req, res) {
   } else if (allApprovals.every((a) => a.status === "APPROVED")) {
     newApprovalStatus = "APPROVED";
   } else {
-    newApprovalStatus = "PENDING"; // ainda há pendências (dual approval)
+    newApprovalStatus = "PENDING";
   }
 
   const ticketPatch = { approvalStatus: newApprovalStatus };
 
-  // Rejeição fecha o chamado imediatamente com o motivo registrado
   if (newApprovalStatus === "REJECTED") {
-    ticketPatch.status          = STATUS.CANCELADO;
-    ticketPatch.completionNote  = note?.trim() || "Recusado pelo Chefe de Setor";
+    ticketPatch.status         = STATUS.CANCELADO;
+    ticketPatch.completionNote = note?.trim() || "Recusado";
+  }
+
+  // Aprovação total em Solicitação de Evento → cria OS automaticamente
+  const io = req.app.get("io");
+  if (newApprovalStatus === "APPROVED" && ticket.subcategoryId) {
+    const sub = await prisma.subcategory.findUnique({
+      where: { id: ticket.subcategoryId },
+      select: { linkedOsTypeId: true },
+    });
+    if (sub?.linkedOsTypeId) {
+      const seq      = await nextOsSeq();
+      const d        = new Date();
+      const osNumber = `OS-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}-${String(seq).padStart(4, "0")}`;
+      await prisma.workOrder.create({
+        data: {
+          osNumber,
+          tipoId:     sub.linkedOsTypeId,
+          status:     "ABERTA",
+          createdById: ticket.openedById || req.user.id,
+          tickets: { create: { ticketId: ticket.id } },
+        },
+      });
+      io?.emit("work-order:created", { osNumber });
+    }
   }
 
   await prisma.ticket.update({
@@ -485,10 +567,7 @@ export async function approveTicket(req, res) {
     },
   });
 
-  req.app.get("io")?.emit("ticket:approval", {
-    ticketId:       id,
-    approvalStatus: newApprovalStatus,
-  });
+  io?.emit("ticket:approval", { ticketId: id, approvalStatus: newApprovalStatus });
 
   res.json({ ok: true, approvalStatus: newApprovalStatus });
 }
@@ -839,13 +918,14 @@ function formatTicket(t) {
     requiresCauseSolution: t.requiresCauseSolution,
     approvalStatus:       t.approvalStatus,
     approvals:           t.approvals?.map((a) => ({
-      id:           a.id,
-      chefDeptId:   a.chefDeptId,
-      chefDeptName: a.chefDept?.name,
-      chefUserName: a.chefUser?.name,
-      status:       a.status,
-      note:         a.note,
-      decidedAt:    a.decidedAt,
+      id:            a.id,
+      chefDeptId:    a.chefDeptId,
+      chefDeptName:  a.chefDept?.name,
+      chefUserName:  a.chefUser?.name,
+      isGtiApproval: a.isGtiApproval ?? false,
+      status:        a.status,
+      note:          a.note,
+      decidedAt:     a.decidedAt,
     })) ?? [],
     status:        t.status,
     unit:          t.unit        ? { id: t.unit.id,        name: t.unit.name }        : null,

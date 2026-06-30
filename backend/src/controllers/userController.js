@@ -77,6 +77,7 @@ export async function listUsers(req, res) {
       role: true,
       active: true,
       isChefe: true,
+      isGtiChief: true,
       matricula: true,
       prefixo: true,
       email: true,
@@ -100,7 +101,7 @@ export async function listUsers(req, res) {
 // PATCH /api/users/:id — atualiza usuário (ADMIN only)
 export async function updateUser(req, res) {
   const id = Number(req.params.id);
-  const { active, unitId, departmentId, role, name, isChefe, email, telefone, matricula, prefixo, nucleoResponsavel } = req.body || {};
+  const { active, unitId, departmentId, role, name, isChefe, isGtiChief, email, telefone, matricula, prefixo, nucleoResponsavel } = req.body || {};
 
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) return res.status(404).json({ error: "Usuário não encontrado" });
@@ -119,7 +120,8 @@ export async function updateUser(req, res) {
     }
     data.departmentId = departmentId ? Number(departmentId) : null;
   }
-  if (isChefe !== undefined) data.isChefe = Boolean(isChefe);
+  if (isChefe !== undefined)    data.isChefe    = Boolean(isChefe);
+  if (isGtiChief !== undefined) data.isGtiChief = Boolean(isGtiChief);
   if (email !== undefined) data.email = email || null;
   if (telefone !== undefined) data.telefone = telefone || null;
   if (matricula !== undefined) data.matricula = matricula || null;
@@ -167,7 +169,7 @@ export async function updateUser(req, res) {
   });
 
   // Notifica via Socket.io para que a sessão do usuário afetado atualize imediatamente
-  if (data.role !== undefined || data.active !== undefined || data.nucleoResponsavel !== undefined) {
+  if (data.role !== undefined || data.active !== undefined || data.nucleoResponsavel !== undefined || data.isGtiChief !== undefined) {
     const io = req.app.get("io");
     if (io) {
       io.emit("user:updated", {
@@ -192,6 +194,7 @@ export async function updateUser(req, res) {
     role: updated.role,
     active: updated.active,
     isChefe: updated.isChefe,
+    isGtiChief: updated.isGtiChief,
     matricula: updated.matricula,
     prefixo: updated.prefixo,
     email: updated.email,

@@ -6,6 +6,7 @@ import {
   Plus, X, ChevronDown, Save,
   Lightbulb, CheckCircle2, ArrowUp, ArrowDown,
   Monitor, Wifi, KeyRound, HelpCircle, MonitorSmartphone, Printer, Server, BookOpen,
+  Calendar, Database, Shield, Phone, Package,
 } from "lucide-react";
 
 const CAT_ICONS = {
@@ -17,6 +18,11 @@ const CAT_ICONS = {
   REMOTE:    MonitorSmartphone,
   PRINTER:   Printer,
   SIGED:     BookOpen,
+};
+
+const ICON_BY_NAME = {
+  Monitor, Wifi, Server, KeyRound, MonitorSmartphone, Printer, BookOpen, HelpCircle,
+  Calendar, Database, Shield, Phone, Package,
 };
 
 const CAT_COLORS = {
@@ -115,7 +121,7 @@ function CategoryCard({ cat, onSaved }) {
   const [dirty, setDirty]   = useState(false);
   const [err, setErr]       = useState("");
 
-  const Icon      = CAT_ICONS[cat.code] || HelpCircle;
+  const Icon      = (cat.icon && ICON_BY_NAME[cat.icon]) || CAT_ICONS[cat.code] || HelpCircle;
   const iconColor = CAT_COLORS[cat.code] || CAT_COLORS.OTHER;
   const tipCount  = tips.length;
 

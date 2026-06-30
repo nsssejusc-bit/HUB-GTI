@@ -8,6 +8,7 @@ import {
   Monitor, Wifi, KeyRound, HelpCircle, MonitorSmartphone, Printer, Server, BookOpen,
   Tag, ToggleLeft, ToggleRight, Clock, Flame, Lightbulb, ShieldCheck, AlignLeft,
   Eye, Layout, GripHorizontal,
+  Calendar, Database, Shield, Phone, Package,
 } from "lucide-react";
 
 // ── Constantes ────────────────────────────────────────────────────────────────
@@ -73,7 +74,28 @@ const CAT_COLORS = {
   OTHER:     "bg-slate-100  dark:bg-gray-800      text-slate-500  dark:text-gray-400",
 };
 
-function getCatIcon(code) { return CAT_ICONS[code] || Tag; }
+// Paleta completa de ícones disponíveis para seleção
+const ICON_PALETTE = [
+  { name: "Monitor",           label: "Hardware",    Component: Monitor },
+  { name: "Wifi",              label: "Rede",        Component: Wifi },
+  { name: "Server",            label: "Servidor",    Component: Server },
+  { name: "KeyRound",          label: "Acesso",      Component: KeyRound },
+  { name: "MonitorSmartphone", label: "Remoto",      Component: MonitorSmartphone },
+  { name: "Printer",           label: "Impressora",  Component: Printer },
+  { name: "BookOpen",          label: "Sistema",     Component: BookOpen },
+  { name: "HelpCircle",        label: "Outros",      Component: HelpCircle },
+  { name: "Calendar",          label: "Evento",      Component: Calendar },
+  { name: "Database",          label: "Banco",       Component: Database },
+  { name: "Shield",            label: "Segurança",   Component: Shield },
+  { name: "Phone",             label: "Telefonia",   Component: Phone },
+  { name: "Package",           label: "Entrega",     Component: Package },
+];
+const ICON_BY_NAME = Object.fromEntries(ICON_PALETTE.map(({ name, Component }) => [name, Component]));
+
+function getCatIcon(cat) {
+  if (cat?.icon && ICON_BY_NAME[cat.icon]) return ICON_BY_NAME[cat.icon];
+  return CAT_ICONS[cat?.code] || Tag;
+}
 function getCatColor(code) { return CAT_COLORS[code] || CAT_COLORS.OTHER; }
 
 // ── Drag-to-reorder ───────────────────────────────────────────────────────────
@@ -298,8 +320,14 @@ function SubEditModal({ sub, catId, onClose, onUpdate }) {
       return parsed.map((f, i) => ({ id: f.id || `cf_${Date.now()}_${i}`, ...f }));
     } catch { return []; }
   });
+  const [linkedOsTypeId, setLinkedOsTypeId] = useState(sub.linkedOsTypeId ? String(sub.linkedOsTypeId) : "");
+  const [osTypes,        setOsTypes]        = useState([]);
   const [n1Tips,   setN1Tips]   = useState(sub.n1Tips ? JSON.parse(sub.n1Tips).join("\n") : "");
   const [saving,   setSaving]   = useState(false);
+
+  useEffect(() => {
+    api.get("/work-order-types").then((r) => setOsTypes(r.data ?? [])).catch(() => {});
+  }, []);
 
   function addCustomField() {
     const ts = Date.now();
@@ -330,6 +358,7 @@ function SubEditModal({ sub, catId, onClose, onUpdate }) {
           : (allowsFreeText ? freeTextLabel.trim() || null : null),
         formType: formTypeVal || null, customFields: cfJson,
         n1Tips: n1Json,
+        linkedOsTypeId: linkedOsTypeId ? Number(linkedOsTypeId) : null,
       });
       onUpdate(res.data);
       addToast({ message: "Subcategoria salva", type: "success" });
@@ -391,8 +420,24 @@ function SubEditModal({ sub, catId, onClose, onUpdate }) {
         <div>
           <p className="text-[11px] font-semibold text-slate-400 dark:text-gray-500 uppercase tracking-wide mb-2">Comportamento</p>
           <div className="space-y-2">
-            <ToggleRow label="Requer aprovação do Chefe de Setor" description="Chamado fica em PENDENTE até aprovação antes de avançar" checked={requiresApproval} onChange={(v) => { setRequiresApproval(v); if (!v) setDualApproval(false); }} />
-            {requiresApproval && <ToggleRow label="Aprovação dupla" description="Exige dois chefes de setor diferentes" checked={dualApproval} onChange={setDualApproval} indent />}
+            <ToggleRow label="Requer aprovação do Chefe de Setor" description="Chamado fica em PENDENTE até aprovação antes de avançar" checked={requiresApproval} onChange={(v) => { setRequiresApproval(v); if (!v) { setDualApproval(false); setLinkedOsTypeId(""); } }} />
+            {requiresApproval && <ToggleRow label="Aprovação dupla (remanejamento)" description="Exige dois chefes de setor diferentes — para movimentação entre setores" checked={dualApproval} onChange={setDualApproval} indent />}
+            {requiresApproval && (
+              <div className="ml-6 space-y-1">
+                <label className="field-label text-[11px]">OS vinculada <span className="font-normal text-slate-400">(Solicitação de Evento)</span></label>
+                <p className="text-[11px] text-slate-400 dark:text-gray-500 -mt-0.5 mb-1">Ao definir uma OS, a aprovação passa a ser dupla (Setor + GTI) e a OS é criada automaticamente na aprovação total.</p>
+                <select
+                  value={linkedOsTypeId}
+                  onChange={(e) => setLinkedOsTypeId(e.target.value)}
+                  className="field-input text-sm py-1.5"
+                >
+                  <option value="">Nenhuma (aprovação simples)</option>
+                  {osTypes.filter((t) => t.active).map((t) => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <ToggleRow label="Atendimento presencial" description="Habilita transição EN_ROUTE (técnico se desloca ao local)" checked={requiresPresential} onChange={setRequiresPresential} />
             <ToggleRow label="Obrigar Causa e Solução ao concluir" description="Técnico precisa preencher Causa e Solução antes de fechar" checked={requiresCauseSolution} onChange={setRequiresCauseSolution} />
             {formTypeVal !== "whatsapp_print" && (
@@ -584,7 +629,7 @@ function CategoryPreviewModal({ cat, onClose }) {
     return null;
   }
 
-  const CatIcon = getCatIcon(cat.code);
+  const CatIcon = getCatIcon(cat);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -796,9 +841,23 @@ function CategoryCard({ cat, onUpdate, onDelete, onGripPointerDown, isDragging }
   const [subcats,    setSubcats]   = useState(cat.subcategories || []);
   const [slaDraft,   setSlaDraft]  = useState(cat.slaHours != null ? String(cat.slaHours) : "");
   const [slaEditing, setSlaEditing] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
+  const [showPreview,    setShowPreview]    = useState(false);
+  const [iconPickerOpen, setIconPickerOpen] = useState(false);
+  const iconPickerRef = useRef(null);
 
   useEffect(() => { setSubcats(cat.subcategories || []); }, [cat.subcategories]);
+
+  // Fecha o picker ao clicar fora
+  useEffect(() => {
+    if (!iconPickerOpen) return;
+    function handleOutside(e) {
+      if (iconPickerRef.current && !iconPickerRef.current.contains(e.target)) {
+        setIconPickerOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleOutside);
+    return () => document.removeEventListener("mousedown", handleOutside);
+  }, [iconPickerOpen]);
 
   const { listRef: subListRef, startDrag: startSubDrag, fromIdx: subFromIdx, overIdx: subOverIdx } =
     useDragReorder(subcats, (next) => {
@@ -807,7 +866,17 @@ function CategoryCard({ cat, onUpdate, onDelete, onGripPointerDown, isDragging }
         .catch(() => addToast({ message: "Erro ao salvar ordem", type: "error" }));
     });
 
-  const Icon = getCatIcon(cat.code);
+  const Icon = getCatIcon(cat);
+
+  async function saveIcon(iconName) {
+    setIconPickerOpen(false);
+    try {
+      const res = await api.patch(`/categories/${cat.id}`, { icon: iconName });
+      onUpdate({ ...cat, icon: res.data.icon });
+    } catch {
+      addToast({ message: "Erro ao salvar ícone", type: "error" });
+    }
+  }
 
   async function renameCategory(name) {
     try {
@@ -905,9 +974,46 @@ function CategoryCard({ cat, onUpdate, onDelete, onGripPointerDown, isDragging }
             onClick={(e) => e.stopPropagation()}
           />
 
-          <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${getCatColor(cat.code)}`}>
-            <Icon size={18} />
-          </span>
+          {/* Ícone clicável — abre galeria de ícones */}
+          <div className="relative shrink-0" ref={iconPickerRef} onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setIconPickerOpen((v) => !v)}
+              title="Alterar ícone"
+              className={`group relative flex h-9 w-9 items-center justify-center rounded-xl transition ${getCatColor(cat.code)}`}
+            >
+              <Icon size={18} />
+              <span className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/25 opacity-0 group-hover:opacity-100 transition">
+                <Pencil size={10} className="text-white" />
+              </span>
+            </button>
+
+            {iconPickerOpen && (
+              <div className="absolute left-0 top-11 z-50 w-[220px] rounded-xl border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-xl p-3">
+                <p className="text-[11px] font-medium text-slate-400 dark:text-gray-500 mb-2.5 uppercase tracking-wide">Ícone da categoria</p>
+                <div className="grid grid-cols-4 gap-1">
+                  {ICON_PALETTE.map(({ name, label, Component }) => {
+                    const active = (cat.icon || null) === name ||
+                      (!cat.icon && CAT_ICONS[cat.code] === Component);
+                    return (
+                      <button
+                        key={name}
+                        onClick={() => saveIcon(name)}
+                        title={label}
+                        className={`flex flex-col items-center gap-1 rounded-lg p-2 transition ${
+                          active
+                            ? "bg-brand-100 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400 ring-1 ring-brand-400/40"
+                            : "hover:bg-slate-100 dark:hover:bg-gray-700 text-slate-500 dark:text-gray-400"
+                        }`}
+                      >
+                        <Component size={16} />
+                        <span className="text-[9px] leading-tight text-center line-clamp-1">{label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
 
           <div className="flex-1 min-w-0 flex items-center gap-3 flex-wrap" onClick={(e) => e.stopPropagation()}>
             <InlineName value={cat.name} onSave={renameCategory} className="font-semibold text-slate-800 dark:text-gray-100" />

@@ -459,6 +459,7 @@ function UserDetailPanel({ user, units, departments, me, onUpdate, onDelete, onG
   const [unitId,           setUnitId]           = useState(user.unit?.id ?? "");
   const [departmentId,     setDepartmentId]     = useState(user.department?.id ?? "");
   const [isChefe,          setIsChefe]          = useState(user.isChefe ?? false);
+  const [isGtiChief,       setIsGtiChief]       = useState(user.isGtiChief ?? false);
   const [nucleoResponsavel, setNucleoResponsavel] = useState(user.nucleoResponsavel ?? "");
 
   // Sincroniza quando o user muda (ex: refresh após update)
@@ -471,6 +472,7 @@ function UserDetailPanel({ user, units, departments, me, onUpdate, onDelete, onG
     setUnitId(user.unit?.id ?? "");
     setDepartmentId(user.department?.id ?? "");
     setIsChefe(user.isChefe ?? false);
+    setIsGtiChief(user.isGtiChief ?? false);
     setNucleoResponsavel(user.nucleoResponsavel ?? "");
     setEditing(false);
   }, [user.id]);
@@ -486,6 +488,7 @@ function UserDetailPanel({ user, units, departments, me, onUpdate, onDelete, onG
       unitId: unitId || null,
       departmentId: departmentId || null,
       isChefe,
+      isGtiChief,
       nucleoResponsavel: nucleoResponsavel || null,
     });
     setSaving(false);
@@ -666,6 +669,24 @@ function UserDetailPanel({ user, units, departments, me, onUpdate, onDelete, onG
               </div>
               <span onClick={() => setIsChefe((v) => !v)} className="text-sm text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
                 <Shield size={13} className="text-amber-500" /> Chefe de Setor
+              </span>
+            </label>
+
+            {/* Toggle isGtiChief */}
+            <label className="flex items-center gap-2.5 cursor-pointer select-none">
+              <div
+                onClick={() => setIsGtiChief((v) => !v)}
+                className={`h-5 w-5 rounded border-2 flex items-center justify-center transition-all cursor-pointer shrink-0
+                  ${isGtiChief ? "border-brand-500 bg-brand-500" : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800"}`}
+              >
+                {isGtiChief && (
+                  <svg className="h-3 w-3 text-white" viewBox="0 0 12 12" fill="none">
+                    <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                )}
+              </div>
+              <span onClick={() => setIsGtiChief((v) => !v)} className="text-sm text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                <ShieldCheck size={13} className="text-brand-500" /> Chefe da GTI
               </span>
             </label>
 

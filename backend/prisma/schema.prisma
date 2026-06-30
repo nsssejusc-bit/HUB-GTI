@@ -123,6 +123,7 @@ model User {
   email              String?
   telefone           String?
   isChefe            Boolean    @default(false)
+  isGtiChief         Boolean    @default(false)
   mustChangePassword Boolean    @default(false)
   createdAt          DateTime   @default(now())
   assignedTickets    Ticket[]   @relation("AssignedTechnician")
@@ -206,6 +207,8 @@ model Subcategory {
   freeTextLabel         String?
   formType              String?
   customFields          String?  @db.Text
+  linkedOsTypeId        Int?
+  linkedOsType          WorkOrderType? @relation("SubcategoryOsType", fields: [linkedOsTypeId], references: [id], onDelete: SetNull)
   categoryId            Int
   category              Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   tickets               Ticket[]
@@ -291,17 +294,18 @@ model TicketMessage {
 }
 
 model TicketApproval {
-  id         Int        @id @default(autoincrement())
-  ticketId   Int
-  ticket     Ticket     @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  chefDeptId Int
-  chefDept   Department @relation(fields: [chefDeptId], references: [id])
-  chefUserId Int?
-  chefUser   User?      @relation("ApprovalChef", fields: [chefUserId], references: [id])
-  status     String     @default("PENDING")
-  note       String?    @db.Text
-  decidedAt  DateTime?
-  createdAt  DateTime   @default(now())
+  id            Int        @id @default(autoincrement())
+  ticketId      Int
+  ticket        Ticket     @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  chefDeptId    Int?
+  chefDept      Department? @relation(fields: [chefDeptId], references: [id])
+  chefUserId    Int?
+  chefUser      User?      @relation("ApprovalChef", fields: [chefUserId], references: [id])
+  isGtiApproval Boolean    @default(false)
+  status        String     @default("PENDING")
+  note          String?    @db.Text
+  decidedAt     DateTime?
+  createdAt     DateTime   @default(now())
 
   @@index([ticketId])
   @@index([chefDeptId, status])
@@ -378,7 +382,8 @@ model WorkOrderType {
   nucleos    Json?
   fields     Json        @default("[]")
   createdAt  DateTime    @default(now())
-  workOrders WorkOrder[]
+  workOrders   WorkOrder[]
+  subcategories Subcategory[] @relation("SubcategoryOsType")
 
   @@index([active, sortOrder])
 }

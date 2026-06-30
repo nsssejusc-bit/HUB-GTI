@@ -137,10 +137,18 @@ function ChefeDashboard() {
   const socketRef = useSocket();
   const [tickets,    setTickets]    = useState([]);
   const [loading,    setLoading]    = useState(true);
-  const [rejectId,   setRejectId]   = useState(null); // id do ticket em rejeição
+  const [rejectId,   setRejectId]   = useState(null);
   const [rejectNote, setRejectNote] = useState("");
   const [acting,     setActing]     = useState(false);
   const [err,        setErr]        = useState("");
+
+  // GTI chief state (when CHEFE_SETOR is also GTI chief)
+  const isGtiChief = !!(user?.isGtiChief);
+  const [gtiTickets,    setGtiTickets]    = useState([]);
+  const [gtiRejectId,   setGtiRejectId]   = useState(null);
+  const [gtiRejectNote, setGtiRejectNote] = useState("");
+  const [gtiActing,     setGtiActing]     = useState(false);
+  const [gtiErr,        setGtiErr]        = useState("");
 
   async function load() {
     setLoading(true);
@@ -151,19 +159,38 @@ function ChefeDashboard() {
     finally { setLoading(false); }
   }
 
-  // Carga inicial + auto-refresh a cada 60s
+  async function loadGti() {
+    if (!isGtiChief) return;
+    try {
+      const { data } = await api.get("/tickets", { params: { pendingGti: "true", limit: 100 } });
+      setGtiTickets(data.tickets ?? []);
+    } catch {}
+  }
+
+  async function decideGtiChef(ticketId, status, note) {
+    setGtiActing(true); setGtiErr("");
+    try {
+      await api.post(`/tickets/${ticketId}/approve`, { status, note: note || undefined });
+      setGtiRejectId(null); setGtiRejectNote("");
+      loadGti();
+    } catch (e) {
+      setGtiErr(e.response?.data?.error || "Erro ao processar aprovação");
+    } finally { setGtiActing(false); }
+  }
+
   useEffect(() => {
     load();
-    const timer = setInterval(load, 60_000);
+    loadGti();
+    const timer = setInterval(() => { load(); loadGti(); }, 60_000);
     return () => clearInterval(timer);
   }, []);
 
-  // Atualiza imediatamente ao receber evento de aprovação pendente
   useEffect(() => {
     const s = socketRef?.current;
     if (!s) return;
     s.on("ticket:approval-needed", load);
-    return () => { s.off("ticket:approval-needed", load); };
+    s.on("ticket:gti-approval-needed", loadGti);
+    return () => { s.off("ticket:approval-needed", load); s.off("ticket:gti-approval-needed", loadGti); };
   }, [socketRef?.current]);
 
   async function decide(ticketId, status, note) {
@@ -240,6 +267,43 @@ function ChefeDashboard() {
             <RefreshCw size={14} /> Atualizar
           </button>
         </div>
+
+        {/* Painel GTI (quando chefe de setor também é chefe da GTI) */}
+        {isGtiChief && gtiTickets.length > 0 && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <ShieldCheck size={15} className="text-brand-500" />
+              <h2 className="text-sm font-semibold text-slate-800 dark:text-gray-100">
+                Aprovações de Eventos — GTI ({gtiTickets.length})
+              </h2>
+            </div>
+            {gtiRejectId !== null && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+                onClick={(e) => { if (e.target === e.currentTarget) setGtiRejectId(null); }}>
+                <div className="card w-full max-w-sm p-6 space-y-4">
+                  <h3 className="font-semibold text-slate-900 dark:text-gray-100">Reprovar Evento</h3>
+                  <textarea rows={3} className="field-input resize-none w-full"
+                    placeholder="Motivo (opcional)" value={gtiRejectNote}
+                    onChange={(e) => setGtiRejectNote(e.target.value)} autoFocus />
+                  {gtiErr && <p className="text-sm text-red-600 dark:text-red-400">{gtiErr}</p>}
+                  <div className="flex gap-2 justify-end">
+                    <button onClick={() => setGtiRejectId(null)} className="btn-secondary text-sm py-2 px-4">Cancelar</button>
+                    <button onClick={() => decideGtiChef(gtiRejectId, "REJECTED", gtiRejectNote)} disabled={gtiActing}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white px-4 py-2 text-sm font-semibold transition disabled:opacity-50">
+                      {gtiActing ? <Spinner className="h-4 w-4" /> : <ThumbsDown size={14} />} Reprovar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+            {gtiTickets.map((t) => (
+              <ApprovalCard key={t.id} ticket={t}
+                onApprove={() => decideGtiChef(t.id, "APPROVED")}
+                onReject={() => { setGtiRejectId(t.id); setGtiRejectNote(""); setGtiErr(""); }}
+                acting={gtiActing} />
+            ))}
+          </div>
+        )}
 
         {loading ? (
           <div className="flex justify-center py-16"><Spinner className="h-8 w-8" /></div>
@@ -375,6 +439,39 @@ export default function DashboardPage() {
   }, [adminDeptId]);
 
   useEffect(() => { loadPendingApprovals(); }, [loadPendingApprovals]);
+
+  // ── Aprovações de Eventos pendentes para Chefe da GTI ──
+  const isGtiChief = !!(user?.isGtiChief);
+  const [gtiApprovals, setGtiApprovals]         = useState([]);
+  const [gtiRejectId, setGtiRejectId]           = useState(null);
+  const [gtiRejectNote, setGtiRejectNote]       = useState("");
+  const [gtiActing, setGtiActing]               = useState(false);
+  const [gtiErr, setGtiErr]                     = useState("");
+
+  const loadGtiApprovals = useCallback(async () => {
+    if (!isGtiChief) return;
+    try {
+      const { data } = await api.get("/tickets", { params: { pendingGti: "true", limit: 100 } });
+      setGtiApprovals(data.tickets ?? []);
+    } catch {}
+  }, [isGtiChief]);
+
+  useEffect(() => { loadGtiApprovals(); }, [loadGtiApprovals]);
+
+  async function decideGti(ticketId, status, note) {
+    setGtiActing(true);
+    setGtiErr("");
+    try {
+      await api.post(`/tickets/${ticketId}/approve`, { status, note: note || undefined });
+      setGtiRejectId(null);
+      setGtiRejectNote("");
+      loadGtiApprovals();
+    } catch (e) {
+      setGtiErr(e.response?.data?.error || "Erro ao processar aprovação");
+    } finally {
+      setGtiActing(false);
+    }
+  }
 
   async function decideApproval(ticketId, status, note) {
     setApprovalActing(true);
@@ -644,6 +741,54 @@ export default function DashboardPage() {
           <KpiCard title="Concluídos"   value={completed.length}  icon={CheckCircle2} sub={todayTotal.length ? `${Math.round((completed.length / todayTotal.length) * 100)}% de hoje` : "—"} />
           <KpiCard title="Sem unidade"  value={noUnit.length}     icon={AlertCircle}  highlight={noUnit.length > 0} />
         </div>
+
+        {/* ── Aprovações de Eventos (Chefe da GTI) ── */}
+        {isGtiChief && gtiApprovals.length > 0 && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <ShieldCheck size={15} className="text-brand-500" />
+              <h2 className="text-sm font-semibold text-slate-800 dark:text-gray-100">
+                Aprovações de Eventos — GTI ({gtiApprovals.length})
+              </h2>
+            </div>
+
+            {gtiRejectId !== null && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+                onClick={(e) => { if (e.target === e.currentTarget) setGtiRejectId(null); }}>
+                <div className="card w-full max-w-sm p-6 space-y-4">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400">
+                      <ThumbsDown size={18} />
+                    </span>
+                    <div>
+                      <h3 className="font-semibold text-slate-900 dark:text-gray-100">Reprovar Solicitação de Evento</h3>
+                      <p className="text-xs text-slate-500 dark:text-gray-400 mt-0.5">Informe o motivo (opcional)</p>
+                    </div>
+                  </div>
+                  <textarea rows={3} className="field-input resize-none w-full"
+                    placeholder="Motivo da reprovação..." value={gtiRejectNote}
+                    onChange={(e) => setGtiRejectNote(e.target.value)} autoFocus />
+                  {gtiErr && <p className="text-sm text-red-600 dark:text-red-400">{gtiErr}</p>}
+                  <div className="flex gap-2 justify-end">
+                    <button onClick={() => { setGtiRejectId(null); setGtiErr(""); }} className="btn-secondary text-sm py-2 px-4">Cancelar</button>
+                    <button onClick={() => decideGti(gtiRejectId, "REJECTED", gtiRejectNote)}
+                      disabled={gtiActing}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white px-4 py-2 text-sm font-semibold transition disabled:opacity-50">
+                      {gtiActing ? <Spinner className="h-4 w-4" /> : <ThumbsDown size={14} />} Reprovar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {gtiApprovals.map((t) => (
+              <ApprovalCard key={t.id} ticket={t}
+                onApprove={() => decideGti(t.id, "APPROVED")}
+                onReject={() => { setGtiRejectId(t.id); setGtiRejectNote(""); setGtiErr(""); }}
+                acting={gtiActing} />
+            ))}
+          </div>
+        )}
 
         {/* ── Aprovações pendentes (admin que é chefe de setor) ── */}
         {adminDeptId && pendingApprovals.length > 0 && (

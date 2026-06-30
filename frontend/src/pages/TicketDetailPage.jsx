@@ -826,18 +826,23 @@ export default function TicketDetailPage() {
               COMPLETED:  ticket.completedAt,
             };
             const approvalDone   = ticket.approvalStatus === "APPROVED" || ticket.approvalStatus === "REJECTED";
+            const hasGtiApproval = ticket.approvals?.some((a) => a.isGtiApproval) ?? false;
             const approvalColors =
               ticket.approvalStatus === "APPROVED" ? "border-emerald-500 bg-emerald-500 text-white"
               : ticket.approvalStatus === "REJECTED" ? "border-red-500 bg-red-500 text-white"
               : "border-amber-400 bg-amber-50 dark:bg-amber-900/20 text-amber-500 dark:text-amber-400";
             const approvalLabel =
-              ticket.approvalStatus === "APPROVED" ? "Autorizado pelo Chefe de Setor"
-              : ticket.approvalStatus === "REJECTED" ? "Reprovado pelo Chefe de Setor"
-              : "Aguardando aprovação do Chefe de Setor";
+              ticket.approvalStatus === "APPROVED"
+                ? (hasGtiApproval ? "Autorizado pelo Chefe de Setor e GTI" : "Autorizado pelo Chefe de Setor")
+              : ticket.approvalStatus === "REJECTED"
+                ? "Reprovado"
+              : (hasGtiApproval ? "Aguardando aprovação do Chefe de Setor e GTI" : "Aguardando aprovação do Chefe de Setor");
             const approvalDesc =
-              ticket.approvalStatus === "APPROVED" ? "Solicitação autorizada — encaminhada para a GTI"
-              : ticket.approvalStatus === "REJECTED" ? (ticket.approvalNote ? `Motivo: ${ticket.approvalNote}` : "Solicitação não autorizada")
-              : "Aguardando decisão do Chefe de Setor";
+              ticket.approvalStatus === "APPROVED"
+                ? (hasGtiApproval ? "Solicitação autorizada — OS criada automaticamente" : "Solicitação autorizada — encaminhada para a GTI")
+              : ticket.approvalStatus === "REJECTED"
+                ? (ticket.approvalNote ? `Motivo: ${ticket.approvalNote}` : "Solicitação não autorizada")
+              : (hasGtiApproval ? "Aguardando decisão do Chefe de Setor e da GTI" : "Aguardando decisão do Chefe de Setor");
 
             return (
               <div className="card p-5">
@@ -1678,6 +1683,8 @@ function CreateOsModal({ onClose, onCreate }) {
 
 // ── Painel de aprovação ───────────────────────────────────────────────────────
 function ApprovalPanel({ approvalStatus, approvals }) {
+  const hasGtiApproval = approvals.some((a) => a.isGtiApproval);
+
   const colors = {
     PENDING:  "border-amber-200  dark:border-amber-700  bg-amber-50  dark:bg-amber-900/15  text-amber-800  dark:text-amber-300",
     APPROVED: "border-emerald-200 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/15 text-emerald-800 dark:text-emerald-300",
@@ -1689,9 +1696,9 @@ function ApprovalPanel({ approvalStatus, approvals }) {
     REJECTED: <ThumbsDown size={16} />,
   };
   const labels = {
-    PENDING:  "Aguardando aprovação do Chefe de Setor",
-    APPROVED: "Aprovado pelo Chefe de Setor",
-    REJECTED: "Reprovado pelo Chefe de Setor",
+    PENDING:  hasGtiApproval ? "Aguardando aprovação do Chefe de Setor e GTI" : "Aguardando aprovação do Chefe de Setor",
+    APPROVED: hasGtiApproval ? "Aprovado pelo Chefe de Setor e GTI" : "Aprovado pelo Chefe de Setor",
+    REJECTED: hasGtiApproval ? "Reprovado" : "Reprovado pelo Chefe de Setor",
   };
 
   return (
@@ -1730,7 +1737,7 @@ function ApprovalPanel({ approvalStatus, approvals }) {
                 {a.status === "APPROVED" ? "Aprovado" : a.status === "REJECTED" ? "Reprovado" : "Pendente"}
               </span>
               <span className="text-slate-600 dark:text-gray-400">
-                {a.chefDeptName}
+                {a.isGtiApproval ? "Chefe da GTI" : a.chefDeptName}
                 {a.chefUserName && <span className="text-slate-400 dark:text-gray-500"> — {a.chefUserName}</span>}
               </span>
               {a.decidedAt && (

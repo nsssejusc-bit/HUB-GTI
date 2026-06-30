@@ -960,9 +960,14 @@ export default function NewTicketPage() {
                           onChange={() => selectSub(s.id)} />
                         <div className="flex-1 min-w-0">
                           <span className="text-sm text-slate-700 dark:text-gray-200">{s.name}</span>
-                          {s.requiresApproval && (
+                          {s.requiresApproval && !s.linkedOsTypeId && (
                             <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 text-xs text-amber-700 dark:text-amber-400 ring-1 ring-amber-200 dark:ring-amber-700">
                               <ShieldCheck size={9} /> Requer aprovação
+                            </span>
+                          )}
+                          {s.linkedOsTypeId && (
+                            <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-violet-50 dark:bg-violet-900/20 px-2 py-0.5 text-xs text-violet-700 dark:text-violet-400 ring-1 ring-violet-200 dark:ring-violet-700">
+                              <ShieldCheck size={9} /> Evento · Aprovação Setor + GTI
                             </span>
                           )}
                         </div>
@@ -972,6 +977,18 @@ export default function NewTicketPage() {
 
                   {/* Dicas N1 + campos extras da subcategoria selecionada */}
                   <div ref={extraRef}>
+                    {form.subcategoryId && selectedSubcategory?.linkedOsTypeId && (
+                      <div className="mt-3 rounded-xl border border-violet-200 dark:border-violet-700 bg-violet-50 dark:bg-violet-900/15 px-4 py-3 flex gap-3 items-start">
+                        <ShieldCheck size={16} className="shrink-0 text-violet-500 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-medium text-violet-800 dark:text-violet-300">Solicitação de Evento</p>
+                          <p className="text-xs text-violet-600 dark:text-violet-400 mt-0.5">
+                            Esta solicitação será encaminhada para aprovação do Chefe de Setor e da GTI. Após ambas as aprovações, uma Ordem de Serviço será criada automaticamente.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
                     {form.subcategoryId && subN1Tips.length > 0 && (
                       <N1TipsBox tips={subN1Tips} title={selectedSubcategory.name} />
                     )}

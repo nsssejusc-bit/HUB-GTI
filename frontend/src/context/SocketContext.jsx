@@ -8,9 +8,8 @@ const SocketContext = createContext(null);
 const ConnectedCtx  = createContext(false);
 const UnreadCtx     = createContext(0);
 
-// Roles que recebem notificações de novos chamados
-const NOTIFY_ROLES = ["TECHNICIAN", "ADMIN"];
-const APPROVAL_ROLES = ["CHEFE_SETOR"];
+const NOTIFY_ROLES    = ["TECHNICIAN", "ADMIN"];
+const APPROVAL_ROLES  = ["CHEFE_SETOR"];
 
 // Título base da aba (sem badge de não lidos)
 const BASE_TITLE = document.title || "HelpDesk";
@@ -142,6 +141,24 @@ export function SocketProvider({ children }) {
           body,
           icon: "/favicon.ico",
           tag: `approval-${data.ticketNumber}`,
+        });
+        notif.onclick = () => { window.focus(); notif.close(); };
+      }
+    });
+
+    socket.on("ticket:gti-approval-needed", (data) => {
+      const u = userRef.current;
+      if (!u || !u.isGtiChief) return;
+
+      playApproval();
+      if (!document.hasFocus()) setUnread((n) => n + 1);
+
+      if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+        const body = [data.department, data.category, data.subcategory].filter(Boolean).join(" · ");
+        const notif = new Notification(`Aprovação GTI necessária — ${data.ticketNumber}`, {
+          body,
+          icon: "/favicon.ico",
+          tag: `gti-approval-${data.ticketNumber}`,
         });
         notif.onclick = () => { window.focus(); notif.close(); };
       }

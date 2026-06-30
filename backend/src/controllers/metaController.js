@@ -51,13 +51,14 @@ const VALID_PRIORITIES = ["LOW", "MEDIUM", "HIGH", "URGENT"];
 
 export async function updateCategory(req, res) {
   const id = Number(req.params.id);
-  const { n1Tips, name, allowsFreeText, slaHours, defaultPriority } = req.body;
+  const { n1Tips, name, allowsFreeText, slaHours, defaultPriority, icon } = req.body;
   const cat = await prisma.category.findUnique({ where: { id } });
   if (!cat) return res.status(404).json({ error: "Categoria não encontrada" });
   const data = {};
   if (n1Tips !== undefined)           data.n1Tips           = n1Tips || null;
   if (allowsFreeText !== undefined)   data.allowsFreeText   = Boolean(allowsFreeText);
   if (slaHours !== undefined)         data.slaHours         = slaHours ? Number(slaHours) : null;
+  if (icon !== undefined)             data.icon             = icon || null;
   if (defaultPriority !== undefined) {
     if (!VALID_PRIORITIES.includes(defaultPriority))
       return res.status(400).json({ error: "Prioridade inválida" });
@@ -137,7 +138,7 @@ export async function updateSubcategory(req, res) {
   const {
     name, slaHours, defaultPriority, n1Tips, nucleoResponsavel,
     requiresApproval, dualApproval, requiresPresential, requiresCauseSolution,
-    allowsFreeText, freeTextLabel, formType, customFields,
+    allowsFreeText, freeTextLabel, formType, customFields, linkedOsTypeId,
   } = req.body || {};
   const sub = await prisma.subcategory.findUnique({ where: { id: subId } });
   if (!sub) return res.status(404).json({ error: "Subcategoria não encontrada" });
@@ -157,6 +158,7 @@ export async function updateSubcategory(req, res) {
   if (freeTextLabel !== undefined)       data.freeTextLabel       = freeTextLabel?.trim() || null;
   if (formType !== undefined)            data.formType            = formType || null;
   if (customFields !== undefined)        data.customFields        = customFields || null;
+  if (linkedOsTypeId !== undefined)      data.linkedOsTypeId      = linkedOsTypeId ? Number(linkedOsTypeId) : null;
   if (defaultPriority !== undefined) {
     if (!VALID_PRIORITIES.includes(defaultPriority))
       return res.status(400).json({ error: "Prioridade inválida" });
