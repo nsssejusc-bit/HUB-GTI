@@ -9,7 +9,7 @@ import { allowedOsNext, canOsTransition } from "../utils/osStateMachine.js";
 import { nextOsSeq } from "../utils/nextSequence.js";
 
 const __dirname  = path.dirname(fileURLToPath(import.meta.url));
-const UPLOADS_OS = path.join(__dirname, "../../../uploads/os");
+const UPLOADS_OS = path.join(__dirname, "../../uploads/os");
 
 const _multer = multer({
   storage: multer.memoryStorage(),
