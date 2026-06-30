@@ -537,12 +537,15 @@ export async function approveTicket(req, res) {
       const seq      = await nextOsSeq();
       const d        = new Date();
       const osNumber = `OS-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}-${String(seq).padStart(4, "0")}`;
+      const preFill  = ticket.extraData?.osPreFill ?? {};
       await prisma.workOrder.create({
         data: {
           osNumber,
-          tipoId:     sub.linkedOsTypeId,
-          status:     "ABERTA",
-          createdById: ticket.openedById || req.user.id,
+          tipoId:      sub.linkedOsTypeId,
+          status:      "ABERTA",
+          problema:    preFill.problema   || null,
+          formData:    preFill.formData   || undefined,
+          createdById: ticket.openedById  || req.user.id,
           tickets: { create: { ticketId: ticket.id } },
         },
       });

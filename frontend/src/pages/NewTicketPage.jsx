@@ -527,6 +527,8 @@ export default function NewTicketPage() {
   const [error,        setError]        = useState("");
   const [submitting,   setSubmitting]   = useState(false);
   const [createdTicket, setCreatedTicket] = useState(null);
+  const [linkedOsType,  setLinkedOsType]  = useState(null);
+  const [osPreFill,     setOsPreFill]     = useState({ problema: "", formData: {} });
 
   const continueRef = useRef(null); // botão "Continuar" na tela 1
   const extraRef    = useRef(null); // bloco de campos extras na tela 2
@@ -578,10 +580,20 @@ export default function NewTicketPage() {
   const steps      = ["Tipo do problema", "Detalhes"];
   const currentStep = screen === "category" ? 1 : 2;
 
+  // Busca o tipo de OS vinculado quando a subcategoria tem linkedOsTypeId
+  useEffect(() => {
+    const osTypeId = selectedSubcategory?.linkedOsTypeId;
+    if (!osTypeId) { setLinkedOsType(null); return; }
+    api.get("/work-order-types")
+      .then((r) => setLinkedOsType((r.data ?? []).find((t) => t.id === osTypeId) ?? null))
+      .catch(() => setLinkedOsType(null));
+  }, [selectedSubcategory?.linkedOsTypeId]);
+
   // Reset de campos extras ao trocar subcategoria
   function selectSub(subId) {
     setForm((f) => ({ ...f, subcategoryId: subId, freeTextDescription: "" }));
     setExtraFields({});
+    setOsPreFill({ problema: "", formData: {} });
     setDataConfirmed(false);
   }
 
@@ -609,6 +621,13 @@ export default function NewTicketPage() {
     if (isRemote) return form.anyDeskCode.trim().length >= 3;
     if (selectedCategory?.allowsFreeText) return form.freeTextDescription.trim().length >= 5;
     if (!form.subcategoryId) return false;
+    // Solicitação de Evento: exige preenchimento dos dados da OS
+    if (selectedSubcategory?.linkedOsTypeId) {
+      if (!osPreFill.problema.trim()) return false;
+      const osFields = linkedOsType?.fields ?? [];
+      const missingRequired = osFields.filter((f) => f.required && !String(osPreFill.formData[f.key] ?? "").trim());
+      return missingRequired.length === 0;
+    }
     if (subcatHasFreeText) return (extraFields.subcatFreetext?.trim().length || 0) >= 5;
     if (formType === "custom") {
       const requiredFields = parsedCustomFields.filter(f => f.required);
@@ -633,6 +652,10 @@ export default function NewTicketPage() {
 
       if (isRemote) {
         payload.freeTextDescription = form.freeTextDescription?.trim() || null;
+      } else if (selectedSubcategory?.linkedOsTypeId) {
+        // Evento: dados da OS ficam em extraData.osPreFill; descrição vira o problema
+        payload.freeTextDescription = osPreFill.problema.trim() || null;
+        payload.extraData = { osPreFill: { problema: osPreFill.problema.trim(), formData: osPreFill.formData } };
       } else if (selectedCategory?.allowsFreeText) {
         payload.freeTextDescription = form.freeTextDescription?.trim() || null;
       } else if (subcatHasFreeText) {
@@ -978,14 +1001,52 @@ export default function NewTicketPage() {
                   {/* Dicas N1 + campos extras da subcategoria selecionada */}
                   <div ref={extraRef}>
                     {form.subcategoryId && selectedSubcategory?.linkedOsTypeId && (
-                      <div className="mt-3 rounded-xl border border-violet-200 dark:border-violet-700 bg-violet-50 dark:bg-violet-900/15 px-4 py-3 flex gap-3 items-start">
-                        <ShieldCheck size={16} className="shrink-0 text-violet-500 mt-0.5" />
-                        <div>
-                          <p className="text-sm font-medium text-violet-800 dark:text-violet-300">Solicitação de Evento</p>
-                          <p className="text-xs text-violet-600 dark:text-violet-400 mt-0.5">
-                            Esta solicitação será encaminhada para aprovação do Chefe de Setor e da GTI. Após ambas as aprovações, uma Ordem de Serviço será criada automaticamente.
-                          </p>
+                      <div className="mt-3 rounded-xl border border-violet-200 dark:border-violet-700 bg-violet-50/60 dark:bg-violet-900/10 p-4 space-y-4">
+                        {/* Cabeçalho */}
+                        <div className="flex gap-3 items-start">
+                          <ShieldCheck size={16} className="shrink-0 text-violet-500 mt-0.5" />
+                          <div>
+                            <p className="text-sm font-semibold text-violet-800 dark:text-violet-300">Solicitação de Evento</p>
+                            <p className="text-xs text-violet-600 dark:text-violet-400 mt-0.5">
+                              Preencha os dados abaixo. Após aprovação do Chefe de Setor e da GTI, a OS será criada automaticamente com essas informações.
+                            </p>
+                          </div>
                         </div>
+
+                        {/* Campo: Descrição / problema */}
+                        <div>
+                          <label className="field-label">Descrição do evento / problema <span className="text-red-500">*</span></label>
+                          <textarea
+                            rows={3}
+                            className="field-input resize-none"
+                            placeholder="Descreva o evento, o local, a data e o que é necessário..."
+                            value={osPreFill.problema}
+                            onChange={(e) => setOsPreFill((p) => ({ ...p, problema: e.target.value }))}
+                          />
+                        </div>
+
+                        {/* Campos dinâmicos do tipo de OS */}
+                        {(linkedOsType?.fields ?? []).map((field) => {
+                          const val = osPreFill.formData[field.key] ?? "";
+                          const setVal = (v) => setOsPreFill((p) => ({ ...p, formData: { ...p.formData, [field.key]: v } }));
+                          return (
+                            <div key={field.key}>
+                              <label className="field-label">
+                                {field.label} {field.required && <span className="text-red-500">*</span>}
+                              </label>
+                              {field.type === "select" ? (
+                                <select value={val} onChange={(e) => setVal(e.target.value)} className="field-input">
+                                  <option value="">Selecione...</option>
+                                  {(field.options ?? []).map((o) => <option key={o} value={o}>{o}</option>)}
+                                </select>
+                              ) : field.type === "textarea" ? (
+                                <textarea rows={3} value={val} onChange={(e) => setVal(e.target.value)} className="field-input resize-none" />
+                              ) : (
+                                <input type={field.type === "number" ? "number" : "text"} value={val} onChange={(e) => setVal(e.target.value)} className="field-input" />
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
 
