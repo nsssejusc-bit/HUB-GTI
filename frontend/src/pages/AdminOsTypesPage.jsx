@@ -32,7 +32,8 @@ function labelToKey(label) {
 }
 
 // ── Editor de um único campo ──────────────────────────────────────────────────
-function FieldEditor({ field, index, total, onChange, onRemove, onMoveUp, onMoveDown }) {
+function FieldEditor({ field, index, total, onChange, onRemove, onMoveUp, onMoveDown,
+                       onDragStart, onDragOver, onDrop, onDragEnd, isDragging, isDropTarget }) {
   const [expanded, setExpanded] = useState(false);
   const [newOpt,   setNewOpt]   = useState("");
 
@@ -50,20 +51,33 @@ function FieldEditor({ field, index, total, onChange, onRemove, onMoveUp, onMove
   }
 
   return (
-    <div className="border border-slate-200 dark:border-gray-700 rounded-xl overflow-hidden">
-      {/* Row header */}
-      <div className="flex items-center gap-2 px-3 py-2.5 bg-white dark:bg-gray-900">
-        <GripVertical size={14} className="text-slate-300 dark:text-gray-600 shrink-0" />
+    <div
+      className={`border rounded-xl overflow-hidden transition-all ${
+        isDragging    ? "opacity-40 scale-[0.98] border-slate-200 dark:border-gray-700" :
+        isDropTarget  ? "border-brand-400 dark:border-brand-500 ring-2 ring-brand-300 dark:ring-brand-700 ring-offset-1 dark:ring-offset-gray-900" :
+                        "border-slate-200 dark:border-gray-700"
+      }`}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+    >
+      {/* Row header — draggable */}
+      <div
+        className="flex items-center gap-2 px-3 py-2.5 bg-white dark:bg-gray-900 cursor-grab active:cursor-grabbing"
+        draggable
+        onDragStart={onDragStart}
+        onDragEnd={onDragEnd}
+      >
+        <GripVertical size={14} className="text-slate-400 dark:text-gray-500 shrink-0" />
         <div className="flex-1 min-w-0">
           <span className="text-sm font-medium text-slate-700 dark:text-gray-300">{field.label || <span className="text-slate-400 italic">sem label</span>}</span>
           <span className="ml-2 text-xs text-slate-400 dark:text-gray-500">{FIELD_TYPES.find(t => t.value === field.type)?.label}</span>
           {field.required && <span className="ml-2 text-[10px] font-medium bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 rounded px-1 py-0.5">obrigatório</span>}
         </div>
-        <div className="flex items-center gap-1 shrink-0">
-          <button type="button" onClick={() => onMoveUp(index)}   disabled={index === 0}          className="p-1 rounded text-slate-400 hover:text-slate-700 dark:hover:text-gray-200 disabled:opacity-30 transition"><ChevronUp   size={14} /></button>
-          <button type="button" onClick={() => onMoveDown(index)} disabled={index === total - 1}  className="p-1 rounded text-slate-400 hover:text-slate-700 dark:hover:text-gray-200 disabled:opacity-30 transition"><ChevronDown size={14} /></button>
-          <button type="button" onClick={() => setExpanded(e => !e)} className="p-1 rounded text-slate-400 hover:text-brand-600 dark:hover:text-brand-400 transition"><Edit2 size={13} /></button>
-          <button type="button" onClick={() => onRemove(index)}   className="p-1 rounded text-slate-400 hover:text-red-500 transition"><Trash2 size={13} /></button>
+        <div className="flex items-center gap-1 shrink-0" onDragStart={(e) => e.stopPropagation()}>
+          <button type="button" onClick={() => onMoveUp(index)}   disabled={index === 0}          className="p-1 rounded text-slate-400 hover:text-slate-700 dark:hover:text-gray-200 disabled:opacity-30 transition cursor-default"><ChevronUp   size={14} /></button>
+          <button type="button" onClick={() => onMoveDown(index)} disabled={index === total - 1}  className="p-1 rounded text-slate-400 hover:text-slate-700 dark:hover:text-gray-200 disabled:opacity-30 transition cursor-default"><ChevronDown size={14} /></button>
+          <button type="button" onClick={() => setExpanded(e => !e)} className="p-1 rounded text-slate-400 hover:text-brand-600 dark:hover:text-brand-400 transition cursor-default"><Edit2 size={13} /></button>
+          <button type="button" onClick={() => onRemove(index)}   className="p-1 rounded text-slate-400 hover:text-red-500 transition cursor-default"><Trash2 size={13} /></button>
         </div>
       </div>
 
@@ -134,6 +148,20 @@ function TypeModal({ existing, onClose, onSaved }) {
   const [fields,  setFields]  = useState(() => (existing?.fields ?? []).map((f, i) => ({ ...f, _keyEdited: true, _uid: String(i) })));
   const [saving,  setSaving]  = useState(false);
   const [err,     setErr]     = useState("");
+  const [dragIdx, setDragIdx] = useState(null);
+  const [dropIdx, setDropIdx] = useState(null);
+
+  function handleDrop(dropIndex) {
+    if (dragIdx === null || dragIdx === dropIndex) { setDragIdx(null); setDropIdx(null); return; }
+    setFields(f => {
+      const arr = [...f];
+      const [removed] = arr.splice(dragIdx, 1);
+      arr.splice(dropIndex, 0, removed);
+      return arr;
+    });
+    setDragIdx(null);
+    setDropIdx(null);
+  }
 
   function addField() {
     setFields(f => [...f, { key: `campo_${f.length + 1}`, label: "", type: "text", required: false, _keyEdited: false, _uid: Math.random().toString(36).slice(2) }]);
@@ -238,6 +266,12 @@ function TypeModal({ existing, onClose, onSaved }) {
                   onRemove={removeField}
                   onMoveUp={(idx)   => moveField(idx, -1)}
                   onMoveDown={(idx) => moveField(idx, +1)}
+                  onDragStart={() => setDragIdx(i)}
+                  onDragOver={(e) => { e.preventDefault(); setDropIdx(i); }}
+                  onDrop={() => handleDrop(i)}
+                  onDragEnd={() => { setDragIdx(null); setDropIdx(null); }}
+                  isDragging={dragIdx === i}
+                  isDropTarget={dropIdx === i && dragIdx !== i}
                 />
               ))}
             </div>
@@ -269,6 +303,7 @@ export default function AdminOsTypesPage() {
   const [loading, setLoading] = useState(true);
   const [modal,   setModal]   = useState(null); // null | "create" | existing type object
   const [deleting, setDeleting] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [err,     setErr]     = useState("");
 
   const load = useCallback(async () => {
@@ -414,14 +449,26 @@ export default function AdminOsTypesPage() {
                   >
                     <Edit2 size={12} /> Editar
                   </button>
-                  <button
-                    onClick={() => deleteType(type)}
-                    disabled={deleting === type.id}
-                    className="flex items-center gap-1 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 px-2.5 py-1.5 text-xs font-medium transition disabled:opacity-60"
-                  >
-                    {deleting === type.id ? <Spinner className="h-3 w-3" /> : <Trash2 size={12} />}
-                    Excluir
-                  </button>
+                  {deleteConfirm === type.id ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-500 dark:text-gray-400">Confirmar?</span>
+                      <button
+                        onClick={() => { setDeleteConfirm(null); deleteType(type); }}
+                        disabled={deleting === type.id}
+                        className="text-xs font-semibold text-red-600 dark:text-red-400 hover:underline disabled:opacity-60"
+                      >
+                        {deleting === type.id ? <Spinner className="h-3 w-3 inline" /> : "Sim"}
+                      </button>
+                      <button onClick={() => setDeleteConfirm(null)} className="text-xs text-slate-400 dark:text-gray-500 hover:underline">Não</button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setDeleteConfirm(type.id)}
+                      className="flex items-center gap-1 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 px-2.5 py-1.5 text-xs font-medium transition"
+                    >
+                      <Trash2 size={12} /> Excluir
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

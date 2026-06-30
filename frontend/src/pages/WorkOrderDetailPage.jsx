@@ -783,7 +783,7 @@ export default function WorkOrderDetailPage() {
               )}
 
               {/* Problema / Solução */}
-              {(os.problema || os.solucao) && (
+              {!editing && (os.problema || os.solucao) && (
                 <div className="space-y-3 pt-1 border-t border-slate-100 dark:border-gray-700/60">
                   {os.problema && (
                     <div>
@@ -805,7 +805,7 @@ export default function WorkOrderDetailPage() {
               )}
 
               {/* Relatório de conclusão */}
-              {os.relatorio && (
+              {!editing && os.relatorio && (
                 <div>
                   <div className="text-xs text-slate-400 dark:text-gray-500 mb-0.5">Relatório de conclusão</div>
                   <div className="text-sm text-slate-800 dark:text-gray-100 whitespace-pre-wrap bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-800 rounded-lg p-3">
@@ -830,7 +830,7 @@ export default function WorkOrderDetailPage() {
                     to={`/painel/ativos/${os.asset.id}`}
                     className="flex items-center gap-1 text-xs text-brand-600 dark:text-brand-400 hover:underline"
                   >
-                    <span className="font-mono">{os.asset.tombo}</span>
+                    <span className="font-mono">{os.asset.tombo ?? os.asset.hostname}</span>
                     <ExternalLink size={11} />
                   </Link>
                 </div>
