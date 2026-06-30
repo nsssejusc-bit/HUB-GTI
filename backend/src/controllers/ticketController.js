@@ -160,6 +160,7 @@ export async function createTicket(req, res) {
     category:          category.name,
     subcategory:       selectedSub?.name ?? null,
     nucleoResponsavel: ticket.nucleoResponsavel ?? null,
+    fromUserId:        req.user?.id ?? null,
   });
 
   if (requiresApproval && !selfApproval) {

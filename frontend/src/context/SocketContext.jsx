@@ -72,6 +72,9 @@ export function SocketProvider({ children }) {
       const u = userRef.current;
       if (!u || !NOTIFY_ROLES.includes(u.role)) return;
 
+      // Não notifica quem abriu o chamado
+      if (data.fromUserId != null && Number(data.fromUserId) === u.id) return;
+
       // Técnico com núcleo definido: filtra por núcleo
       if (
         u.role === "TECHNICIAN" &&
@@ -110,7 +113,7 @@ export function SocketProvider({ children }) {
     socket.on("ticket:message", ({ fromUserId }) => {
       const u = userRef.current;
       if (!u || !NOTIFY_ROLES.includes(u.role)) return;
-      if (fromUserId && fromUserId === u.id) return;
+      if (fromUserId != null && Number(fromUserId) === u.id) return;
       playNewMessage();
     });
 

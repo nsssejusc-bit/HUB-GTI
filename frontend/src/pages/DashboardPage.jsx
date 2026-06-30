@@ -512,7 +512,8 @@ export default function DashboardPage() {
     const s = socket?.current;
     if (!s) return;
 
-    const onCreated = ({ ticketNumber }) => {
+    const onCreated = ({ ticketNumber, fromUserId }) => {
+      if (fromUserId != null && Number(fromUserId) === user?.id) { load(); return; }
       addToast({ message: `Novo chamado: ${ticketNumber}`, type: "info" });
       load();
     };
@@ -523,7 +524,7 @@ export default function DashboardPage() {
     };
     const onDeleted  = ({ id }) => setTickets((prev) => prev.filter((t) => t.id !== id));
     const onMessage  = ({ ticketId, fromUserId }) => {
-      if (fromUserId && fromUserId === user?.id) return;
+      if (fromUserId != null && Number(fromUserId) === user?.id) return;
       setUnreadMsgs((prev) => ({ ...prev, [ticketId]: (prev[ticketId] || 0) + 1 }));
     };
 
