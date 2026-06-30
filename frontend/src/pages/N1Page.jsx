@@ -36,6 +36,25 @@ const CAT_COLORS = {
   SIGED:     "bg-amber-100  dark:bg-amber-900/30  text-amber-600  dark:text-amber-400",
 };
 
+const COLOR_BY_NAME = {
+  orange:  "bg-orange-100  dark:bg-orange-900/30  text-orange-600  dark:text-orange-400",
+  amber:   "bg-amber-100   dark:bg-amber-900/30   text-amber-600   dark:text-amber-400",
+  lime:    "bg-lime-100    dark:bg-lime-900/30    text-lime-600    dark:text-lime-400",
+  green:   "bg-green-100   dark:bg-green-900/30   text-green-600   dark:text-green-400",
+  emerald: "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400",
+  teal:    "bg-teal-100    dark:bg-teal-900/30    text-teal-600    dark:text-teal-400",
+  cyan:    "bg-cyan-100    dark:bg-cyan-900/30    text-cyan-600    dark:text-cyan-400",
+  sky:     "bg-sky-100     dark:bg-sky-900/30     text-sky-600     dark:text-sky-400",
+  blue:    "bg-blue-100    dark:bg-blue-900/30    text-blue-600    dark:text-blue-400",
+  indigo:  "bg-indigo-100  dark:bg-indigo-900/30  text-indigo-600  dark:text-indigo-400",
+  violet:  "bg-violet-100  dark:bg-violet-900/30  text-violet-600  dark:text-violet-400",
+  purple:  "bg-purple-100  dark:bg-purple-900/30  text-purple-600  dark:text-purple-400",
+  pink:    "bg-pink-100    dark:bg-pink-900/30    text-pink-600    dark:text-pink-400",
+  rose:    "bg-rose-100    dark:bg-rose-900/30    text-rose-600    dark:text-rose-400",
+  red:     "bg-red-100     dark:bg-red-900/30     text-red-600     dark:text-red-400",
+  slate:   "bg-slate-100   dark:bg-gray-800       text-slate-500   dark:text-gray-400",
+};
+
 export default function N1Page() {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -122,7 +141,7 @@ function CategoryCard({ cat, onSaved }) {
   const [err, setErr]       = useState("");
 
   const Icon      = (cat.icon && ICON_BY_NAME[cat.icon]) || CAT_ICONS[cat.code] || HelpCircle;
-  const iconColor = CAT_COLORS[cat.code] || CAT_COLORS.OTHER;
+  const iconColor = (cat.color && COLOR_BY_NAME[cat.color]) || CAT_COLORS[cat.code] || CAT_COLORS.OTHER;
   const tipCount  = tips.length;
 
   function addTip() {

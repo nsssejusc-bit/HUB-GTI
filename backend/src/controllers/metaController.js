@@ -51,14 +51,15 @@ const VALID_PRIORITIES = ["LOW", "MEDIUM", "HIGH", "URGENT"];
 
 export async function updateCategory(req, res) {
   const id = Number(req.params.id);
-  const { n1Tips, name, allowsFreeText, slaHours, defaultPriority, icon } = req.body;
+  const { n1Tips, name, allowsFreeText, slaHours, defaultPriority, icon, color } = req.body;
   const cat = await prisma.category.findUnique({ where: { id } });
   if (!cat) return res.status(404).json({ error: "Categoria não encontrada" });
   const data = {};
   if (n1Tips !== undefined)           data.n1Tips           = n1Tips || null;
   if (allowsFreeText !== undefined)   data.allowsFreeText   = Boolean(allowsFreeText);
   if (slaHours !== undefined)         data.slaHours         = slaHours ? Number(slaHours) : null;
-  if (icon !== undefined)             data.icon             = icon || null;
+  if (icon  !== undefined)            data.icon             = icon  || null;
+  if (color !== undefined)            data.color            = color || null;
   if (defaultPriority !== undefined) {
     if (!VALID_PRIORITIES.includes(defaultPriority))
       return res.status(400).json({ error: "Prioridade inválida" });

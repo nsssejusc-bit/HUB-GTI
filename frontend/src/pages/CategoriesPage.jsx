@@ -74,6 +74,27 @@ const CAT_COLORS = {
   OTHER:     "bg-slate-100  dark:bg-gray-800      text-slate-500  dark:text-gray-400",
 };
 
+// Paleta de cores selecionáveis
+const COLOR_PALETTE = [
+  { name: "orange",  dot: "bg-orange-400",  cls: "bg-orange-100  dark:bg-orange-900/30  text-orange-600  dark:text-orange-400"  },
+  { name: "amber",   dot: "bg-amber-400",   cls: "bg-amber-100   dark:bg-amber-900/30   text-amber-600   dark:text-amber-400"   },
+  { name: "lime",    dot: "bg-lime-400",    cls: "bg-lime-100    dark:bg-lime-900/30    text-lime-600    dark:text-lime-400"    },
+  { name: "green",   dot: "bg-green-500",   cls: "bg-green-100   dark:bg-green-900/30   text-green-600   dark:text-green-400"   },
+  { name: "emerald", dot: "bg-emerald-500", cls: "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400" },
+  { name: "teal",    dot: "bg-teal-400",    cls: "bg-teal-100    dark:bg-teal-900/30    text-teal-600    dark:text-teal-400"    },
+  { name: "cyan",    dot: "bg-cyan-400",    cls: "bg-cyan-100    dark:bg-cyan-900/30    text-cyan-600    dark:text-cyan-400"    },
+  { name: "sky",     dot: "bg-sky-400",     cls: "bg-sky-100     dark:bg-sky-900/30     text-sky-600     dark:text-sky-400"     },
+  { name: "blue",    dot: "bg-blue-400",    cls: "bg-blue-100    dark:bg-blue-900/30    text-blue-600    dark:text-blue-400"    },
+  { name: "indigo",  dot: "bg-indigo-400",  cls: "bg-indigo-100  dark:bg-indigo-900/30  text-indigo-600  dark:text-indigo-400"  },
+  { name: "violet",  dot: "bg-violet-400",  cls: "bg-violet-100  dark:bg-violet-900/30  text-violet-600  dark:text-violet-400"  },
+  { name: "purple",  dot: "bg-purple-400",  cls: "bg-purple-100  dark:bg-purple-900/30  text-purple-600  dark:text-purple-400"  },
+  { name: "pink",    dot: "bg-pink-400",    cls: "bg-pink-100    dark:bg-pink-900/30    text-pink-600    dark:text-pink-400"    },
+  { name: "rose",    dot: "bg-rose-400",    cls: "bg-rose-100    dark:bg-rose-900/30    text-rose-600    dark:text-rose-400"    },
+  { name: "red",     dot: "bg-red-400",     cls: "bg-red-100     dark:bg-red-900/30     text-red-600     dark:text-red-400"     },
+  { name: "slate",   dot: "bg-slate-400",   cls: "bg-slate-100   dark:bg-gray-800       text-slate-500   dark:text-gray-400"    },
+];
+const COLOR_BY_NAME = Object.fromEntries(COLOR_PALETTE.map(({ name, cls }) => [name, cls]));
+
 // Paleta completa de ícones disponíveis para seleção
 const ICON_PALETTE = [
   { name: "Monitor",           label: "Hardware",    Component: Monitor },
@@ -96,7 +117,10 @@ function getCatIcon(cat) {
   if (cat?.icon && ICON_BY_NAME[cat.icon]) return ICON_BY_NAME[cat.icon];
   return CAT_ICONS[cat?.code] || Tag;
 }
-function getCatColor(code) { return CAT_COLORS[code] || CAT_COLORS.OTHER; }
+function getCatColor(cat) {
+  if (cat?.color && COLOR_BY_NAME[cat.color]) return COLOR_BY_NAME[cat.color];
+  return CAT_COLORS[cat?.code] || CAT_COLORS.OTHER;
+}
 
 // ── Drag-to-reorder ───────────────────────────────────────────────────────────
 function useDragReorder(items, onReorder) {
@@ -661,7 +685,7 @@ function CategoryPreviewModal({ cat, onClose }) {
             {/* Header da tela */}
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${getCatColor(cat.code)}`}>
+                <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${getCatColor(cat)}`}>
                   <CatIcon size={14} />
                 </span>
                 <h3 className="text-sm font-semibold text-slate-800 dark:text-gray-100">{cat.name}</h3>
@@ -869,12 +893,20 @@ function CategoryCard({ cat, onUpdate, onDelete, onGripPointerDown, isDragging }
   const Icon = getCatIcon(cat);
 
   async function saveIcon(iconName) {
-    setIconPickerOpen(false);
     try {
       const res = await api.patch(`/categories/${cat.id}`, { icon: iconName });
       onUpdate({ ...cat, icon: res.data.icon });
     } catch {
       addToast({ message: "Erro ao salvar ícone", type: "error" });
+    }
+  }
+
+  async function saveColor(colorName) {
+    try {
+      const res = await api.patch(`/categories/${cat.id}`, { color: colorName });
+      onUpdate({ ...cat, color: res.data.color });
+    } catch {
+      addToast({ message: "Erro ao salvar cor", type: "error" });
     }
   }
 
@@ -979,7 +1011,7 @@ function CategoryCard({ cat, onUpdate, onDelete, onGripPointerDown, isDragging }
             <button
               onClick={() => setIconPickerOpen((v) => !v)}
               title="Alterar ícone"
-              className={`group relative flex h-9 w-9 items-center justify-center rounded-xl transition ${getCatColor(cat.code)}`}
+              className={`group relative flex h-9 w-9 items-center justify-center rounded-xl transition ${getCatColor(cat)}`}
             >
               <Icon size={18} />
               <span className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/25 opacity-0 group-hover:opacity-100 transition">
@@ -988,28 +1020,50 @@ function CategoryCard({ cat, onUpdate, onDelete, onGripPointerDown, isDragging }
             </button>
 
             {iconPickerOpen && (
-              <div className="absolute left-0 top-11 z-50 w-[220px] rounded-xl border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-xl p-3">
-                <p className="text-[11px] font-medium text-slate-400 dark:text-gray-500 mb-2.5 uppercase tracking-wide">Ícone da categoria</p>
-                <div className="grid grid-cols-4 gap-1">
-                  {ICON_PALETTE.map(({ name, label, Component }) => {
-                    const active = (cat.icon || null) === name ||
-                      (!cat.icon && CAT_ICONS[cat.code] === Component);
-                    return (
+              <div className="absolute left-0 top-11 z-50 w-[232px] rounded-xl border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-xl p-3 space-y-3">
+                {/* Ícones */}
+                <div>
+                  <p className="text-[11px] font-medium text-slate-400 dark:text-gray-500 mb-2 uppercase tracking-wide">Ícone</p>
+                  <div className="grid grid-cols-4 gap-1">
+                    {ICON_PALETTE.map(({ name, label, Component }) => {
+                      const active = (cat.icon || null) === name ||
+                        (!cat.icon && CAT_ICONS[cat.code] === Component);
+                      return (
+                        <button
+                          key={name}
+                          onClick={() => saveIcon(name)}
+                          title={label}
+                          className={`flex flex-col items-center gap-1 rounded-lg p-2 transition ${
+                            active
+                              ? "bg-brand-100 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400 ring-1 ring-brand-400/40"
+                              : "hover:bg-slate-100 dark:hover:bg-gray-700 text-slate-500 dark:text-gray-400"
+                          }`}
+                        >
+                          <Component size={16} />
+                          <span className="text-[9px] leading-tight text-center line-clamp-1">{label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Cores */}
+                <div className="border-t border-slate-100 dark:border-gray-700 pt-3">
+                  <p className="text-[11px] font-medium text-slate-400 dark:text-gray-500 mb-2 uppercase tracking-wide">Cor de fundo</p>
+                  <div className="flex flex-wrap gap-2">
+                    {COLOR_PALETTE.map(({ name, dot }) => (
                       <button
                         key={name}
-                        onClick={() => saveIcon(name)}
-                        title={label}
-                        className={`flex flex-col items-center gap-1 rounded-lg p-2 transition ${
-                          active
-                            ? "bg-brand-100 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400 ring-1 ring-brand-400/40"
-                            : "hover:bg-slate-100 dark:hover:bg-gray-700 text-slate-500 dark:text-gray-400"
+                        onClick={() => saveColor(name)}
+                        title={name}
+                        className={`h-6 w-6 rounded-full transition ${dot} ring-offset-2 ring-offset-white dark:ring-offset-gray-800 ${
+                          cat.color === name
+                            ? "ring-2 ring-brand-500"
+                            : "hover:ring-2 hover:ring-slate-300 dark:hover:ring-gray-500"
                         }`}
-                      >
-                        <Component size={16} />
-                        <span className="text-[9px] leading-tight text-center line-clamp-1">{label}</span>
-                      </button>
-                    );
-                  })}
+                      />
+                    ))}
+                  </div>
                 </div>
               </div>
             )}

@@ -430,6 +430,42 @@ export async function feedbackByMonth(req, res) {
   })));
 }
 
+export async function feedbackComments(req, res) {
+  const { month, limit: lim = 30 } = req.query;
+  const where = { comment: { not: null } };
+  if (month) {
+    const start = new Date(`${month}-01T00:00:00`);
+    const end   = new Date(start);
+    end.setMonth(end.getMonth() + 1);
+    where.createdAt = { gte: start, lt: end };
+  }
+  const rows = await prisma.feedback.findMany({
+    where,
+    orderBy: { createdAt: "desc" },
+    take: Math.min(Number(lim) || 30, 100),
+    include: {
+      ticket: {
+        select: {
+          ticketNumber: true,
+          requesterName: true,
+          department: true,
+          assignedTech: { select: { name: true } },
+        },
+      },
+    },
+  });
+  res.json(rows.map((f) => ({
+    id:           f.id,
+    rating:       f.rating,
+    comment:      f.comment,
+    createdAt:    f.createdAt,
+    ticketNumber: f.ticket?.ticketNumber ?? null,
+    requester:    f.ticket?.requesterName ?? null,
+    department:   f.ticket?.department ?? null,
+    technician:   f.ticket?.assignedTech?.name ?? null,
+  })));
+}
+
 // ── OS Analytics ──────────────────────────────────────────────────────────────
 
 function parseOsRange(q) {

@@ -109,11 +109,58 @@ export function SocketProvider({ children }) {
       }
     });
 
-    socket.on("ticket:message", ({ fromUserId }) => {
+    socket.on("ticket:message", ({ ticketId, fromUserId, openedById }) => {
       const u = userRef.current;
-      if (!u || !NOTIFY_ROLES.includes(u.role)) return;
-      if (fromUserId != null && Number(fromUserId) === u.id) return;
+      if (!u) return;
+
+      // Técnico / Admin: só som (comportamento existente)
+      if (NOTIFY_ROLES.includes(u.role)) {
+        if (fromUserId != null && Number(fromUserId) === u.id) return;
+        playNewMessage();
+        return;
+      }
+
+      // Solicitante (USER): notifica quando o técnico responde no SEU chamado
+      if (
+        u.role === "USER" &&
+        fromUserId != null &&          // veio de um técnico (não do próprio usuário)
+        openedById != null &&
+        Number(openedById) === u.id    // é o dono do chamado
+      ) {
+        playNewMessage();
+        if (!document.hasFocus()) setUnread((n) => n + 1);
+        if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+          const notif = new Notification("Nova resposta no seu chamado", {
+            body: "O técnico respondeu sua solicitação. Clique para visualizar.",
+            icon: "/favicon.ico",
+            tag:  `msg-${ticketId}`,
+          });
+          notif.onclick = () => { window.focus(); notif.close(); };
+        }
+      }
+    });
+
+    socket.on("ticket:updated", ({ ticketId, status, openedById }) => {
+      const u = userRef.current;
+      if (!u || u.role !== "USER" || !openedById || Number(openedById) !== u.id) return;
+
       playNewMessage();
+      if (!document.hasFocus()) setUnread((n) => n + 1);
+      if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+        const labels = {
+          VIEWED:     "Visualizado pelo técnico",
+          EN_ROUTE:   "Técnico a caminho",
+          IN_SERVICE: "Em atendimento",
+          COMPLETED:  "Concluído",
+          CANCELADO:  "Cancelado",
+        };
+        const notif = new Notification("Atualização no seu chamado", {
+          body: labels[status] || `Status: ${status}`,
+          icon: "/favicon.ico",
+          tag:  `status-${ticketId}`,
+        });
+        notif.onclick = () => { window.focus(); notif.close(); };
+      }
     });
 
     socket.on("user:updated", (data) => {

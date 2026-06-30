@@ -181,6 +181,7 @@ model Category {
   code            String        @unique
   name            String
   icon            String?
+  color           String?
   sortOrder       Int           @default(0)
   allowsFreeText  Boolean       @default(false)
   n1Tips          String?       @db.Text

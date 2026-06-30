@@ -345,6 +345,8 @@ export async function listTickets(req, res) {
       orConditions.push({ approvals: { some: { isGtiApproval: true } } });
     }
     andClauses.push({ OR: orConditions });
+  } else if (req.user.role === "USER") {
+    where.openedById = req.user.id;
   }
   // ADMIN vê tudo (sem filtro adicional)
 
@@ -656,8 +658,10 @@ export async function transitionTicket(req, res) {
   });
 
   req.app.get("io")?.emit("ticket:updated", {
+    ticketId:     updated.id,
     ticketNumber: updated.ticketNumber,
     status:       updated.status,
+    openedById:   ticket.openedById,
   });
 
   // Notificação push para o solicitante
@@ -985,7 +989,7 @@ export async function sendMessage(req, res) {
   const { content } = req.body || {};
   if (!content?.trim()) return res.status(400).json({ error: "Mensagem vazia" });
 
-  const ticket = await prisma.ticket.findUnique({ where: { id }, select: { id: true } });
+  const ticket = await prisma.ticket.findUnique({ where: { id }, select: { id: true, openedById: true } });
   if (!ticket) return res.status(404).json({ error: "Chamado não encontrado" });
 
   const prepared = await prepareMessageContent(content, id);
@@ -996,7 +1000,7 @@ export async function sendMessage(req, res) {
     include: { author: { select: { name: true, role: true } } },
   });
 
-  req.app.get("io")?.emit("ticket:message", { ticketId: id, fromUserId: req.user.id });
+  req.app.get("io")?.emit("ticket:message", { ticketId: id, fromUserId: req.user.id, openedById: ticket.openedById });
   res.status(201).json(withImageUrl(msg, `/api/tickets/${id}/messages`));
 }
 

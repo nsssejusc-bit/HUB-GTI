@@ -8,7 +8,7 @@ import AppHeader from "../components/AppHeader";
 import { formatElapsed, formatRelative, STATUS_LABEL, STATUS_ORDER, statusIndex } from "../lib/statuses";
 import { useServerTick, serverNow } from "../lib/serverTime";
 import { isImageMessage } from "../lib/messages";
-import { ArrowLeft, Clock, CheckCircle2, Circle, ChevronRight, Trash2, AlertTriangle, MonitorSmartphone, Copy, Check as CheckIcon, ClipboardList, Plus, ExternalLink, Shield, ShieldCheck, ShieldX, ThumbsUp, ThumbsDown, UserCheck, X, MessageSquare, ArrowRight, FileText, RotateCcw, Users2, Send, Timer, ImageIcon, Ban, Edit2 } from "lucide-react";
+import { ArrowLeft, Clock, CheckCircle2, Circle, ChevronRight, Trash2, AlertTriangle, MonitorSmartphone, Copy, Check as CheckIcon, ClipboardList, Plus, ExternalLink, Shield, ShieldCheck, ShieldX, ThumbsUp, ThumbsDown, UserCheck, X, MessageSquare, ArrowRight, FileText, RotateCcw, Users2, Send, Timer, ImageIcon, Ban, Edit2, Star } from "lucide-react";
 
 const TRANSITION_LABEL = {
   VIEWED:     "Marcar como Visualizado",
@@ -805,6 +805,33 @@ export default function TicketDetailPage() {
               <div className="mt-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700 px-4 py-3">
                 <div className="text-xs font-medium text-emerald-700 dark:text-emerald-400 mb-1">Solução aplicada</div>
                 <p className="text-sm text-emerald-900 dark:text-emerald-200">{ticket.solution}</p>
+              </div>
+            )}
+
+            {ticket.feedback && (
+              <div className="mt-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 px-4 py-3">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="text-xs font-medium text-amber-700 dark:text-amber-400">Avaliação do solicitante</span>
+                  <div className="flex gap-0.5">
+                    {[1,2,3,4,5].map((n) => (
+                      <Star
+                        key={n}
+                        size={13}
+                        className={n <= ticket.feedback.rating
+                          ? "fill-amber-400 text-amber-400"
+                          : "text-amber-200 dark:text-amber-700"}
+                      />
+                    ))}
+                  </div>
+                  <span className="text-xs text-amber-600 dark:text-amber-500 font-semibold">
+                    {ticket.feedback.rating}/5
+                  </span>
+                </div>
+                {ticket.feedback.comment ? (
+                  <p className="text-sm text-amber-900 dark:text-amber-200 italic">"{ticket.feedback.comment}"</p>
+                ) : (
+                  <p className="text-xs text-amber-600 dark:text-amber-500">Sem comentário</p>
+                )}
               </div>
             )}
           </div>

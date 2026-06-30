@@ -545,6 +545,8 @@ export default function AnalyticsPage() {
   const [fbYear,          setFbYear]          = useState(Number(today.slice(0, 4)));
   const [fbAnnualData,    setFbAnnualData]    = useState([]);
   const [fbAnnualLoading, setFbAnnualLoading] = useState(false);
+  const [fbComments,      setFbComments]      = useState([]);
+  const [fbCommentsLoading, setFbCommentsLoading] = useState(false);
 
   // PDF
   const [pdfBusy,  setPdfBusy]  = useState(false);
@@ -652,6 +654,7 @@ export default function AnalyticsPage() {
 
   const loadFeedback = useCallback((month) => {
     setFbLoading(true);
+    setFbCommentsLoading(true);
     setFbError("");
     const q = `?month=${month}`;
     Promise.all([
@@ -665,6 +668,11 @@ export default function AnalyticsPage() {
     }).catch(() => {
       setFbError("Não foi possível carregar os dados de avaliação.");
     }).finally(() => setFbLoading(false));
+
+    api.get(`/analytics/feedback/comments${q}`)
+      .then((r) => setFbComments(r.data))
+      .catch(() => setFbComments([]))
+      .finally(() => setFbCommentsLoading(false));
   }, []);
 
   const loadFbAnnual = useCallback((year) => {
@@ -1061,6 +1069,64 @@ export default function AnalyticsPage() {
                     )}
                   </div>
                 </>
+              )}
+
+              {/* Comentários das avaliações */}
+              {!fbAnnual && (
+                <div className="card p-5">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Star size={16} className="text-amber-500" />
+                    <h3 className="font-semibold text-slate-700 dark:text-gray-200">Comentários das avaliações</h3>
+                    <span className="text-xs text-slate-400 dark:text-gray-500 ml-1">{fmtMonth(fbMonth)}</span>
+                  </div>
+                  {fbCommentsLoading ? (
+                    <div className="flex justify-center py-8"><Spinner /></div>
+                  ) : fbComments.length === 0 ? (
+                    <p className="text-sm text-slate-400 dark:text-gray-500 text-center py-6">
+                      Nenhuma avaliação com comentário neste mês
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {fbComments.map((c) => (
+                        <div key={c.id} className="rounded-xl border border-slate-100 dark:border-gray-800 bg-slate-50 dark:bg-gray-800/50 px-4 py-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                                {/* Estrelas */}
+                                <div className="flex gap-0.5">
+                                  {[1,2,3,4,5].map((n) => (
+                                    <Star
+                                      key={n}
+                                      size={12}
+                                      className={n <= c.rating ? "fill-amber-400 text-amber-400" : "text-slate-200 dark:text-gray-600"}
+                                    />
+                                  ))}
+                                </div>
+                                <span className={`text-xs font-bold ${c.rating >= 4 ? "text-emerald-600 dark:text-emerald-400" : c.rating === 3 ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400"}`}>
+                                  {c.rating}/5
+                                </span>
+                                {c.ticketNumber && (
+                                  <span className="font-mono text-[11px] text-slate-400 dark:text-gray-500">
+                                    #{c.ticketNumber}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-sm text-slate-700 dark:text-gray-200 italic">"{c.comment}"</p>
+                              <div className="mt-1.5 flex gap-2 flex-wrap text-xs text-slate-400 dark:text-gray-500">
+                                {c.requester && <span>{c.requester}</span>}
+                                {c.department && <span>· {c.department}</span>}
+                                {c.technician && <span>· Técnico: {c.technician}</span>}
+                              </div>
+                            </div>
+                            <div className="text-xs text-slate-400 dark:text-gray-500 shrink-0 whitespace-nowrap">
+                              {new Date(c.createdAt).toLocaleDateString("pt-BR")}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               )}
             </>
           );

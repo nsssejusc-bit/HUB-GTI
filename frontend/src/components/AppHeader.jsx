@@ -6,8 +6,9 @@ import { useSocketConnected, useUnreadCount } from "../context/SocketContext";
 import { api } from "../lib/api";
 import {
   LayoutDashboard, BarChart2, LogOut, Users,
-  Crown, Sun, Moon, Building2, ChevronDown, UserCircle, Ticket, KeyRound, ClipboardList, Settings, Tag, Shield, Package, SlidersHorizontal, Monitor, Settings2,
+  Crown, Sun, Moon, Building2, ChevronDown, UserCircle, Ticket, KeyRound, ClipboardList, Settings, Tag, Shield, Package, SlidersHorizontal, Monitor, Settings2, Search, X,
 } from "lucide-react";
+import { STATUS_LABEL } from "../lib/statuses";
 
 // Slot da logo — quando /logo.png existir, a imagem aparece automaticamente;
 // enquanto isso exibe o ícone de texto.
@@ -50,6 +51,10 @@ export default function AppHeader() {
   const [pendingChecklists, setPendingChecklists] = useState(0);
   const [userOpen,   setUserOpen]   = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
+  const [searchQuery,   setSearchQuery]   = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchOpen,    setSearchOpen]    = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
   const userRef   = useRef(null);
   const configRef = useRef(null);
 
@@ -69,6 +74,39 @@ export default function AppHeader() {
     document.addEventListener("mousedown", handle);
     return () => document.removeEventListener("mousedown", handle);
   }, []);
+
+  // Atalho Ctrl+K para abrir busca
+  useEffect(() => {
+    if (!isFullStaff) return;
+    function handleKey(e) {
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+        e.preventDefault();
+        setSearchOpen((o) => !o);
+      }
+    }
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [isFullStaff]);
+
+  // Busca global — debounce 300 ms, apenas para TECHNICIAN/ADMIN
+  useEffect(() => {
+    if (!isFullStaff || searchQuery.trim().length < 2) {
+      setSearchResults([]);
+      return;
+    }
+    setSearchLoading(true);
+    const t = setTimeout(async () => {
+      try {
+        const r = await api.get(`/tickets?search=${encodeURIComponent(searchQuery.trim())}&limit=8`);
+        setSearchResults(r.data.tickets || []);
+      } catch {
+        setSearchResults([]);
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [searchQuery, isFullStaff]);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -113,6 +151,7 @@ export default function AppHeader() {
     }`;
 
   return (
+    <>
     <header className="sticky top-0 z-30 bg-white/90 dark:bg-gray-900/95 backdrop-blur-md border-b border-slate-200 dark:border-gray-700">
       <div className="max-w-6xl mx-auto px-4 h-14 flex items-center gap-3">
 
@@ -130,7 +169,12 @@ export default function AppHeader() {
 
           {/* USER */}
           {!isStaff && (
-            <Link to="/perfil" className={navCls(isActive("/perfil"))}>
+            <Link to="/meus-chamados" className={navCls(isActive("/meus-chamados"))}>
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold animate-pulse">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
               <Ticket size={15} />
               <span className="hidden sm:inline">Meus chamados</span>
             </Link>
@@ -313,6 +357,17 @@ export default function AppHeader() {
             </div>
           )}
 
+          {/* Botão de busca — apenas TECHNICIAN / ADMIN */}
+          {isFullStaff && (
+            <button
+              onClick={() => setSearchOpen(true)}
+              title="Buscar chamado (Ctrl+K)"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-gray-800 transition"
+            >
+              <Search size={16} />
+            </button>
+          )}
+
           {/* Toggle tema */}
           <button
             onClick={toggle}
@@ -381,5 +436,88 @@ export default function AppHeader() {
         </div>
       </div>
     </header>
+
+    {/* ── Modal de busca global ── */}
+    {isFullStaff && searchOpen && (
+      <div
+        className="fixed inset-0 z-50 flex items-start justify-center pt-24 px-4"
+        onMouseDown={(e) => { if (e.target === e.currentTarget) setSearchOpen(false); }}
+      >
+        {/* Backdrop */}
+        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setSearchOpen(false)} />
+
+        {/* Caixa de busca */}
+        <div className="relative w-full max-w-lg bg-white dark:bg-gray-900 rounded-2xl border border-slate-200 dark:border-gray-700 shadow-2xl overflow-hidden">
+
+          {/* Input */}
+          <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-100 dark:border-gray-800">
+            <Search size={18} className="text-slate-400 dark:text-gray-500 shrink-0" />
+            <input
+              autoFocus
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Escape") { setSearchOpen(false); setSearchQuery(""); } }}
+              placeholder="Número, solicitante, setor..."
+              className="flex-1 bg-transparent text-sm text-slate-700 dark:text-gray-200 placeholder-slate-400 dark:placeholder-gray-500 outline-none"
+            />
+            {searchQuery ? (
+              <button onClick={() => setSearchQuery("")} className="text-slate-400 hover:text-slate-600 dark:hover:text-gray-300">
+                <X size={15} />
+              </button>
+            ) : (
+              <kbd className="hidden sm:inline text-[10px] text-slate-400 dark:text-gray-500 border border-slate-200 dark:border-gray-700 rounded px-1.5 py-0.5 font-mono">Esc</kbd>
+            )}
+          </div>
+
+          {/* Resultados */}
+          {searchQuery.trim().length >= 2 && (
+            <div className="max-h-80 overflow-y-auto">
+              {searchLoading ? (
+                <div className="px-4 py-4 text-sm text-slate-400 dark:text-gray-500 text-center">Buscando...</div>
+              ) : searchResults.length === 0 ? (
+                <div className="px-4 py-4 text-sm text-slate-400 dark:text-gray-500 text-center">Nenhum chamado encontrado</div>
+              ) : (
+                <ul className="py-1">
+                  {searchResults.map((t) => (
+                    <li key={t.id}>
+                      <Link
+                        to={`/painel/chamado/${t.id}`}
+                        onClick={() => { setSearchOpen(false); setSearchQuery(""); }}
+                        className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 dark:hover:bg-gray-800 transition"
+                      >
+                        <span className="font-mono text-[11px] text-slate-400 dark:text-gray-500 shrink-0 w-28">
+                          #{t.ticketNumber}
+                        </span>
+                        <span className="flex-1 text-sm text-slate-700 dark:text-gray-200 truncate">
+                          {t.requesterName || "—"}
+                          {t.department && (
+                            <span className="text-slate-400 dark:text-gray-500"> · {t.department}</span>
+                          )}
+                        </span>
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${
+                          t.status === "COMPLETED" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" :
+                          t.status === "CANCELADO" ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" :
+                          "bg-brand-100 text-brand-700 dark:bg-brand-900/30 dark:text-brand-400"
+                        }`}>
+                          {STATUS_LABEL[t.status] || t.status}
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
+          {/* Dica quando vazio */}
+          {searchQuery.trim().length < 2 && (
+            <div className="px-4 py-4 text-xs text-slate-400 dark:text-gray-500 text-center">
+              Digite pelo menos 2 caracteres para buscar
+            </div>
+          )}
+        </div>
+      </div>
+    )}
+    </>
   );
 }

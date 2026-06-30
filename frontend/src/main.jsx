@@ -21,6 +21,7 @@ const ManualPage         = lazy(() => import("./pages/ManualPage"));
 // Usuário logado
 const NewTicketPage      = lazy(() => import("./pages/NewTicketPage"));
 const ProfilePage        = lazy(() => import("./pages/ProfilePage"));
+const MyTicketsPage      = lazy(() => import("./pages/MyTicketsPage"));
 const ChangePasswordPage = lazy(() => import("./pages/ChangePasswordPage"));
 
 // Staff geral
@@ -123,8 +124,9 @@ ReactDOM.createRoot(document.getElementById("root")).render(
                       <Route path="/esqueci-senha" element={<ForgotPasswordPage />} />
 
                       {/* Qualquer usuário logado */}
-                      <Route path="/perfil"       element={<Protected><ProfilePage /></Protected>} />
-                      <Route path="/trocar-senha" element={<Protected><ChangePasswordPage /></Protected>} />
+                      <Route path="/perfil"          element={<Protected><ProfilePage /></Protected>} />
+                      <Route path="/meus-chamados"   element={<Protected><MyTicketsPage /></Protected>} />
+                      <Route path="/trocar-senha"    element={<Protected><ChangePasswordPage /></Protected>} />
 
                       {/* Staff (TECHNICIAN, ADMIN, CHEFE_SETOR) */}
                       <Route path="/painel" element={<Protected staffOnly><DashboardPage /></Protected>} />
