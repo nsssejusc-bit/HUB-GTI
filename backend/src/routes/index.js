@@ -8,7 +8,7 @@ import {
 import {
   createTicket, getTicketPublic, listTickets, getTicket,
   transitionTicket, approveTicket, deleteTicket, submitFeedback,
-  reopenTicket, assignTicket, listComments, addComment, submitFeedbackAuth,
+  reopenTicket, assignTicket, recategorizeTicket, listComments, addComment, submitFeedbackAuth,
   listMessages, sendMessage, listMessagesPublic, sendMessagePublic,
   getMessageImage, getMessageImagePublic, cancelTicket,
 } from "../controllers/ticketController.js";
@@ -153,7 +153,8 @@ router.post("/tickets/:id/transition", authRequired, requireRole("TECHNICIAN", "
 router.post("/tickets/:id/approve",    authRequired, requireRole("CHEFE_SETOR", "ADMIN"), approveTicket);
 router.post("/tickets/:id/reopen",     authRequired, reopenTicket);
 router.post("/tickets/:id/cancel",     authRequired, requireRole("TECHNICIAN", "ADMIN"), cancelTicket);
-router.patch("/tickets/:id/assign",    authRequired, requireRole("TECHNICIAN", "ADMIN"), assignTicket);
+router.patch("/tickets/:id/assign",       authRequired, requireRole("TECHNICIAN", "ADMIN"), assignTicket);
+router.patch("/tickets/:id/recategorize", authRequired, requireRole("TECHNICIAN", "ADMIN"), recategorizeTicket);
 router.get("/tickets/:id/comments",   authRequired, listComments);
 router.post("/tickets/:id/comments",  authRequired, addComment);
 router.get("/tickets/:id/messages",   authRequired, requireRole("TECHNICIAN", "ADMIN"), listMessages);

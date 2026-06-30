@@ -8,7 +8,7 @@ import AppHeader from "../components/AppHeader";
 import { formatElapsed, formatRelative, STATUS_LABEL, STATUS_ORDER, statusIndex } from "../lib/statuses";
 import { useServerTick, serverNow } from "../lib/serverTime";
 import { isImageMessage } from "../lib/messages";
-import { ArrowLeft, Clock, CheckCircle2, Circle, ChevronRight, Trash2, AlertTriangle, MonitorSmartphone, Copy, Check as CheckIcon, ClipboardList, Plus, ExternalLink, Shield, ShieldCheck, ShieldX, ThumbsUp, ThumbsDown, UserCheck, X, MessageSquare, ArrowRight, FileText, RotateCcw, Users2, Send, Timer, ImageIcon, Ban } from "lucide-react";
+import { ArrowLeft, Clock, CheckCircle2, Circle, ChevronRight, Trash2, AlertTriangle, MonitorSmartphone, Copy, Check as CheckIcon, ClipboardList, Plus, ExternalLink, Shield, ShieldCheck, ShieldX, ThumbsUp, ThumbsDown, UserCheck, X, MessageSquare, ArrowRight, FileText, RotateCcw, Users2, Send, Timer, ImageIcon, Ban, Edit2 } from "lucide-react";
 
 const TRANSITION_LABEL = {
   VIEWED:     "Marcar como Visualizado",
@@ -96,6 +96,12 @@ export default function TicketDetailPage() {
   const [cancelErr,        setCancelErr]        = useState("");
   const [showUnsavedModal, setShowUnsavedModal] = useState(false);
 
+  const [categories,        setCategories]        = useState([]);
+  const [editCat,           setEditCat]           = useState(false);
+  const [editCategoryId,    setEditCategoryId]    = useState("");
+  const [editSubcategoryId, setEditSubcategoryId] = useState("");
+  const [catSaving,         setCatSaving]         = useState(false);
+
   const isDirty = !!(form.internalNote.trim() || form.cause.trim() || form.solution.trim());
 
   useEffect(() => {
@@ -109,6 +115,7 @@ export default function TicketDetailPage() {
     load();
     api.get("/units").then((r) => setUnits(r.data));
     api.get("/technicians").then((r) => setTechs(r.data));
+    api.get("/categories").then((r) => setCategories(r.data));
     api.get(`/work-orders?ticketId=${id}`).then((r) => setLinkedOs(r.data));
     api.get(`/tickets/${id}/comments`).then((r) => setComments(r.data)).catch(() => {});
     api.get(`/tickets/${id}/messages`).then((r) => setMessages(r.data)).catch(() => {});
@@ -236,6 +243,24 @@ export default function TicketDetailPage() {
       setErr(e.response?.data?.error || "Erro ao transferir chamado");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function saveCategory() {
+    setCatSaving(true);
+    setErr("");
+    try {
+      const { data } = await api.patch(`/tickets/${id}/recategorize`, {
+        categoryId:    Number(editCategoryId),
+        subcategoryId: editSubcategoryId ? Number(editSubcategoryId) : null,
+      });
+      setTicket((t) => ({ ...t, category: data.category, subcategory: data.subcategory }));
+      setEditCat(false);
+      addToast({ message: "Categoria atualizada", type: "success" });
+    } catch (e) {
+      setErr(e.response?.data?.error || "Erro ao atualizar categoria");
+    } finally {
+      setCatSaving(false);
     }
   }
 
@@ -680,8 +705,77 @@ export default function TicketDetailPage() {
                   <InfoItem label="Departamento" value={ticket.department} />
                 </>
               )}
-              <InfoItem label="Categoria" value={ticket.category?.name} />
-              <InfoItem label="Subcategoria" value={ticket.subcategory?.name} />
+              {editCat ? (
+                <div className="sm:col-span-2 rounded-xl bg-slate-50 dark:bg-gray-800/60 px-3 py-3 space-y-2.5">
+                  <div className="text-xs font-medium text-slate-500 dark:text-gray-400">Alterar categoria</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[11px] text-slate-400 dark:text-gray-500 mb-1 block">Categoria *</label>
+                      <select
+                        value={editCategoryId}
+                        onChange={(e) => { setEditCategoryId(e.target.value); setEditSubcategoryId(""); }}
+                        className="field-input text-sm"
+                        autoFocus
+                      >
+                        <option value="">Selecione...</option>
+                        {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                    </div>
+                    {(() => {
+                      const cat = categories.find((c) => c.id === Number(editCategoryId));
+                      const needsSub = cat && !cat.allowsFreeText && cat.code !== "REMOTE";
+                      return (
+                        <div>
+                          <label className="text-[11px] text-slate-400 dark:text-gray-500 mb-1 block">
+                            Subcategoria {needsSub ? "*" : <span className="text-slate-300 dark:text-gray-600">(não aplicável)</span>}
+                          </label>
+                          <select
+                            value={editSubcategoryId}
+                            onChange={(e) => setEditSubcategoryId(e.target.value)}
+                            disabled={!needsSub}
+                            className="field-input text-sm disabled:opacity-40"
+                          >
+                            <option value="">{needsSub ? "Selecione..." : "—"}</option>
+                            {needsSub && cat.subcategories?.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                          </select>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={saveCategory}
+                      disabled={catSaving || !editCategoryId}
+                      className="inline-flex items-center gap-1 rounded-lg bg-brand-600 hover:bg-brand-700 text-white px-3 py-1.5 text-xs font-semibold transition disabled:opacity-60"
+                    >
+                      {catSaving ? <Spinner className="h-3 w-3" /> : <CheckIcon size={12} />} Salvar
+                    </button>
+                    <button onClick={() => setEditCat(false)} className="btn-secondary text-xs px-3 py-1.5">Cancelar</button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <InfoItem label="Categoria" value={ticket.category?.name} />
+                  <div className="flex items-stretch gap-1 min-w-0">
+                    <div className="flex-1 min-w-0">
+                      <InfoItem label="Subcategoria" value={ticket.subcategory?.name} />
+                    </div>
+                    {canTransition && !["COMPLETED","CANCELADO"].includes(ticket.status) && (
+                      <button
+                        onClick={() => {
+                          setEditCategoryId(String(ticket.category?.id ?? ""));
+                          setEditSubcategoryId(String(ticket.subcategory?.id ?? ""));
+                          setEditCat(true);
+                        }}
+                        title="Alterar categoria"
+                        className="shrink-0 self-center p-1.5 rounded-lg text-slate-400 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-slate-100 dark:hover:bg-gray-700 transition"
+                      >
+                        <Edit2 size={13} />
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
               <InfoItem label="Unidade" value={ticket.unit?.name} />
               <InfoItem label="Técnico" value={ticket.technician?.name} />
               {ticket.nucleoResponsavel && (

@@ -695,6 +695,57 @@ export async function assignTicket(req, res) {
   res.json({ ok: true, technician: updated.assignedTech, unit: updated.unit ? { id: updated.unit.id, name: updated.unit.name } : null });
 }
 
+// ── RECATEGORIZE ─────────────────────────────────────────────────────────────
+export async function recategorizeTicket(req, res) {
+  const id = Number(req.params.id);
+  const { categoryId, subcategoryId } = req.body || {};
+
+  if (!categoryId) return res.status(400).json({ error: "Categoria é obrigatória" });
+
+  const ticket = await prisma.ticket.findUnique({ where: { id } });
+  if (!ticket) return res.status(404).json({ error: "Chamado não encontrado" });
+  if (["COMPLETED", "CANCELADO"].includes(ticket.status)) {
+    return res.status(400).json({ error: "Não é possível alterar a categoria de chamados concluídos ou cancelados" });
+  }
+
+  const category = await prisma.category.findUnique({
+    where: { id: Number(categoryId) },
+    include: { subcategories: true },
+  });
+  if (!category) return res.status(400).json({ error: "Categoria não encontrada" });
+
+  const isRemote = category.code === "REMOTE";
+
+  let selectedSub = null;
+  if (subcategoryId) {
+    selectedSub = category.subcategories.find((s) => s.id === Number(subcategoryId));
+    if (!selectedSub) return res.status(400).json({ error: "Subcategoria inválida para essa categoria" });
+  } else if (!category.allowsFreeText && !isRemote) {
+    return res.status(400).json({ error: "Subcategoria é obrigatória para essa categoria" });
+  }
+
+  const updated = await prisma.ticket.update({
+    where: { id },
+    data: {
+      categoryId:       Number(categoryId),
+      subcategoryId:    selectedSub?.id ?? null,
+      nucleoResponsavel: selectedSub?.nucleoResponsavel ?? ticket.nucleoResponsavel,
+      history: {
+        create: {
+          fromStatus:   ticket.status,
+          toStatus:     ticket.status,
+          actorId:      req.user.id,
+          internalNote: `Categoria alterada: ${category.name}${selectedSub ? ` › ${selectedSub.name}` : ""}`,
+        },
+      },
+    },
+    include: { category: true, subcategory: true },
+  });
+
+  req.app.get("io")?.emit("ticket:updated", { ticketNumber: updated.ticketNumber, status: updated.status });
+  res.json({ category: updated.category, subcategory: updated.subcategory });
+}
+
 // ── COMMENTS ─────────────────────────────────────────────────────────────────
 export async function listComments(req, res) {
   const id = Number(req.params.id);
