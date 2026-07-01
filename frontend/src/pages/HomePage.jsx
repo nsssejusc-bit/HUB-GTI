@@ -40,7 +40,11 @@ export default function HomePage() {
   useEffect(() => {
     if (!user) return;
     if (user.mustChangePassword) { nav("/trocar-senha", { replace: true }); return; }
-    if (STAFF_ROLES.includes(user.role)) { nav(next?.startsWith("/painel") ? next : "/painel", { replace: true }); }
+    if (STAFF_ROLES.includes(user.role)) {
+      nav(next?.startsWith("/painel") ? next : "/painel", { replace: true });
+    } else {
+      nav("/meus-chamados", { replace: true });
+    }
   }, [user]);
 
   useEffect(() => {
@@ -70,7 +74,11 @@ export default function HomePage() {
     setLoggingIn(true);
     try {
       const u = await login(cpf, password);
-      if (STAFF_ROLES.includes(u.role)) nav(next?.startsWith("/painel") ? next : "/painel", { replace: true });
+      if (STAFF_ROLES.includes(u.role)) {
+        nav(next?.startsWith("/painel") ? next : "/painel", { replace: true });
+      } else {
+        nav("/meus-chamados", { replace: true });
+      }
     } catch (ex) {
       setErr(ex.response?.data?.error || "Credenciais incorretas.");
     } finally {
