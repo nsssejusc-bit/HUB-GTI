@@ -1,4 +1,4 @@
-CREATE TABLE `ConfigFlag` (
+CREATE TABLE IF NOT EXISTS `ConfigFlag` (
   `key`       VARCHAR(191) NOT NULL,
   `value`     VARCHAR(191) NOT NULL,
   `updatedAt` DATETIME(3)  NOT NULL,
