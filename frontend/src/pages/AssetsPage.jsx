@@ -30,6 +30,20 @@ const STATUS_TABS = [
   { key: "INATIVO",   label: "Inativos"      },
 ];
 
+// ── Campo de texto do formulário de cadastro ──────────────────────────────────
+function Field({ label, value, onChange, required, placeholder }) {
+  return (
+    <div>
+      <label className="field-label">{label}{required && " *"}</label>
+      <input
+        type="text" value={value} onChange={(e) => onChange(e.target.value)}
+        required={required} placeholder={placeholder}
+        className="field-input text-sm"
+      />
+    </div>
+  );
+}
+
 // ── Modal de criação ──────────────────────────────────────────────────────────
 function CreateAssetModal({ onClose, onCreate }) {
   const [form, setForm] = useState({
@@ -57,17 +71,6 @@ function CreateAssetModal({ onClose, onCreate }) {
     } finally { setSaving(false); }
   }
 
-  const Field = ({ label, k, required, placeholder }) => (
-    <div>
-      <label className="field-label">{label}{required && " *"}</label>
-      <input
-        type="text" value={form[k]} onChange={(e) => set(k, e.target.value)}
-        required={required} placeholder={placeholder}
-        className="field-input text-sm"
-      />
-    </div>
-  );
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
@@ -86,21 +89,21 @@ function CreateAssetModal({ onClose, onCreate }) {
 
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Field label="Tombo"    k="tombo"    required placeholder="Ex: 00123456" />
-            <Field label="Hostname" k="hostname" required placeholder="Ex: PC-RH-01" />
+            <Field label="Tombo"    value={form.tombo}    onChange={(v) => set("tombo", v)}    required placeholder="Ex: 00123456" />
+            <Field label="Hostname" value={form.hostname} onChange={(v) => set("hostname", v)} required placeholder="Ex: PC-RH-01" />
           </div>
-          <Field label="Processador (CPU)" k="cpu" required placeholder="Ex: Intel Core i5-10400" />
+          <Field label="Processador (CPU)" value={form.cpu} onChange={(v) => set("cpu", v)} required placeholder="Ex: Intel Core i5-10400" />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Field label="Memória RAM" k="ram"     required placeholder="Ex: 8 GB DDR4" />
-            <Field label="HD / SSD"    k="storage" required placeholder="Ex: SSD 240 GB" />
+            <Field label="Memória RAM" value={form.ram}     onChange={(v) => set("ram", v)}     required placeholder="Ex: 8 GB DDR4" />
+            <Field label="HD / SSD"    value={form.storage} onChange={(v) => set("storage", v)} required placeholder="Ex: SSD 240 GB" />
           </div>
-          <Field label="Sistema Operacional" k="operatingSystem" required placeholder="Ex: Windows 10 Pro" />
+          <Field label="Sistema Operacional" value={form.operatingSystem} onChange={(v) => set("operatingSystem", v)} required placeholder="Ex: Windows 10 Pro" />
 
           <div className="border-t border-slate-100 dark:border-gray-700 pt-3">
             <p className="text-xs font-medium text-slate-500 dark:text-gray-400 mb-2">Localização atual (opcional)</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Field label="Setor"       k="setor"       placeholder="Ex: Recursos Humanos" />
-              <Field label="Responsável" k="responsavel" placeholder="Ex: João Silva" />
+              <Field label="Setor"       value={form.setor}       onChange={(v) => set("setor", v)} placeholder="Ex: Recursos Humanos" />
+              <Field label="Responsável" value={form.responsavel} onChange={(v) => set("responsavel", v)} placeholder="Ex: João Silva" />
             </div>
           </div>
 

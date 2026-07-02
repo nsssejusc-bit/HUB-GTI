@@ -48,6 +48,9 @@ function fmtFieldValue(field, raw) {
   if (field.type === "multiselect") {
     return Array.isArray(raw) && raw.length > 0 ? raw.join(", ") : "—";
   }
+  if (field.type === "image") {
+    return raw ? "Imagem anexada" : "—";
+  }
   if (raw === undefined || raw === null || raw === "") return "—";
   if (field.type === "checkbox") return raw ? "Sim" : "Não";
   if (field.type === "date" && raw)
@@ -78,6 +81,49 @@ function InfoRow({ label, value }) {
 function DynamicField({ field, value, onChange }) {
   const cls = "field-input text-sm";
   const val = value ?? "";
+  const [imgErr, setImgErr] = useState("");
+
+  function handleImageFile(e) {
+    const file = e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      setImgErr("Imagem muito grande. Máximo 2 MB.");
+      return;
+    }
+    setImgErr("");
+    const reader = new FileReader();
+    reader.onload = (ev) => onChange(ev.target.result);
+    reader.readAsDataURL(file);
+  }
+
+  if (field.type === "image") {
+    return (
+      <div>
+        <label className="field-label">{field.label}{field.required && " *"}</label>
+        {val ? (
+          <div className="relative inline-block">
+            <img src={val} alt={field.label} className="max-h-40 rounded-lg border border-slate-200 dark:border-gray-700 object-contain" />
+            <button
+              type="button"
+              onClick={() => onChange("")}
+              className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-600 hover:bg-red-700 text-white transition"
+              title="Remover imagem"
+            >
+              <X size={12} />
+            </button>
+          </div>
+        ) : (
+          <label className="flex flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-slate-200 dark:border-gray-700 py-4 cursor-pointer hover:border-brand-400 dark:hover:border-brand-600 transition text-slate-400 dark:text-gray-500">
+            <ImageIcon size={18} />
+            <span className="text-xs">Selecionar imagem</span>
+            <input type="file" accept="image/*" className="sr-only" onChange={handleImageFile} />
+          </label>
+        )}
+        {imgErr && <p className="text-xs text-red-500 dark:text-red-400 mt-1">{imgErr}</p>}
+      </div>
+    );
+  }
 
   if (field.type === "textarea") {
     return (
@@ -809,11 +855,27 @@ export default function WorkOrderDetailPage() {
 
                   {tipoFields.length > 0 ? (
                     tipoFields.map((field) => (
-                      <InfoRow
-                        key={field.key}
-                        label={field.label}
-                        value={fmtFieldValue(field, formData[field.key])}
-                      />
+                      field.type === "image" ? (
+                        <div key={field.key}>
+                          <div className="text-xs text-slate-400 dark:text-gray-500 mb-0.5">{field.label}</div>
+                          {formData[field.key] ? (
+                            <img
+                              src={formData[field.key]}
+                              alt={field.label}
+                              className="max-h-40 rounded-lg border border-slate-200 dark:border-gray-700 object-contain cursor-zoom-in"
+                              onClick={() => setLightbox({ url: formData[field.key], originalName: field.label, size: null })}
+                            />
+                          ) : (
+                            <div className="text-sm text-slate-400">—</div>
+                          )}
+                        </div>
+                      ) : (
+                        <InfoRow
+                          key={field.key}
+                          label={field.label}
+                          value={fmtFieldValue(field, formData[field.key])}
+                        />
+                      )
                     ))
                   ) : (
                     <p className="text-xs text-slate-400 dark:text-gray-500 italic">Nenhum campo configurado para este tipo.</p>
@@ -1237,7 +1299,7 @@ export default function WorkOrderDetailPage() {
             onClick={(e) => e.stopPropagation()}
           />
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-xs text-white/60 truncate max-w-xs text-center">
-            {lightbox.originalName} · {(lightbox.size / 1024).toFixed(0)} KB
+            {lightbox.originalName}{lightbox.size ? ` · ${(lightbox.size / 1024).toFixed(0)} KB` : ""}
           </div>
         </div>
       )}

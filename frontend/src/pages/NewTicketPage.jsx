@@ -8,6 +8,7 @@ import {
   CheckCircle2, MonitorSmartphone, Copy, Check as CheckIcon, Printer, LogOut,
   Lightbulb, AlertTriangle, ShieldCheck, ChevronDown, ChevronRight, UserPlus,
   KeyRound, BookOpen, HelpCircle, Calendar, Database, Shield, Phone, Package,
+  Image as ImageIcon, X as XIcon,
 } from "lucide-react";
 
 // ── Ícones e cores por código de categoria (fallback quando a categoria não tem ícone/cor customizados) ──
@@ -546,6 +547,51 @@ function N1TipsBox({ tips, title }) {
   );
 }
 
+// ── Campo de imagem para formulários dinâmicos de tipo de OS ──────────────────
+function OsImageField({ label, required, value, onChange }) {
+  const [imgErr, setImgErr] = useState("");
+
+  function handleImageFile(e) {
+    const file = e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      setImgErr("Imagem muito grande. Máximo 2 MB.");
+      return;
+    }
+    setImgErr("");
+    const reader = new FileReader();
+    reader.onload = (ev) => onChange(ev.target.result);
+    reader.readAsDataURL(file);
+  }
+
+  return (
+    <div>
+      <label className="field-label">{label}{required && " *"}</label>
+      {value ? (
+        <div className="relative inline-block">
+          <img src={value} alt={label} className="max-h-40 rounded-lg border border-slate-200 dark:border-gray-700 object-contain" />
+          <button
+            type="button"
+            onClick={() => onChange("")}
+            className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-600 hover:bg-red-700 text-white transition"
+            title="Remover imagem"
+          >
+            <XIcon size={12} />
+          </button>
+        </div>
+      ) : (
+        <label className="flex flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-slate-200 dark:border-gray-700 py-4 cursor-pointer hover:border-brand-400 dark:hover:border-brand-600 transition text-slate-400 dark:text-gray-500">
+          <ImageIcon size={18} />
+          <span className="text-xs">Selecionar imagem</span>
+          <input type="file" accept="image/*" className="sr-only" onChange={handleImageFile} />
+        </label>
+      )}
+      {imgErr && <p className="text-xs text-red-500 dark:text-red-400 mt-1">{imgErr}</p>}
+    </div>
+  );
+}
+
 // ── Página principal ─────────────────────────────────────────────────────────
 export default function NewTicketPage() {
   const nav          = useNavigate();
@@ -1044,6 +1090,17 @@ export default function NewTicketPage() {
                         {(linkedOsType?.fields ?? []).map((field) => {
                           const val = osPreFill.formData[field.key] ?? "";
                           const setVal = (v) => setOsPreFill((p) => ({ ...p, formData: { ...p.formData, [field.key]: v } }));
+                          if (field.type === "image") {
+                            return (
+                              <OsImageField
+                                key={field.key}
+                                label={field.label}
+                                required={field.required}
+                                value={val}
+                                onChange={setVal}
+                              />
+                            );
+                          }
                           return (
                             <div key={field.key}>
                               <label className="field-label">

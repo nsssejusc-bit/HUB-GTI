@@ -7,7 +7,7 @@ import AppHeader from "../components/AppHeader";
 import { OS_STATUS_LABEL, OS_STATUS_STYLE } from "../lib/osConstants";
 import {
   ClipboardList, Plus, ChevronRight, MapPin,
-  Users, Filter, RefreshCw, Clock, Monitor, X, Check, Search,
+  Users, Filter, RefreshCw, Clock, Monitor, X, Check, Search, Image as ImageIcon,
 } from "lucide-react";
 
 const STATUS_TABS = [
@@ -16,6 +16,8 @@ const STATUS_TABS = [
   { key: "EM_ANDAMENTO", label: "Em Andamento" },
   { key: "CONCLUIDA",    label: "Concluídas"   },
 ];
+
+const MAX_FIELD_IMG_BYTES = 2 * 1024 * 1024; // 2 MB
 
 function fmtDate(d) {
   if (!d) return null;
@@ -46,6 +48,49 @@ function TipoBadge({ tipo }) {
 function DynamicField({ field, value, onChange }) {
   const cls = "field-input text-sm";
   const val = value ?? "";
+  const [imgErr, setImgErr] = useState("");
+
+  function handleImageFile(e) {
+    const file = e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    if (file.size > MAX_FIELD_IMG_BYTES) {
+      setImgErr("Imagem muito grande. Máximo 2 MB.");
+      return;
+    }
+    setImgErr("");
+    const reader = new FileReader();
+    reader.onload = (ev) => onChange(ev.target.result);
+    reader.readAsDataURL(file);
+  }
+
+  if (field.type === "image") {
+    return (
+      <div>
+        <label className="field-label">{field.label}{field.required && " *"}</label>
+        {val ? (
+          <div className="relative inline-block">
+            <img src={val} alt={field.label} className="max-h-40 rounded-lg border border-slate-200 dark:border-gray-700 object-contain" />
+            <button
+              type="button"
+              onClick={() => onChange("")}
+              className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-600 hover:bg-red-700 text-white transition"
+              title="Remover imagem"
+            >
+              <X size={12} />
+            </button>
+          </div>
+        ) : (
+          <label className="flex flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-slate-200 dark:border-gray-700 py-4 cursor-pointer hover:border-brand-400 dark:hover:border-brand-600 transition text-slate-400 dark:text-gray-500">
+            <ImageIcon size={18} />
+            <span className="text-xs">Selecionar imagem</span>
+            <input type="file" accept="image/*" className="sr-only" onChange={handleImageFile} />
+          </label>
+        )}
+        {imgErr && <p className="text-xs text-red-500 dark:text-red-400 mt-1">{imgErr}</p>}
+      </div>
+    );
+  }
 
   if (field.type === "textarea") {
     return (

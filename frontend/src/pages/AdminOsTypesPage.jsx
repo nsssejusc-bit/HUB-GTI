@@ -16,6 +16,7 @@ const FIELD_TYPES = [
   { value: "select",      label: "Lista de opções" },
   { value: "multiselect", label: "Múltipla escolha"},
   { value: "checkbox",    label: "Sim / Não"       },
+  { value: "image",       label: "Imagem"          },
 ];
 
 const PRESET_COLORS = [
