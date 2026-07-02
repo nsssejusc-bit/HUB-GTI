@@ -8,13 +8,14 @@ import {
 } from "lucide-react";
 
 const FIELD_TYPES = [
-  { value: "text",      label: "Texto curto"    },
-  { value: "textarea",  label: "Texto longo"    },
-  { value: "number",    label: "Número"         },
-  { value: "date",      label: "Data"           },
-  { value: "datetime",  label: "Data e hora"    },
-  { value: "select",    label: "Lista de opções"},
-  { value: "checkbox",  label: "Sim / Não"      },
+  { value: "text",        label: "Texto curto"     },
+  { value: "textarea",    label: "Texto longo"     },
+  { value: "number",      label: "Número"          },
+  { value: "date",        label: "Data"            },
+  { value: "datetime",    label: "Data e hora"     },
+  { value: "select",      label: "Lista de opções" },
+  { value: "multiselect", label: "Múltipla escolha"},
+  { value: "checkbox",    label: "Sim / Não"       },
 ];
 
 const PRESET_COLORS = [
@@ -111,7 +112,7 @@ function FieldEditor({ field, index, total, onChange, onRemove, onMoveUp, onMove
               <label htmlFor={`req-${index}`} className="text-sm text-slate-700 dark:text-gray-300">Obrigatório</label>
             </div>
           </div>
-          {field.type === "select" && (
+          {(field.type === "select" || field.type === "multiselect") && (
             <div>
               <label className="field-label">Opções</label>
               <div className="space-y-1 mb-2">

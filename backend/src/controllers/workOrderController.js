@@ -168,7 +168,9 @@ export async function createWorkOrder(req, res) {
   for (const field of fields) {
     if (field.required) {
       const val = data.formData[field.key];
-      if (val === undefined || val === null || val === "") {
+      const isEmpty = val === undefined || val === null || val === ""
+        || (Array.isArray(val) && val.length === 0);
+      if (isEmpty) {
         return res.status(400).json({ error: `Campo "${field.label}" é obrigatório` });
       }
     }

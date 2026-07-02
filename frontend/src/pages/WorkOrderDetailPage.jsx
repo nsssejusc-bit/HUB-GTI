@@ -45,6 +45,9 @@ function fmtDate(d) {
 }
 
 function fmtFieldValue(field, raw) {
+  if (field.type === "multiselect") {
+    return Array.isArray(raw) && raw.length > 0 ? raw.join(", ") : "—";
+  }
   if (raw === undefined || raw === null || raw === "") return "—";
   if (field.type === "checkbox") return raw ? "Sim" : "Não";
   if (field.type === "date" && raw)
@@ -93,6 +96,34 @@ function DynamicField({ field, value, onChange }) {
           <option value="">Selecione...</option>
           {(field.options || []).map((opt) => <option key={opt} value={opt}>{opt}</option>)}
         </select>
+      </div>
+    );
+  }
+  if (field.type === "multiselect") {
+    const arr = Array.isArray(value) ? value : [];
+    return (
+      <div>
+        <label className="field-label">{field.label}{field.required && " *"}</label>
+        <div className="flex flex-wrap gap-2">
+          {(field.options || []).map((opt) => {
+            const checked = arr.includes(opt);
+            return (
+              <label key={opt} className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm cursor-pointer transition ${
+                checked
+                  ? "border-brand-400 dark:border-brand-600 bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-300"
+                  : "border-slate-200 dark:border-gray-700 text-slate-600 dark:text-gray-300"
+              }`}>
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => onChange(checked ? arr.filter((o) => o !== opt) : [...arr, opt])}
+                  className="h-3.5 w-3.5 rounded"
+                />
+                {opt}
+              </label>
+            );
+          })}
+        </div>
       </div>
     );
   }

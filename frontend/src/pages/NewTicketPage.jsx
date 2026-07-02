@@ -1054,6 +1054,28 @@ export default function NewTicketPage() {
                                   <option value="">Selecione...</option>
                                   {(field.options ?? []).map((o) => <option key={o} value={o}>{o}</option>)}
                                 </select>
+                              ) : field.type === "multiselect" ? (
+                                <div className="flex flex-wrap gap-2">
+                                  {(field.options ?? []).map((opt) => {
+                                    const arr = Array.isArray(val) ? val : [];
+                                    const checked = arr.includes(opt);
+                                    return (
+                                      <label key={opt} className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm cursor-pointer transition ${
+                                        checked
+                                          ? "border-brand-400 dark:border-brand-600 bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-300"
+                                          : "border-slate-200 dark:border-gray-700 text-slate-600 dark:text-gray-300"
+                                      }`}>
+                                        <input
+                                          type="checkbox"
+                                          checked={checked}
+                                          onChange={() => setVal(checked ? arr.filter((o) => o !== opt) : [...arr, opt])}
+                                          className="h-3.5 w-3.5 rounded"
+                                        />
+                                        {opt}
+                                      </label>
+                                    );
+                                  })}
+                                </div>
                               ) : field.type === "textarea" ? (
                                 <textarea rows={3} value={val} onChange={(e) => setVal(e.target.value)} className="field-input resize-none" />
                               ) : (
