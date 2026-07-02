@@ -8,7 +8,9 @@ import AppHeader from "../components/AppHeader";
 import { formatElapsed, formatRelative, STATUS_LABEL, STATUS_ORDER, statusIndex } from "../lib/statuses";
 import { useServerTick, serverNow } from "../lib/serverTime";
 import { isImageMessage } from "../lib/messages";
-import { ArrowLeft, Clock, CheckCircle2, Circle, ChevronRight, Trash2, AlertTriangle, MonitorSmartphone, Copy, Check as CheckIcon, ClipboardList, Plus, ExternalLink, Shield, ShieldCheck, ShieldX, ThumbsUp, ThumbsDown, UserCheck, X, MessageSquare, ArrowRight, FileText, RotateCcw, Users2, Send, Timer, ImageIcon, Ban, Edit2, Star } from "lucide-react";
+import { ArrowLeft, Clock, CheckCircle2, Circle, ChevronRight, Trash2, AlertTriangle, MonitorSmartphone, Copy, Check as CheckIcon, ClipboardList, Plus, ExternalLink, Shield, ShieldCheck, ShieldX, ThumbsUp, ThumbsDown, UserCheck, X, MessageSquare, ArrowRight, FileText, RotateCcw, Users2, Send, Timer, ImageIcon, Ban, Edit2, Star, Pin, PinOff } from "lucide-react";
+
+const CHAT_STICKY_KEY = "hd_chat_sticky";
 
 const TRANSITION_LABEL = {
   VIEWED:     "Marcar como Visualizado",
@@ -86,6 +88,15 @@ export default function TicketDetailPage() {
   const msgEndRef     = useRef(null);
   const msgImgRef     = useRef(null);
   const scrollFlagRef = useRef(true);
+  const [chatSticky, setChatSticky] = useState(() => localStorage.getItem(CHAT_STICKY_KEY) !== "0");
+
+  function toggleChatSticky() {
+    setChatSticky((v) => {
+      const next = !v;
+      localStorage.setItem(CHAT_STICKY_KEY, next ? "1" : "0");
+      return next;
+    });
+  }
   const [deleting, setDeleting] = useState(false);
   const [showReopenModal,  setShowReopenModal]  = useState(false);
   const [reopenReason,     setReopenReason]     = useState("");
@@ -621,10 +632,10 @@ export default function TicketDetailPage() {
         </div>
       </div>
 
-      <main className="max-w-6xl mx-auto p-4 md:p-6 grid lg:grid-cols-5 gap-5">
+      <main className="max-w-6xl mx-auto p-4 md:p-6 grid lg:grid-cols-2 gap-5">
 
-        {/* ── Coluna principal ── */}
-        <div className="lg:col-span-3 space-y-4">
+        {/* ── Coluna A: informações do chamado ── */}
+        <div className="space-y-4">
 
           {/* Status + tempo */}
           <div className="card px-5 py-4 flex flex-wrap items-center justify-between gap-3">
@@ -674,16 +685,6 @@ export default function TicketDetailPage() {
               );
             })()}
           </div>
-
-          {/* Painel de aprovação */}
-          {ticket.approvalStatus && ticket.approvalStatus !== "NOT_REQUIRED" && (
-            <ApprovalPanel approvalStatus={ticket.approvalStatus} approvals={ticket.approvals || []} />
-          )}
-
-          {/* Painel AnyDesk — visível para técnico/monitor quando é remoto */}
-          {ticket.isRemote && ticket.anyDeskCode && (
-            <AnyDeskPanel code={ticket.anyDeskCode} status={ticket.status} />
-          )}
 
           {/* Dados */}
           <div className="card p-5">
@@ -979,6 +980,66 @@ export default function TicketDetailPage() {
             );
           })()}
 
+          {/* Histórico */}
+          <div className="card p-5">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-gray-100 mb-4">Histórico</h3>
+            <ol className="space-y-3">
+              {ticket.history.map((h, i) => {
+                const hasNote = !!h.internalNote;
+                const isFirst = !h.fromStatus;
+                const HistIcon = hasNote ? MessageSquare : isFirst ? FileText : ArrowRight;
+                const iconCls  = hasNote
+                  ? "bg-amber-50 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400"
+                  : isFirst
+                  ? "bg-brand-50 dark:bg-brand-900/40 text-brand-600 dark:text-brand-400"
+                  : "bg-slate-100 dark:bg-gray-800 text-slate-500 dark:text-gray-400";
+                return (
+                  <li key={h.id} className="flex gap-3">
+                    <div className="flex flex-col items-center">
+                      <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${iconCls}`}>
+                        <HistIcon size={12} />
+                      </div>
+                      {i < ticket.history.length - 1 && (
+                        <div className="w-px flex-1 bg-slate-300 dark:bg-gray-600 my-1 min-h-[16px]" />
+                      )}
+                    </div>
+                    <div className="pb-1">
+                      <div className="text-sm font-medium text-slate-800 dark:text-gray-100">
+                        {h.fromStatus ? (
+                          <><span className="text-slate-400 dark:text-gray-500">{STATUS_LABEL[h.fromStatus]}</span>{" → "}</>
+                        ) : null}
+                        {STATUS_LABEL[h.toStatus]}
+                      </div>
+                      <div className="text-xs text-slate-500 dark:text-gray-400 mt-0.5">
+                        {new Date(h.createdAt).toLocaleString("pt-BR")}
+                        {h.actor && <span className="ml-1">· {h.actor.name}</span>}
+                      </div>
+                      {h.internalNote && (
+                        <div className="mt-1.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 px-3 py-1.5 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-1.5">
+                          <MessageSquare size={11} className="shrink-0 mt-0.5" />
+                          {h.internalNote}
+                        </div>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+        </div>
+
+        {/* ── Coluna B: ação e comunicação ── */}
+        <aside className="space-y-4">
+          {/* Painel de aprovação */}
+          {ticket.approvalStatus && ticket.approvalStatus !== "NOT_REQUIRED" && (
+            <ApprovalPanel approvalStatus={ticket.approvalStatus} approvals={ticket.approvals || []} />
+          )}
+
+          {/* Painel AnyDesk — visível para técnico/monitor quando é remoto */}
+          {ticket.isRemote && ticket.anyDeskCode && (
+            <AnyDeskPanel code={ticket.anyDeskCode} status={ticket.status} />
+          )}
+
           {/* Ordens de Serviço vinculadas */}
           <div className="card p-5">
             <div className="flex items-center justify-between mb-3">
@@ -1052,211 +1113,6 @@ export default function TicketDetailPage() {
                 ))}
               </div>
             )}
-          </div>
-
-          {/* Histórico */}
-          <div className="card p-5">
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-gray-100 mb-4">Histórico</h3>
-            <ol className="space-y-3">
-              {ticket.history.map((h, i) => {
-                const hasNote = !!h.internalNote;
-                const isFirst = !h.fromStatus;
-                const HistIcon = hasNote ? MessageSquare : isFirst ? FileText : ArrowRight;
-                const iconCls  = hasNote
-                  ? "bg-amber-50 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400"
-                  : isFirst
-                  ? "bg-brand-50 dark:bg-brand-900/40 text-brand-600 dark:text-brand-400"
-                  : "bg-slate-100 dark:bg-gray-800 text-slate-500 dark:text-gray-400";
-                return (
-                  <li key={h.id} className="flex gap-3">
-                    <div className="flex flex-col items-center">
-                      <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${iconCls}`}>
-                        <HistIcon size={12} />
-                      </div>
-                      {i < ticket.history.length - 1 && (
-                        <div className="w-px flex-1 bg-slate-300 dark:bg-gray-600 my-1 min-h-[16px]" />
-                      )}
-                    </div>
-                    <div className="pb-1">
-                      <div className="text-sm font-medium text-slate-800 dark:text-gray-100">
-                        {h.fromStatus ? (
-                          <><span className="text-slate-400 dark:text-gray-500">{STATUS_LABEL[h.fromStatus]}</span>{" → "}</>
-                        ) : null}
-                        {STATUS_LABEL[h.toStatus]}
-                      </div>
-                      <div className="text-xs text-slate-500 dark:text-gray-400 mt-0.5">
-                        {new Date(h.createdAt).toLocaleString("pt-BR")}
-                        {h.actor && <span className="ml-1">· {h.actor.name}</span>}
-                      </div>
-                      {h.internalNote && (
-                        <div className="mt-1.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 px-3 py-1.5 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-1.5">
-                          <MessageSquare size={11} className="shrink-0 mt-0.5" />
-                          {h.internalNote}
-                        </div>
-                      )}
-                    </div>
-                  </li>
-                );
-              })}
-            </ol>
-          </div>
-          {/* Comentários */}
-          <div className="card p-5 space-y-3">
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-gray-100 flex items-center gap-2">
-              <MessageSquare size={14} className="text-brand-600" />
-              Comentários ({comments.length})
-            </h3>
-
-            {comments.length === 0 ? (
-              <p className="text-sm text-slate-400 dark:text-gray-500">Nenhum comentário ainda.</p>
-            ) : (
-              <div className="space-y-3">
-                {comments.map((c) => {
-                  const isStaff = ["ADMIN", "TECHNICIAN"].includes(c.author?.role);
-                  return (
-                    <div key={c.id} className={`flex gap-3 ${isStaff ? "flex-row-reverse" : ""}`}>
-                      <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
-                        isStaff ? "bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-400" : "bg-slate-100 dark:bg-gray-700 text-slate-600 dark:text-gray-300"
-                      }`}>
-                        {c.author?.name?.charAt(0).toUpperCase()}
-                      </div>
-                      <div className={`flex-1 ${isStaff ? "items-end" : "items-start"} flex flex-col`}>
-                        <div className={`rounded-xl px-3 py-2 text-sm max-w-[85%] ${
-                          isStaff
-                            ? "bg-brand-50 dark:bg-brand-900/20 text-brand-900 dark:text-brand-100"
-                            : "bg-slate-100 dark:bg-gray-800 text-slate-800 dark:text-gray-200"
-                        }`}>
-                          {c.text}
-                        </div>
-                        <div className="text-[10px] text-slate-400 dark:text-gray-500 mt-0.5 px-1">
-                          {c.author?.name} · {new Date(c.createdAt).toLocaleString("pt-BR")}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {ticket.status !== "COMPLETED" && (
-              <div className="flex gap-2 pt-1">
-                <input
-                  type="text"
-                  className="field-input flex-1 text-sm"
-                  placeholder="Escreva um comentário..."
-                  value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); doAddComment(); } }}
-                />
-                <button
-                  onClick={doAddComment}
-                  disabled={!newComment.trim() || commentSending}
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-600 hover:bg-brand-700 text-white disabled:opacity-50 transition"
-                >
-                  {commentSending ? <Spinner className="h-4 w-4" /> : <Send size={15} />}
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* ── Sidebar de ações ── */}
-        <aside className="lg:col-span-2 space-y-4">
-          {/* Mensagens ao solicitante — fixo no topo da coluna direita para não precisar rolar a página */}
-          <div className="lg:sticky lg:top-16 lg:max-h-[calc(100vh-5rem)] lg:overflow-y-auto z-10 card p-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-slate-900 dark:text-gray-100 flex items-center gap-2">
-                <Send size={14} className="text-brand-600" />
-                Mensagens ao solicitante
-                {messages.length > 0 && (
-                  <span className="rounded-full bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-400 text-[10px] font-semibold px-2 py-0.5">
-                    {messages.length}
-                  </span>
-                )}
-              </h3>
-              <span className="text-[10px] rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 font-medium">
-                VISÍVEL AO SOLICITANTE
-              </span>
-            </div>
-
-            {messages.length === 0 ? (
-              <p className="text-sm text-slate-400 dark:text-gray-500">Nenhuma mensagem enviada ainda.</p>
-            ) : (
-              <div className="max-h-[50vh] overflow-y-auto space-y-2.5 pr-1">
-                {messages.map((m) => (
-                  <div key={m.id} className={`flex gap-2.5 ${m.fromUser ? "" : "flex-row-reverse"}`}>
-                    {/* Avatar com iniciais reais */}
-                    <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
-                      m.fromUser
-                        ? "bg-slate-100 dark:bg-gray-700 text-slate-600 dark:text-gray-300"
-                        : "bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-400"
-                    }`}>
-                      {m.fromUser
-                        ? getInitials(ticket.requesterName)
-                        : getInitials(m.author?.name || "Técnico")}
-                    </div>
-                    <div className={`flex flex-col ${m.fromUser ? "items-start" : "items-end"} max-w-[85%]`}>
-                      <div className={`rounded-xl text-sm overflow-hidden ${
-                        isImageMessage(m.content) ? "p-1" :
-                        m.fromUser
-                          ? "bg-slate-100 dark:bg-gray-800 text-slate-800 dark:text-gray-200 px-3 py-2"
-                          : "bg-brand-50 dark:bg-brand-900/20 text-brand-900 dark:text-brand-100 px-3 py-2"
-                      }`}>
-                        {isImageMessage(m.content)
-                          ? <img src={m.content} alt="imagem" className="max-w-[260px] max-h-64 rounded-lg object-contain cursor-zoom-in" onClick={() => setLightbox(m.content)} />
-                          : m.content}
-                      </div>
-                      {/* Timestamp relativo com data completa no hover */}
-                      <div
-                        className="text-[10px] text-slate-400 dark:text-gray-500 mt-0.5 px-1 cursor-default"
-                        title={new Date(m.createdAt).toLocaleString("pt-BR")}
-                      >
-                        {m.fromUser
-                          ? (ticket.requesterName?.split(" ")[0] || "Solicitante")
-                          : (m.author?.name?.split(" ")[0] || "Técnico")}
-                        {" · "}
-                        {formatRelative(m.createdAt)}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                <div ref={msgEndRef} />
-              </div>
-            )}
-
-            <input ref={msgImgRef} type="file" accept="image/*" className="sr-only" onChange={handleMsgImage} />
-            <div className="flex gap-2 pt-1">
-              <textarea
-                rows={3}
-                className="field-input flex-1 text-sm resize-none"
-                placeholder="Escreva uma mensagem que o solicitante verá ao acompanhar o chamado..."
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); doSendMessage(); } }}
-                onPaste={handleMsgPaste}
-              />
-              <div className="flex flex-col gap-1.5 self-end">
-                <button
-                  type="button"
-                  onClick={() => msgImgRef.current?.click()}
-                  disabled={msgSending}
-                  className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400 hover:bg-slate-50 dark:hover:bg-gray-700 disabled:opacity-50 transition"
-                  title="Enviar imagem (máx. 3 MB)"
-                >
-                  <ImageIcon size={15} />
-                </button>
-                <button
-                  onClick={doSendMessage}
-                  disabled={!newMessage.trim() || msgSending}
-                  className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 hover:bg-brand-700 text-white disabled:opacity-50 transition"
-                  title="Enviar (Enter)"
-                >
-                  {msgSending ? <Spinner className="h-4 w-4" /> : <Send size={15} />}
-                </button>
-              </div>
-            </div>
-            {msgErr && <p className="text-xs text-red-500 dark:text-red-400">{msgErr}</p>}
-            <p className="text-[10px] text-slate-400 dark:text-gray-500">Enter para enviar · Shift+Enter para nova linha</p>
           </div>
 
           <div className="card p-5 space-y-3">
@@ -1468,6 +1324,175 @@ export default function TicketDetailPage() {
                     })}
                 </div>
               </>
+            )}
+          </div>
+
+          {/* Mensagens ao solicitante */}
+          <div className={`${chatSticky ? "lg:sticky lg:top-16 lg:max-h-[calc(100vh-5rem)] lg:overflow-y-auto" : ""} z-10 card p-5 space-y-3`}>
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-gray-100 flex items-center gap-2">
+                <Send size={14} className="text-brand-600" />
+                Mensagens ao solicitante
+                {messages.length > 0 && (
+                  <span className="rounded-full bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-400 text-[10px] font-semibold px-2 py-0.5">
+                    {messages.length}
+                  </span>
+                )}
+              </h3>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  onClick={toggleChatSticky}
+                  title={chatSticky ? "Desafixar mensagens ao rolar a página" : "Fixar mensagens ao rolar a página"}
+                  className={`hidden lg:flex h-6 w-6 items-center justify-center rounded-lg transition ${
+                    chatSticky
+                      ? "text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-900/30"
+                      : "text-slate-400 dark:text-gray-500 hover:bg-slate-100 dark:hover:bg-gray-700"
+                  }`}
+                >
+                  {chatSticky ? <Pin size={12} /> : <PinOff size={12} />}
+                </button>
+                <span className="text-[10px] rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 font-medium">
+                  VISÍVEL AO SOLICITANTE
+                </span>
+              </div>
+            </div>
+
+            {messages.length === 0 ? (
+              <p className="text-sm text-slate-400 dark:text-gray-500">Nenhuma mensagem enviada ainda.</p>
+            ) : (
+              <div className="max-h-[50vh] overflow-y-auto space-y-2.5 pr-1">
+                {messages.map((m) => (
+                  <div key={m.id} className={`flex gap-2.5 ${m.fromUser ? "" : "flex-row-reverse"}`}>
+                    {/* Avatar com iniciais reais */}
+                    <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                      m.fromUser
+                        ? "bg-slate-100 dark:bg-gray-700 text-slate-600 dark:text-gray-300"
+                        : "bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-400"
+                    }`}>
+                      {m.fromUser
+                        ? getInitials(ticket.requesterName)
+                        : getInitials(m.author?.name || "Técnico")}
+                    </div>
+                    <div className={`flex flex-col ${m.fromUser ? "items-start" : "items-end"} max-w-[85%]`}>
+                      <div className={`rounded-xl text-sm overflow-hidden ${
+                        isImageMessage(m.content) ? "p-1" :
+                        m.fromUser
+                          ? "bg-slate-100 dark:bg-gray-800 text-slate-800 dark:text-gray-200 px-3 py-2"
+                          : "bg-brand-50 dark:bg-brand-900/20 text-brand-900 dark:text-brand-100 px-3 py-2"
+                      }`}>
+                        {isImageMessage(m.content)
+                          ? <img src={m.content} alt="imagem" className="max-w-[260px] max-h-64 rounded-lg object-contain cursor-zoom-in" onClick={() => setLightbox(m.content)} />
+                          : m.content}
+                      </div>
+                      {/* Timestamp relativo com data completa no hover */}
+                      <div
+                        className="text-[10px] text-slate-400 dark:text-gray-500 mt-0.5 px-1 cursor-default"
+                        title={new Date(m.createdAt).toLocaleString("pt-BR")}
+                      >
+                        {m.fromUser
+                          ? (ticket.requesterName?.split(" ")[0] || "Solicitante")
+                          : (m.author?.name?.split(" ")[0] || "Técnico")}
+                        {" · "}
+                        {formatRelative(m.createdAt)}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                <div ref={msgEndRef} />
+              </div>
+            )}
+
+            <input ref={msgImgRef} type="file" accept="image/*" className="sr-only" onChange={handleMsgImage} />
+            <div className="flex gap-2 pt-1">
+              <textarea
+                rows={3}
+                className="field-input flex-1 text-sm resize-none"
+                placeholder="Escreva uma mensagem que o solicitante verá ao acompanhar o chamado..."
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); doSendMessage(); } }}
+                onPaste={handleMsgPaste}
+              />
+              <div className="flex flex-col gap-1.5 self-end">
+                <button
+                  type="button"
+                  onClick={() => msgImgRef.current?.click()}
+                  disabled={msgSending}
+                  className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400 hover:bg-slate-50 dark:hover:bg-gray-700 disabled:opacity-50 transition"
+                  title="Enviar imagem (máx. 3 MB)"
+                >
+                  <ImageIcon size={15} />
+                </button>
+                <button
+                  onClick={doSendMessage}
+                  disabled={!newMessage.trim() || msgSending}
+                  className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 hover:bg-brand-700 text-white disabled:opacity-50 transition"
+                  title="Enviar (Enter)"
+                >
+                  {msgSending ? <Spinner className="h-4 w-4" /> : <Send size={15} />}
+                </button>
+              </div>
+            </div>
+            {msgErr && <p className="text-xs text-red-500 dark:text-red-400">{msgErr}</p>}
+            <p className="text-[10px] text-slate-400 dark:text-gray-500">Enter para enviar · Shift+Enter para nova linha</p>
+          </div>
+
+          {/* Comentários */}
+          <div className="card p-5 space-y-3">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-gray-100 flex items-center gap-2">
+              <MessageSquare size={14} className="text-brand-600" />
+              Comentários ({comments.length})
+            </h3>
+
+            {comments.length === 0 ? (
+              <p className="text-sm text-slate-400 dark:text-gray-500">Nenhum comentário ainda.</p>
+            ) : (
+              <div className="space-y-3">
+                {comments.map((c) => {
+                  const isStaff = ["ADMIN", "TECHNICIAN"].includes(c.author?.role);
+                  return (
+                    <div key={c.id} className={`flex gap-3 ${isStaff ? "flex-row-reverse" : ""}`}>
+                      <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                        isStaff ? "bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-400" : "bg-slate-100 dark:bg-gray-700 text-slate-600 dark:text-gray-300"
+                      }`}>
+                        {c.author?.name?.charAt(0).toUpperCase()}
+                      </div>
+                      <div className={`flex-1 ${isStaff ? "items-end" : "items-start"} flex flex-col`}>
+                        <div className={`rounded-xl px-3 py-2 text-sm max-w-[85%] ${
+                          isStaff
+                            ? "bg-brand-50 dark:bg-brand-900/20 text-brand-900 dark:text-brand-100"
+                            : "bg-slate-100 dark:bg-gray-800 text-slate-800 dark:text-gray-200"
+                        }`}>
+                          {c.text}
+                        </div>
+                        <div className="text-[10px] text-slate-400 dark:text-gray-500 mt-0.5 px-1">
+                          {c.author?.name} · {new Date(c.createdAt).toLocaleString("pt-BR")}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {ticket.status !== "COMPLETED" && (
+              <div className="flex gap-2 pt-1">
+                <input
+                  type="text"
+                  className="field-input flex-1 text-sm"
+                  placeholder="Escreva um comentário..."
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); doAddComment(); } }}
+                />
+                <button
+                  onClick={doAddComment}
+                  disabled={!newComment.trim() || commentSending}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-600 hover:bg-brand-700 text-white disabled:opacity-50 transition"
+                >
+                  {commentSending ? <Spinner className="h-4 w-4" /> : <Send size={15} />}
+                </button>
+              </div>
             )}
           </div>
         </aside>
