@@ -4,7 +4,7 @@ import { prisma } from "../config/prisma.js";
 const fieldSchema = z.object({
   key:      z.string().min(1).max(50).regex(/^[a-zA-Z][a-zA-Z0-9_]*$/),
   label:    z.string().min(1).max(100),
-  type:     z.enum(["text", "textarea", "number", "date", "datetime", "select", "checkbox"]),
+  type:     z.enum(["text", "textarea", "number", "date", "datetime", "select", "multiselect", "checkbox"]),
   required: z.boolean().default(false),
   options:  z.array(z.string().min(1).max(200)).optional(),
 });
