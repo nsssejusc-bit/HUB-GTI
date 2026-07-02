@@ -8,7 +8,7 @@ import { OS_STATUS_LABEL, OS_STATUS_STYLE } from "../lib/osConstants";
 import {
   ArrowLeft, ChevronRight, Monitor, Edit2, Check, X, Trash2,
   AlertTriangle, MapPin, User, Clock, Plus, History,
-  ClipboardList, ExternalLink,
+  ClipboardList, ExternalLink, Image as ImageIcon,
 } from "lucide-react";
 
 const STATUS_LABEL = {
@@ -165,6 +165,51 @@ function DeleteModal({ asset, onClose, onDeleted }) {
   );
 }
 
+// ── Campo de imagem para formulários dinâmicos de tipo de OS ──────────────────
+function OsImageField({ label, required, value, onChange }) {
+  const [imgErr, setImgErr] = useState("");
+
+  function handleImageFile(e) {
+    const file = e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      setImgErr("Imagem muito grande. Máximo 2 MB.");
+      return;
+    }
+    setImgErr("");
+    const reader = new FileReader();
+    reader.onload = (ev) => onChange(ev.target.result);
+    reader.readAsDataURL(file);
+  }
+
+  return (
+    <div>
+      <label className="field-label">{label}{required && " *"}</label>
+      {value ? (
+        <div className="relative inline-block">
+          <img src={value} alt={label} className="max-h-40 rounded-lg border border-slate-200 dark:border-gray-700 object-contain" />
+          <button
+            type="button"
+            onClick={() => onChange("")}
+            className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-600 hover:bg-red-700 text-white transition"
+            title="Remover imagem"
+          >
+            <X size={12} />
+          </button>
+        </div>
+      ) : (
+        <label className="flex flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-slate-200 dark:border-gray-700 py-4 cursor-pointer hover:border-brand-400 dark:hover:border-brand-600 transition text-slate-400 dark:text-gray-500">
+          <ImageIcon size={18} />
+          <span className="text-xs">Selecionar imagem</span>
+          <input type="file" accept="image/*" className="sr-only" onChange={handleImageFile} />
+        </label>
+      )}
+      {imgErr && <p className="text-xs text-red-500 dark:text-red-400 mt-1">{imgErr}</p>}
+    </div>
+  );
+}
+
 // ── Modal criar OS para este ativo ────────────────────────────────────────────
 function CreateOsModal({ asset, types, onClose, onCreate }) {
   const [tipoId,   setTipoId]   = useState(types[0]?.id ?? "");
@@ -249,6 +294,49 @@ function CreateOsModal({ asset, types, onClose, onCreate }) {
                   {(field.options || []).map((o) => <option key={o} value={o}>{o}</option>)}
                 </select>
               </div>
+            );
+            if (field.type === "multiselect") {
+              if (!field.options || field.options.length === 0) return (
+                <div key={field.key}>
+                  <label className="field-label">{field.label}{field.required && " *"}</label>
+                  <p className="text-xs text-slate-400 dark:text-gray-500 italic">Nenhuma opção configurada para este campo.</p>
+                </div>
+              );
+              const arr = Array.isArray(val) ? val : [];
+              return (
+                <div key={field.key}>
+                  <label className="field-label">{field.label}{field.required && " *"}</label>
+                  <div className="flex flex-col gap-1.5">
+                    {field.options.map((opt) => {
+                      const checked = arr.includes(opt);
+                      return (
+                        <label key={opt} className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm cursor-pointer transition ${
+                          checked
+                            ? "border-brand-400 dark:border-brand-600 bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-300"
+                            : "border-slate-200 dark:border-gray-700 text-slate-600 dark:text-gray-300"
+                        }`}>
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => setField(field.key, checked ? arr.filter((o) => o !== opt) : [...arr, opt])}
+                            className="h-3.5 w-3.5 rounded"
+                          />
+                          {opt}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            }
+            if (field.type === "image") return (
+              <OsImageField
+                key={field.key}
+                label={field.label}
+                required={field.required}
+                value={val}
+                onChange={(v) => setField(field.key, v)}
+              />
             );
             if (field.type === "checkbox") return (
               <div key={field.key} className="flex items-center gap-2 pt-1">
