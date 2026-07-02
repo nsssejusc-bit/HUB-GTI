@@ -95,6 +95,21 @@ model Department {
   tickets         Ticket[]
   users           User[]           @relation("UserDepartment")
   ticketApprovals TicketApproval[]
+  chiefs          DepartmentChief[]
+}
+
+// Setores adicionais sob a alçada de aprovação de um CHEFE_SETOR
+// (o setor "principal" do usuário continua em User.departmentId)
+model DepartmentChief {
+  id           Int        @id @default(autoincrement())
+  userId       Int
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  departmentId Int
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+
+  @@unique([userId, departmentId])
+  @@index([departmentId])
 }
 
 model Unit {
@@ -147,6 +162,7 @@ model User {
   assetsCreated      Asset[]              @relation("AssetCreatedBy")
   assetAllocations   AssetAllocation[]    @relation("AssetAllocationCreatedBy")
   workOrderImages    WorkOrderImage[]     @relation("WorkOrderImageCreatedBy")
+  chiefDepartments   DepartmentChief[]
 
   @@index([departmentId])
   @@index([role, active])

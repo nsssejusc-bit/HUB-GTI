@@ -101,9 +101,19 @@ export async function createTicket(req, res) {
   // ── Monta registros de aprovação ────────────────────────────────────────
   const approvalDeptId = (dualApproval && !isEvento && targetDeptId) ? targetDeptId : deptId;
   // Evento: sem auto-aprovação (requer deliberação explícita do setor + GTI)
-  const selfApproval = requiresApproval && !isEvento
-    && (req.user.role === "CHEFE_SETOR" || req.user.role === "ADMIN")
-    && req.user.departmentId === approvalDeptId;
+  let selfApproval = false;
+  if (requiresApproval && !isEvento) {
+    if (req.user.role === "ADMIN") {
+      selfApproval = req.user.departmentId === approvalDeptId;
+    } else if (req.user.role === "CHEFE_SETOR") {
+      // Chefe pode ser responsável por mais de um setor
+      const chiefMatch = await prisma.departmentChief.findFirst({
+        where: { userId: req.user.id, departmentId: approvalDeptId },
+        select: { id: true },
+      });
+      selfApproval = !!chiefMatch;
+    }
+  }
 
   let approvalRecords = [];
   if (isEvento && requiresApproval) {
@@ -307,16 +317,17 @@ export async function listTickets(req, res) {
 
   // ── Filtros por role ────────────────────────────────────────────────────
   if (req.user.role === "CHEFE_SETOR") {
-    // Chefe vê apenas chamados PENDENTES da aprovação do seu setor
-    const chefeUser = await prisma.user.findUnique({
-      where: { id: req.user.id },
+    // Chefe vê apenas chamados PENDENTES da aprovação dos setores sob sua chefia (pode ser mais de um)
+    const chiefDepts = await prisma.departmentChief.findMany({
+      where: { userId: req.user.id },
       select: { departmentId: true },
     });
-    if (!chefeUser?.departmentId) return res.json({ tickets: [], nextCursor: null });
+    const chiefDeptIds = chiefDepts.map((c) => c.departmentId);
+    if (chiefDeptIds.length === 0) return res.json({ tickets: [], nextCursor: null });
 
     where.approvalStatus = "PENDING";
     where.approvals = {
-      some: { chefDeptId: chefeUser.departmentId, status: "PENDING" },
+      some: { chefDeptId: { in: chiefDeptIds }, status: "PENDING" },
     };
   } else if (req.user.role === "ADMIN") {
     // Filtro especial: admin visualizando aprovações pendentes do seu setor
@@ -461,7 +472,7 @@ export async function approveTicket(req, res) {
   // Verifica permissão: CHEFE_SETOR, ADMIN ou Chefe da GTI
   const actorUser = await prisma.user.findUnique({
     where: { id: req.user.id },
-    select: { role: true, departmentId: true, isGtiChief: true },
+    select: { role: true, isGtiChief: true },
   });
   const canApprove = ["CHEFE_SETOR", "ADMIN"].includes(actorUser?.role) || actorUser?.isGtiChief;
   if (!canApprove) {
@@ -487,12 +498,17 @@ export async function approveTicket(req, res) {
     // Chefe da GTI: aprova o registro de aprovação GTI
     targetApproval = ticket.approvals.find((a) => a.isGtiApproval && a.status === "PENDING");
   } else {
-    // Chefe de Setor: busca o registro do seu departamento
-    if (!actorUser.departmentId) {
+    // Chefe de Setor: busca o registro de algum dos setores sob sua chefia
+    const chiefDepts = await prisma.departmentChief.findMany({
+      where: { userId: req.user.id },
+      select: { departmentId: true },
+    });
+    const chiefDeptIds = chiefDepts.map((c) => c.departmentId);
+    if (chiefDeptIds.length === 0) {
       return res.status(403).json({ error: "Você não está associado a nenhum setor." });
     }
     targetApproval = ticket.approvals.find(
-      (a) => !a.isGtiApproval && a.chefDeptId === actorUser.departmentId && a.status === "PENDING"
+      (a) => !a.isGtiApproval && chiefDeptIds.includes(a.chefDeptId) && a.status === "PENDING"
     );
   }
 

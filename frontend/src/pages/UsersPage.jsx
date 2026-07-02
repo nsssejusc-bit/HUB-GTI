@@ -461,6 +461,7 @@ function UserDetailPanel({ user, units, departments, me, onUpdate, onDelete, onG
   const [isChefe,          setIsChefe]          = useState(user.isChefe ?? false);
   const [isGtiChief,       setIsGtiChief]       = useState(user.isGtiChief ?? false);
   const [nucleoResponsavel, setNucleoResponsavel] = useState(user.nucleoResponsavel ?? "");
+  const [chiefDeptIds,     setChiefDeptIds]     = useState((user.chiefDepartments ?? []).map((d) => d.id));
 
   // Sincroniza quando o user muda (ex: refresh após update)
   useEffect(() => {
@@ -474,8 +475,13 @@ function UserDetailPanel({ user, units, departments, me, onUpdate, onDelete, onG
     setIsChefe(user.isChefe ?? false);
     setIsGtiChief(user.isGtiChief ?? false);
     setNucleoResponsavel(user.nucleoResponsavel ?? "");
+    setChiefDeptIds((user.chiefDepartments ?? []).map((d) => d.id));
     setEditing(false);
   }, [user.id]);
+
+  function toggleChiefDept(deptId) {
+    setChiefDeptIds((prev) => prev.includes(deptId) ? prev.filter((d) => d !== deptId) : [...prev, deptId]);
+  }
 
   async function saveEdits() {
     setSaving(true);
@@ -490,6 +496,7 @@ function UserDetailPanel({ user, units, departments, me, onUpdate, onDelete, onG
       isChefe,
       isGtiChief,
       nucleoResponsavel: nucleoResponsavel || null,
+      ...(user.role === "CHEFE_SETOR" && { chiefDepartmentIds: chiefDeptIds }),
     });
     setSaving(false);
     setEditing(false);
@@ -552,6 +559,15 @@ function UserDetailPanel({ user, units, departments, me, onUpdate, onDelete, onG
             <DataRow icon={<Hash size={13} />}      label="Matrícula"    value={user.matricula || "—"} />
             <DataRow icon={<Briefcase size={13} />} label="Vínculo"      value={PREFIXO_LABEL[user.prefixo] || "—"} />
             <DataRow icon={<Building2 size={13} />} label="Setor"        value={user.department?.name || "—"} />
+            {user.role === "CHEFE_SETOR" && (
+              <DataRow
+                icon={<ShieldCheck size={13} />}
+                label="Setores sob chefia"
+                value={(user.chiefDepartments ?? []).length > 0
+                  ? user.chiefDepartments.map((d) => d.name).join(", ")
+                  : "Nenhum"}
+              />
+            )}
             <DataRow icon={<Shield size={13} />}    label="Núcleo"       value={user.unit?.name || "—"} />
             <DataRow icon={<Mail size={13} />}      label="E-mail"       value={user.email || "—"} />
             <DataRow icon={<Phone size={13} />}     label="Telefone"     value={user.telefone || "—"} />
@@ -624,6 +640,25 @@ function UserDetailPanel({ user, units, departments, me, onUpdate, onDelete, onG
                 {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
               </select>
             </div>
+            {user.role === "CHEFE_SETOR" && (
+              <div>
+                <label className="field-label text-xs">Setores sob chefia (aprovação)</label>
+                <div className="rounded-xl border border-slate-200 dark:border-gray-700 max-h-40 overflow-y-auto p-2 space-y-1">
+                  {departments.map((d) => (
+                    <label key={d.id} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer select-none px-1 py-0.5 rounded hover:bg-slate-50 dark:hover:bg-gray-800">
+                      <input
+                        type="checkbox"
+                        className="h-3.5 w-3.5 rounded accent-purple-600"
+                        checked={chiefDeptIds.includes(d.id)}
+                        onChange={() => toggleChiefDept(d.id)}
+                      />
+                      {d.name}
+                    </label>
+                  ))}
+                </div>
+                <p className="mt-1 text-[11px] text-slate-400 dark:text-gray-500">Chamados que exigem aprovação nesses setores aparecem para este chefe.</p>
+              </div>
+            )}
             <div>
               <label className="field-label text-xs">Unidade TI</label>
               <select className="field-input w-full text-sm" value={unitId} onChange={(e) => setUnitId(e.target.value)}>

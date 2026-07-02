@@ -90,6 +90,10 @@ export async function listUsers(req, res) {
       createdAt: true,
       unit: { select: { id: true, name: true } },
       department: { select: { id: true, name: true } },
+      chiefDepartments: {
+        select: { department: { select: { id: true, name: true } } },
+        orderBy: { department: { name: "asc" } },
+      },
       _count: {
         select: {
           assignedTickets: { where: { status: "COMPLETED" } },
@@ -99,13 +103,20 @@ export async function listUsers(req, res) {
     },
     orderBy: [{ role: "asc" }, { createdAt: "desc" }],
   });
-  res.json(users.map((u) => ({ ...u, cpf: maskCpf(u.cpf) })));
+  res.json(users.map((u) => ({
+    ...u,
+    cpf: maskCpf(u.cpf),
+    chiefDepartments: u.chiefDepartments.map((cd) => cd.department),
+  })));
 }
 
 // PATCH /api/users/:id — atualiza usuário (ADMIN only)
 export async function updateUser(req, res) {
   const id = Number(req.params.id);
-  const { active, unitId, departmentId, role, name, isChefe, isGtiChief, email, telefone, matricula, prefixo, nucleoResponsavel } = req.body || {};
+  const {
+    active, unitId, departmentId, role, name, isChefe, isGtiChief,
+    email, telefone, matricula, prefixo, nucleoResponsavel, chiefDepartmentIds,
+  } = req.body || {};
 
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) return res.status(404).json({ error: "Usuário não encontrado" });
@@ -163,13 +174,61 @@ export async function updateUser(req, res) {
     data.role = role;
   }
 
-  const updated = await prisma.user.update({
-    where: { id },
-    data,
-    include: {
-      unit: { select: { id: true, name: true } },
-      department: { select: { id: true, name: true } },
-    },
+  // Setores sob chefia (um chefe de setor pode responder por mais de um)
+  const nextRole = data.role ?? user.role;
+  let chiefDeptIds = null;
+  if (chiefDepartmentIds !== undefined) {
+    if (nextRole !== "CHEFE_SETOR") {
+      return res.status(400).json({ error: "Apenas chefes de setor podem ter setores sob chefia" });
+    }
+    if (!Array.isArray(chiefDepartmentIds)) {
+      return res.status(400).json({ error: "Lista de setores inválida" });
+    }
+    chiefDeptIds = [...new Set(chiefDepartmentIds.map(Number))].filter((n) => Number.isInteger(n) && n > 0);
+    if (chiefDeptIds.length > 0) {
+      const validCount = await prisma.department.count({ where: { id: { in: chiefDeptIds }, active: true } });
+      if (validCount !== chiefDeptIds.length) {
+        return res.status(400).json({ error: "Um ou mais setores selecionados são inválidos" });
+      }
+    }
+  }
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const u = await tx.user.update({
+      where: { id },
+      data,
+      include: {
+        unit: { select: { id: true, name: true } },
+        department: { select: { id: true, name: true } },
+      },
+    });
+
+    if (chiefDeptIds !== null) {
+      // Lista explícita enviada pelo admin — substitui os setores sob chefia
+      await tx.departmentChief.deleteMany({ where: { userId: id } });
+      if (chiefDeptIds.length > 0) {
+        await tx.departmentChief.createMany({
+          data: chiefDeptIds.map((deptId) => ({ userId: id, departmentId: deptId })),
+        });
+      }
+    } else if (data.role === "CHEFE_SETOR" && user.role !== "CHEFE_SETOR") {
+      // Promoção sem lista explícita — vira chefe do seu próprio setor por padrão
+      const existing = await tx.departmentChief.count({ where: { userId: id } });
+      if (existing === 0 && u.departmentId) {
+        await tx.departmentChief.create({ data: { userId: id, departmentId: u.departmentId } });
+      }
+    } else if (data.role !== undefined && data.role !== "CHEFE_SETOR" && user.role === "CHEFE_SETOR") {
+      // Rebaixamento — revoga toda a alçada de aprovação
+      await tx.departmentChief.deleteMany({ where: { userId: id } });
+    }
+
+    const chiefDepartments = await tx.departmentChief.findMany({
+      where: { userId: id },
+      select: { department: { select: { id: true, name: true } } },
+      orderBy: { department: { name: "asc" } },
+    });
+
+    return { ...u, chiefDepartments: chiefDepartments.map((cd) => cd.department) };
   });
 
   // Notifica via Socket.io para que a sessão do usuário afetado atualize imediatamente
@@ -206,6 +265,7 @@ export async function updateUser(req, res) {
     nucleoResponsavel: updated.nucleoResponsavel,
     unit: updated.unit,
     department: updated.department,
+    chiefDepartments: updated.chiefDepartments,
   });
 }
 

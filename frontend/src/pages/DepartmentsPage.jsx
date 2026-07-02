@@ -74,6 +74,15 @@ export default function DepartmentsPage() {
     return acc;
   }, {});
 
+  // Agrupa chefes de setor por departmento sob chefia (um chefe pode responder por mais de um)
+  const chiefsByDept = users.reduce((acc, u) => {
+    for (const d of u.chiefDepartments ?? []) {
+      if (!acc[d.id]) acc[d.id] = [];
+      acc[d.id].push(u);
+    }
+    return acc;
+  }, {});
+
   async function handleAdd(e) {
     e.preventDefault();
     if (!newName.trim()) return;
@@ -235,6 +244,7 @@ export default function DepartmentsPage() {
                       key={dept.id}
                       dept={dept}
                       deptUsers={usersByDept[dept.id] ?? []}
+                      chiefUsers={chiefsByDept[dept.id] ?? []}
                       editingId={editingId}
                       editName={editName}
                       setEditingId={setEditingId}
@@ -259,6 +269,7 @@ export default function DepartmentsPage() {
                       key={dept.id}
                       dept={dept}
                       deptUsers={usersByDept[dept.id] ?? []}
+                      chiefUsers={chiefsByDept[dept.id] ?? []}
                       editingId={editingId}
                       editName={editName}
                       setEditingId={setEditingId}
@@ -297,14 +308,16 @@ const TICKET_STATUS_COLOR = {
   COMPLETED:  "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400",
 };
 
-function DeptRow({ dept, deptUsers, editingId, editName, setEditingId, setEditName, onSaveEdit, onToggle, onDelete }) {
+function DeptRow({ dept, deptUsers, chiefUsers, editingId, editName, setEditingId, setEditName, onSaveEdit, onToggle, onDelete }) {
   const isEditing = editingId === dept.id;
   const [expanded, setExpanded] = useState(false);
   const [ticketsOpen, setTicketsOpen] = useState(false);
   const [deptTickets, setDeptTickets] = useState([]);
   const [ticketsLoading, setTicketsLoading] = useState(false);
 
-  const chefe = deptUsers.find((u) => u.role === "CHEFE_SETOR" || (u.isChefe && u.role !== "USER" ));
+  // Chefe(s) que respondem pela aprovação deste setor (podem ser chefes de outro setor "principal")
+  const chefes = chiefUsers ?? [];
+  const chefe = chefes[0] ?? deptUsers.find((u) => u.isChefe && u.role !== "USER");
   const chefeDeclarado = deptUsers.find((u) => u.isChefe && u.role === "USER");
   const totalUsers = deptUsers.length;
 
@@ -360,8 +373,12 @@ function DeptRow({ dept, deptUsers, editingId, editName, setEditingId, setEditNa
               </span>
               {/* Badge chefe confirmado */}
               {chefe && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 ring-1 ring-purple-200 dark:ring-purple-700 px-1.5 py-0.5 text-[11px] font-medium">
+                <span
+                  className="inline-flex items-center gap-1 rounded-full bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 ring-1 ring-purple-200 dark:ring-purple-700 px-1.5 py-0.5 text-[11px] font-medium"
+                  title={chefes.length > 1 ? chefes.map((c) => c.name).join(", ") : undefined}
+                >
                   <ShieldCheck size={9} /> {chefe.name.split(" ")[0]}
+                  {chefes.length > 1 && ` +${chefes.length - 1}`}
                 </span>
               )}
               {/* Badge chefe auto-declarado (ainda USER) */}

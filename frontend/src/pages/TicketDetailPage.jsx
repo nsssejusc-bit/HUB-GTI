@@ -621,10 +621,10 @@ export default function TicketDetailPage() {
         </div>
       </div>
 
-      <main className="max-w-5xl mx-auto p-4 md:p-6 grid lg:grid-cols-3 gap-5">
+      <main className="max-w-5xl mx-auto p-4 md:p-6 grid lg:grid-cols-5 gap-5">
 
         {/* ── Coluna principal ── */}
-        <div className="lg:col-span-2 space-y-4">
+        <div className="lg:col-span-3 space-y-4">
 
           {/* Status + tempo */}
           <div className="card px-5 py-4 flex flex-wrap items-center justify-between gap-3">
@@ -1100,8 +1100,70 @@ export default function TicketDetailPage() {
               })}
             </ol>
           </div>
-          {/* Mensagens ao solicitante */}
+          {/* Comentários */}
           <div className="card p-5 space-y-3">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-gray-100 flex items-center gap-2">
+              <MessageSquare size={14} className="text-brand-600" />
+              Comentários ({comments.length})
+            </h3>
+
+            {comments.length === 0 ? (
+              <p className="text-sm text-slate-400 dark:text-gray-500">Nenhum comentário ainda.</p>
+            ) : (
+              <div className="space-y-3">
+                {comments.map((c) => {
+                  const isStaff = ["ADMIN", "TECHNICIAN"].includes(c.author?.role);
+                  return (
+                    <div key={c.id} className={`flex gap-3 ${isStaff ? "flex-row-reverse" : ""}`}>
+                      <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                        isStaff ? "bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-400" : "bg-slate-100 dark:bg-gray-700 text-slate-600 dark:text-gray-300"
+                      }`}>
+                        {c.author?.name?.charAt(0).toUpperCase()}
+                      </div>
+                      <div className={`flex-1 ${isStaff ? "items-end" : "items-start"} flex flex-col`}>
+                        <div className={`rounded-xl px-3 py-2 text-sm max-w-[85%] ${
+                          isStaff
+                            ? "bg-brand-50 dark:bg-brand-900/20 text-brand-900 dark:text-brand-100"
+                            : "bg-slate-100 dark:bg-gray-800 text-slate-800 dark:text-gray-200"
+                        }`}>
+                          {c.text}
+                        </div>
+                        <div className="text-[10px] text-slate-400 dark:text-gray-500 mt-0.5 px-1">
+                          {c.author?.name} · {new Date(c.createdAt).toLocaleString("pt-BR")}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {ticket.status !== "COMPLETED" && (
+              <div className="flex gap-2 pt-1">
+                <input
+                  type="text"
+                  className="field-input flex-1 text-sm"
+                  placeholder="Escreva um comentário..."
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); doAddComment(); } }}
+                />
+                <button
+                  onClick={doAddComment}
+                  disabled={!newComment.trim() || commentSending}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-600 hover:bg-brand-700 text-white disabled:opacity-50 transition"
+                >
+                  {commentSending ? <Spinner className="h-4 w-4" /> : <Send size={15} />}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Sidebar de ações ── */}
+        <aside className="lg:col-span-2 space-y-4">
+          {/* Mensagens ao solicitante — fixo no topo da coluna direita para não precisar rolar a página */}
+          <div className="lg:sticky lg:top-16 z-10 card p-5 space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold text-slate-900 dark:text-gray-100 flex items-center gap-2">
                 <Send size={14} className="text-brand-600" />
@@ -1120,7 +1182,7 @@ export default function TicketDetailPage() {
             {messages.length === 0 ? (
               <p className="text-sm text-slate-400 dark:text-gray-500">Nenhuma mensagem enviada ainda.</p>
             ) : (
-              <div className="max-h-64 overflow-y-auto space-y-2.5 pr-1">
+              <div className="max-h-96 overflow-y-auto space-y-2.5 pr-1">
                 {messages.map((m) => (
                   <div key={m.id} className={`flex gap-2.5 ${m.fromUser ? "" : "flex-row-reverse"}`}>
                     {/* Avatar com iniciais reais */}
@@ -1197,68 +1259,6 @@ export default function TicketDetailPage() {
             <p className="text-[10px] text-slate-400 dark:text-gray-500">Enter para enviar · Shift+Enter para nova linha</p>
           </div>
 
-          {/* Comentários */}
-          <div className="card p-5 space-y-3">
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-gray-100 flex items-center gap-2">
-              <MessageSquare size={14} className="text-brand-600" />
-              Comentários ({comments.length})
-            </h3>
-
-            {comments.length === 0 ? (
-              <p className="text-sm text-slate-400 dark:text-gray-500">Nenhum comentário ainda.</p>
-            ) : (
-              <div className="space-y-3">
-                {comments.map((c) => {
-                  const isStaff = ["ADMIN", "TECHNICIAN"].includes(c.author?.role);
-                  return (
-                    <div key={c.id} className={`flex gap-3 ${isStaff ? "flex-row-reverse" : ""}`}>
-                      <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
-                        isStaff ? "bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-400" : "bg-slate-100 dark:bg-gray-700 text-slate-600 dark:text-gray-300"
-                      }`}>
-                        {c.author?.name?.charAt(0).toUpperCase()}
-                      </div>
-                      <div className={`flex-1 ${isStaff ? "items-end" : "items-start"} flex flex-col`}>
-                        <div className={`rounded-xl px-3 py-2 text-sm max-w-[85%] ${
-                          isStaff
-                            ? "bg-brand-50 dark:bg-brand-900/20 text-brand-900 dark:text-brand-100"
-                            : "bg-slate-100 dark:bg-gray-800 text-slate-800 dark:text-gray-200"
-                        }`}>
-                          {c.text}
-                        </div>
-                        <div className="text-[10px] text-slate-400 dark:text-gray-500 mt-0.5 px-1">
-                          {c.author?.name} · {new Date(c.createdAt).toLocaleString("pt-BR")}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {ticket.status !== "COMPLETED" && (
-              <div className="flex gap-2 pt-1">
-                <input
-                  type="text"
-                  className="field-input flex-1 text-sm"
-                  placeholder="Escreva um comentário..."
-                  value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); doAddComment(); } }}
-                />
-                <button
-                  onClick={doAddComment}
-                  disabled={!newComment.trim() || commentSending}
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-600 hover:bg-brand-700 text-white disabled:opacity-50 transition"
-                >
-                  {commentSending ? <Spinner className="h-4 w-4" /> : <Send size={15} />}
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* ── Sidebar de ações ── */}
-        <aside className="space-y-4">
           <div className="card p-5 space-y-3">
             <h3 className="text-sm font-semibold text-slate-900 dark:text-gray-100">Ações</h3>
 
