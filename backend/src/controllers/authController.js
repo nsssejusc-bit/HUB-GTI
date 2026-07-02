@@ -53,6 +53,7 @@ export async function login(req, res) {
       isChefe: user.isChefe,
       isGtiChief: user.isGtiChief,
       nucleoResponsavel: user.nucleoResponsavel,
+      hasCustomNotificationSound: !!user.notificationSoundFile,
       unit: user.unit ? { id: user.unit.id, name: user.unit.name } : null,
       department: user.department ? { id: user.department.id, name: user.department.name } : null,
     },
@@ -156,6 +157,7 @@ export async function me(req, res) {
     isChefe: user.isChefe,
     isGtiChief: user.isGtiChief,
     nucleoResponsavel: user.nucleoResponsavel,
+    hasCustomNotificationSound: !!user.notificationSoundFile,
     unit: user.unit ? { id: user.unit.id, name: user.unit.name } : null,
     department: user.department ? { id: user.department.id, name: user.department.name } : null,
   });

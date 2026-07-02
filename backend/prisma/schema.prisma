@@ -125,6 +125,7 @@ model User {
   isChefe            Boolean    @default(false)
   isGtiChief         Boolean    @default(false)
   mustChangePassword Boolean    @default(false)
+  notificationSoundFile String?
   createdAt          DateTime   @default(now())
   assignedTickets    Ticket[]   @relation("AssignedTechnician")
   openedTickets      Ticket[]   @relation("TicketOpener")
@@ -364,7 +365,7 @@ model AuditLog {
 
 model ConfigFlag {
   key       String   @id
-  value     String
+  value     String   @db.Text
   updatedAt DateTime @updatedAt
 }
 

@@ -989,7 +989,7 @@ export async function sendMessage(req, res) {
   const { content } = req.body || {};
   if (!content?.trim()) return res.status(400).json({ error: "Mensagem vazia" });
 
-  const ticket = await prisma.ticket.findUnique({ where: { id }, select: { id: true, openedById: true } });
+  const ticket = await prisma.ticket.findUnique({ where: { id }, select: { id: true, openedById: true, nucleoResponsavel: true } });
   if (!ticket) return res.status(404).json({ error: "Chamado não encontrado" });
 
   const prepared = await prepareMessageContent(content, id);
@@ -1000,7 +1000,12 @@ export async function sendMessage(req, res) {
     include: { author: { select: { name: true, role: true } } },
   });
 
-  req.app.get("io")?.emit("ticket:message", { ticketId: id, fromUserId: req.user.id, openedById: ticket.openedById });
+  req.app.get("io")?.emit("ticket:message", {
+    ticketId: id,
+    fromUserId: req.user.id,
+    openedById: ticket.openedById,
+    nucleoResponsavel: ticket.nucleoResponsavel ?? null,
+  });
   res.status(201).json(withImageUrl(msg, `/api/tickets/${id}/messages`));
 }
 
@@ -1066,7 +1071,7 @@ export async function sendMessagePublic(req, res) {
 
   const ticket = await prisma.ticket.findUnique({
     where: { ticketNumber },
-    select: { id: true, subcategory: { select: { code: true } } },
+    select: { id: true, nucleoResponsavel: true, subcategory: { select: { code: true } } },
   });
   if (!ticket) return res.status(404).json({ error: "Chamado não encontrado" });
 
@@ -1089,7 +1094,11 @@ export async function sendMessagePublic(req, res) {
     data: { ticketId: ticket.id, fromUser: true, content: prepared.content },
   });
 
-  req.app.get("io")?.emit("ticket:message", { ticketId: ticket.id, fromUserId: null });
+  req.app.get("io")?.emit("ticket:message", {
+    ticketId: ticket.id,
+    fromUserId: null,
+    nucleoResponsavel: ticket.nucleoResponsavel ?? null,
+  });
   res.status(201).json(withImageUrl(msg, `/api/tickets/track/${ticketNumber}/messages`));
 }
 

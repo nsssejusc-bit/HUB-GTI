@@ -4,6 +4,7 @@ import { login, me, logout, forgotPassword, listResetRequests, resolveResetReque
 import {
   register, listUsers, updateUser, deleteUser,
   resetPassword, changePassword, myTickets,
+  uploadNotificationSound, removeNotificationSound, getNotificationSound,
 } from "../controllers/userController.js";
 import {
   createTicket, getTicketPublic, listTickets, getTicket,
@@ -133,6 +134,9 @@ router.post("/password-reset-requests/:id/resolve", authRequired, requireRole("A
 
 // ── Perfil do usuário logado ───────────────────────────────────────────────────
 router.get("/users/me/tickets", authRequired, myTickets);
+router.get("/users/me/notification-sound",    authRequired, getNotificationSound);
+router.post("/users/me/notification-sound",   authRequired, requireRole("TECHNICIAN", "ADMIN"), uploadNotificationSound);
+router.delete("/users/me/notification-sound", authRequired, requireRole("TECHNICIAN", "ADMIN"), removeNotificationSound);
 
 // ── Gestão de setores (ADMIN) ──────────────────────────────────────────────────
 router.get("/departments/all",  authRequired, requireRole("ADMIN"), listAllDepartments);

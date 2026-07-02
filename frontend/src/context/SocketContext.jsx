@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import { useAuth } from "./AuthContext";
-import { playNewTicket, playNewMessage, playApproval } from "../lib/sounds";
+import { playNewTicket, playNewMessage, playApproval, setCustomSoundAvailable } from "../lib/sounds";
 import { registerPushSubscription } from "../lib/pushSubscription";
 
 const SocketContext = createContext(null);
@@ -23,6 +23,9 @@ export function SocketProvider({ children }) {
 
   // Mantém userRef sempre atualizado sem recriar o socket
   useEffect(() => { userRef.current = user; }, [user]);
+
+  // Reflete disponibilidade do áudio customizado no módulo de sons
+  useEffect(() => { setCustomSoundAvailable(user?.hasCustomNotificationSound); }, [user?.hasCustomNotificationSound]);
 
   // Pede permissão de notificação (todos os usuários logados) e registra push subscription
   useEffect(() => {
@@ -109,13 +112,22 @@ export function SocketProvider({ children }) {
       }
     });
 
-    socket.on("ticket:message", ({ ticketId, fromUserId, openedById }) => {
+    socket.on("ticket:message", ({ ticketId, fromUserId, openedById, nucleoResponsavel }) => {
       const u = userRef.current;
       if (!u) return;
 
       // Técnico / Admin: só som (comportamento existente)
       if (NOTIFY_ROLES.includes(u.role)) {
         if (fromUserId != null && Number(fromUserId) === u.id) return;
+
+        // Técnico com núcleo definido: filtra por núcleo, igual ticket:created
+        if (
+          u.role === "TECHNICIAN" &&
+          u.nucleoResponsavel &&
+          nucleoResponsavel &&
+          nucleoResponsavel !== u.nucleoResponsavel
+        ) return;
+
         playNewMessage();
         return;
       }

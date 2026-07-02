@@ -4,9 +4,9 @@ import { api } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { StatusBadge, Spinner } from "../components/ui";
 import AppHeader from "../components/AppHeader";
-import { User, Building2, Shield, Clock, Ticket, KeyRound, ChevronRight, Search, X, Star, Volume2, Play } from "lucide-react";
+import { User, Building2, Shield, Clock, Ticket, KeyRound, ChevronRight, Search, X, Star, Volume2, Play, Upload, Trash2 } from "lucide-react";
 import { maskCpf } from "../lib/cpf";
-import { SOUND_THEMES, getSelectedThemeId, setSelectedThemeId } from "../lib/sounds";
+import { SOUND_THEMES, CUSTOM_THEME_ID, getSelectedThemeId, setSelectedThemeId } from "../lib/sounds";
 
 const ROLE_LABEL = {
   ADMIN:      "Administrador",
@@ -97,17 +97,61 @@ function StarRating({ ticketId, onDone }) {
 }
 
 export default function ProfilePage() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusGroup, setStatusGroup] = useState("");
   const [openFeedback, setOpenFeedback] = useState(null);
   const [soundTheme, setSoundTheme] = useState(() => getSelectedThemeId());
+  const [uploadingSound, setUploadingSound] = useState(false);
+  const [soundError, setSoundError] = useState("");
+
+  const canCustomSound = user?.role === "TECHNICIAN" || user?.role === "ADMIN";
 
   function handleSelectSound(id) {
     setSoundTheme(id);
     setSelectedThemeId(id);
+  }
+
+  function handleUploadSound(e) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("audio/")) {
+      setSoundError("Selecione um arquivo de áudio (MP3, WAV, OGG ou M4A).");
+      return;
+    }
+    if (file.size > 2.2 * 1024 * 1024) {
+      setSoundError("Áudio muito grande. Máximo ~2 MB.");
+      return;
+    }
+    setSoundError("");
+    setUploadingSound(true);
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        await api.post("/users/me/notification-sound", { audio: reader.result });
+        await refreshUser();
+        handleSelectSound(CUSTOM_THEME_ID);
+      } catch (err) {
+        setSoundError(err.response?.data?.error || "Erro ao enviar áudio");
+      } finally {
+        setUploadingSound(false);
+      }
+    };
+    reader.onerror = () => { setSoundError("Erro ao ler o arquivo"); setUploadingSound(false); };
+    reader.readAsDataURL(file);
+  }
+
+  async function handleDeleteSound() {
+    try {
+      await api.delete("/users/me/notification-sound");
+      await refreshUser();
+      if (soundTheme === CUSTOM_THEME_ID) handleSelectSound("sinos");
+    } catch {
+      setSoundError("Erro ao remover áudio");
+    }
   }
 
   useEffect(() => {
@@ -245,7 +289,57 @@ export default function ProfilePage() {
                 </button>
               );
             })}
+
+            {canCustomSound && user.hasCustomNotificationSound && (
+              <button
+                onClick={() => handleSelectSound(CUSTOM_THEME_ID)}
+                className={`flex items-center gap-3 rounded-xl px-4 py-3 text-left w-full transition ring-1 ${
+                  soundTheme === CUSTOM_THEME_ID
+                    ? "ring-brand-600 bg-brand-100/60 dark:bg-brand-900/20"
+                    : "ring-slate-200 dark:ring-gray-700 bg-slate-50 dark:bg-gray-800/60 hover:bg-slate-100 dark:hover:bg-gray-800"
+                }`}
+              >
+                <div className={`h-4 w-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                  soundTheme === CUSTOM_THEME_ID ? "border-brand-600" : "border-slate-300 dark:border-gray-600"
+                }`}>
+                  {soundTheme === CUSTOM_THEME_ID && <div className="h-2 w-2 rounded-full bg-brand-600" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-slate-800 dark:text-gray-100">Meu áudio</div>
+                  <div className="text-xs text-slate-400 dark:text-gray-500 mt-0.5 leading-snug">Arquivo customizado enviado por você</div>
+                </div>
+                <button
+                  onClick={(e) => { e.stopPropagation(); new Audio("/api/users/me/notification-sound").play().catch(() => {}); }}
+                  className="p-1.5 rounded-lg text-slate-400 dark:text-gray-500 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-white dark:hover:bg-gray-700 transition shrink-0"
+                  title="Testar som"
+                >
+                  <Play size={13} />
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleDeleteSound(); }}
+                  className="p-1.5 rounded-lg text-slate-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-white dark:hover:bg-gray-700 transition shrink-0"
+                  title="Remover áudio"
+                >
+                  <Trash2 size={13} />
+                </button>
+              </button>
+            )}
           </div>
+
+          {canCustomSound && (
+            <div className="mt-3 pt-3 border-t border-slate-100 dark:border-gray-700/60">
+              <label className={`inline-flex items-center gap-2 text-sm font-medium cursor-pointer transition ${
+                uploadingSound ? "opacity-60 pointer-events-none" : "text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300"
+              }`}>
+                <Upload size={14} />
+                {uploadingSound ? "Enviando..." : user.hasCustomNotificationSound ? "Substituir meu áudio" : "Enviar meu áudio"}
+                <input type="file" accept="audio/*" className="hidden" onChange={handleUploadSound} disabled={uploadingSound} />
+              </label>
+              <p className="mt-1 text-xs text-slate-400 dark:text-gray-500">MP3, WAV, OGG ou M4A — máximo ~2 MB. Apenas 1 áudio por conta.</p>
+              {soundError && <p className="mt-1 text-xs text-red-500 dark:text-red-400">{soundError}</p>}
+            </div>
+          )}
+
           <p className="mt-3 text-xs text-slate-400 dark:text-gray-500">
             Preferência salva neste dispositivo. Cada técnico pode escolher o som que prefere.
           </p>

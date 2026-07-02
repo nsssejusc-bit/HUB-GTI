@@ -2,15 +2,15 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
-import { maskCpf } from "../lib/cpf";
 import { Alert, Spinner } from "../components/ui";
 import {
   ArrowLeft, ArrowRight, Monitor, Wifi, Server, FileText,
   CheckCircle2, MonitorSmartphone, Copy, Check as CheckIcon, Printer, LogOut,
   Lightbulb, AlertTriangle, ShieldCheck, ChevronDown, ChevronRight, UserPlus,
+  KeyRound, BookOpen, HelpCircle, Calendar, Database, Shield, Phone, Package,
 } from "lucide-react";
 
-// ── Ícones e cores por código de categoria ───────────────────────────────────
+// ── Ícones e cores por código de categoria (fallback quando a categoria não tem ícone/cor customizados) ──
 const CATEGORY_ICONS = {
   HARDWARE:  Monitor,
   NETWORK:   Wifi,
@@ -28,6 +28,40 @@ const CATEGORY_COLORS = {
   REMOTE:    "bg-cyan-50    dark:bg-cyan-900/30    text-cyan-600    dark:text-cyan-400    border-cyan-200    dark:border-cyan-700",
   PRINTER:   "bg-green-50   dark:bg-green-900/30   text-green-600   dark:text-green-400   border-green-200   dark:border-green-700",
 };
+
+// Ícones e cores customizáveis via CategoriesPage (mesmos nomes salvos em cat.icon / cat.color)
+const CUSTOM_ICON_BY_NAME = {
+  Monitor, Wifi, Server, KeyRound, MonitorSmartphone, Printer, BookOpen, HelpCircle,
+  Calendar, Database, Shield, Phone, Package,
+};
+
+const CUSTOM_COLOR_BY_NAME = {
+  orange:  "bg-orange-50  dark:bg-orange-900/30  text-orange-600  dark:text-orange-400  border-orange-200  dark:border-orange-700",
+  amber:   "bg-amber-50   dark:bg-amber-900/30   text-amber-600   dark:text-amber-400   border-amber-200   dark:border-amber-700",
+  lime:    "bg-lime-50    dark:bg-lime-900/30    text-lime-600    dark:text-lime-400    border-lime-200    dark:border-lime-700",
+  green:   "bg-green-50   dark:bg-green-900/30   text-green-600   dark:text-green-400   border-green-200   dark:border-green-700",
+  emerald: "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-700",
+  teal:    "bg-teal-50    dark:bg-teal-900/30    text-teal-600    dark:text-teal-400    border-teal-200    dark:border-teal-700",
+  cyan:    "bg-cyan-50    dark:bg-cyan-900/30    text-cyan-600    dark:text-cyan-400    border-cyan-200    dark:border-cyan-700",
+  sky:     "bg-sky-50     dark:bg-sky-900/30     text-sky-600     dark:text-sky-400     border-sky-200     dark:border-sky-700",
+  blue:    "bg-blue-50    dark:bg-blue-900/30    text-blue-600    dark:text-blue-400    border-blue-200    dark:border-blue-700",
+  indigo:  "bg-indigo-50  dark:bg-indigo-900/30  text-indigo-600  dark:text-indigo-400  border-indigo-200  dark:border-indigo-700",
+  violet:  "bg-violet-50  dark:bg-violet-900/30  text-violet-600  dark:text-violet-400  border-violet-200  dark:border-violet-700",
+  purple:  "bg-purple-50  dark:bg-purple-900/30  text-purple-600  dark:text-purple-400  border-purple-200  dark:border-purple-700",
+  pink:    "bg-pink-50    dark:bg-pink-900/30    text-pink-600    dark:text-pink-400    border-pink-200    dark:border-pink-700",
+  rose:    "bg-rose-50    dark:bg-rose-900/30    text-rose-600    dark:text-rose-400    border-rose-200    dark:border-rose-700",
+  red:     "bg-red-50     dark:bg-red-900/30     text-red-600     dark:text-red-400     border-red-200     dark:border-red-700",
+  slate:   "bg-slate-50   dark:bg-gray-800       text-slate-500   dark:text-gray-400     border-slate-200   dark:border-gray-700",
+};
+
+function getCategoryIcon(c) {
+  if (c?.icon && CUSTOM_ICON_BY_NAME[c.icon]) return CUSTOM_ICON_BY_NAME[c.icon];
+  return CATEGORY_ICONS[c?.code] || FileText;
+}
+function getCategoryColorClass(c) {
+  if (c?.color && CUSTOM_COLOR_BY_NAME[c.color]) return CUSTOM_COLOR_BY_NAME[c.color];
+  return CATEGORY_COLORS[c?.code] || "";
+}
 
 // Modelos de impressora e instruções de contador para cada um
 const PRINTER_COUNTER_MODELS = [
@@ -597,25 +631,6 @@ export default function NewTicketPage() {
     setDataConfirmed(false);
   }
 
-  // Pré-preenche campos pessoais com dados do usuário logado
-  useEffect(() => {
-    if (!formType || !PERSONAL_DATA_FORMS.has(formType) || !user) return;
-    const dept = user.department;
-    const cpf  = maskCpf(user.cpf || "");
-    let prefill = { cpf };
-    if (formType === "net_user_create") {
-      prefill = { nome: user.name ?? "", cpf, email: user.email ?? "", setorId: dept?.id ?? null, setorName: dept?.name ?? "" };
-    } else if (formType === "siged_user_create") {
-      prefill = { nome: user.name ?? "", cpf, email: user.email ?? "", matricula: user.matricula ?? "" };
-    } else if (formType === "net_password_reset") {
-      prefill = { nome: user.name ?? "", cpf, setorId: dept?.id ?? null, setorName: dept?.name ?? "" };
-    } else if (formType === "net_user_delete") {
-      prefill = { cpf, setorId: dept?.id ?? null, setorName: dept?.name ?? "" };
-    }
-    setExtraFields(prefill);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.subcategoryId]);
-
   function canSubmit() {
     if (forOther && (!beneficiary.name.trim() || !beneficiary.deptId)) return false;
     if (isRemote) return form.anyDeskCode.trim().length >= 3;
@@ -823,8 +838,8 @@ export default function NewTicketPage() {
 
               <div className="space-y-2">
                 {categories.filter((c) => c.code !== "REMOTE").map((c) => {
-                  const Icon       = CATEGORY_ICONS[c.code] || FileText;
-                  const colorClass = CATEGORY_COLORS[c.code] || "";
+                  const Icon       = getCategoryIcon(c);
+                  const colorClass = getCategoryColorClass(c);
                   const selected   = form.categoryId === c.id;
                   return (
                     <button

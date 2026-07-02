@@ -6,6 +6,10 @@ import { stripCpf, isValidCpf, maskCpf } from "../utils/cpf.js";
 import { toTitleCase } from "../utils/name.js";
 import { createAuditLog } from "./auditController.js";
 import { setAuthCookie } from "../utils/authCookie.js";
+import {
+  saveNotificationSound, resolveNotificationSoundPath,
+  deleteNotificationSoundFile, mimeForSoundFilename, MAX_AUDIO_B64,
+} from "../utils/notificationSound.js";
 
 const VALID_PREFIXOS = ["GOVERNO", "TERCEIRIZADO", "ESTAGIARIO"];
 
@@ -304,5 +308,57 @@ export async function myTickets(req, res) {
     completedAt: t.completedAt,
     hasFeedback: !!t.feedback,
   })));
+}
+
+// POST /api/users/me/notification-sound — técnico/admin envia áudio customizado (substitui o anterior)
+export async function uploadNotificationSound(req, res) {
+  const { audio } = req.body || {};
+  if (!audio || typeof audio !== "string") {
+    return res.status(400).json({ error: "Áudio ausente" });
+  }
+  if (audio.length > MAX_AUDIO_B64) {
+    return res.status(400).json({ error: "Áudio muito grande. Máximo ~2 MB." });
+  }
+
+  const filename = await saveNotificationSound(audio, req.user.id);
+  if (!filename) {
+    return res.status(400).json({ error: "Áudio inválido. Use MP3, WAV, OGG ou M4A." });
+  }
+
+  await prisma.user.update({
+    where: { id: req.user.id },
+    data: { notificationSoundFile: filename },
+  });
+
+  res.json({ ok: true });
+}
+
+// DELETE /api/users/me/notification-sound — remove o áudio customizado
+export async function removeNotificationSound(req, res) {
+  await deleteNotificationSoundFile(req.user.id);
+  await prisma.user.update({
+    where: { id: req.user.id },
+    data: { notificationSoundFile: null },
+  });
+  res.json({ ok: true });
+}
+
+// GET /api/users/me/notification-sound — serve o áudio customizado do usuário logado
+export async function getNotificationSound(req, res) {
+  const user = await prisma.user.findUnique({
+    where: { id: req.user.id },
+    select: { notificationSoundFile: true },
+  });
+  if (!user?.notificationSoundFile) {
+    return res.status(404).json({ error: "Nenhum áudio customizado" });
+  }
+  const filePath = resolveNotificationSoundPath(req.user.id, user.notificationSoundFile);
+  if (!filePath) return res.status(404).json({ error: "Nenhum áudio customizado" });
+
+  res.setHeader("Content-Type", mimeForSoundFilename(user.notificationSoundFile));
+  res.setHeader("Cache-Control", "private, max-age=86400");
+  res.sendFile(filePath, (err) => {
+    if (err && !res.headersSent) res.status(404).json({ error: "Nenhum áudio customizado" });
+  });
 }
 

@@ -91,6 +91,9 @@ export const SOUND_THEMES = [
 const STORAGE_KEY = "hd_notif_sound";
 const DEFAULT_THEME = "sinos";
 
+// Tema especial: áudio customizado enviado pelo próprio técnico/admin (servido pelo backend)
+export const CUSTOM_THEME_ID = "custom";
+
 export function getSelectedThemeId() {
   return localStorage.getItem(STORAGE_KEY) || DEFAULT_THEME;
 }
@@ -99,8 +102,26 @@ export function setSelectedThemeId(id) {
   localStorage.setItem(STORAGE_KEY, id);
 }
 
+// Setado pelo SocketContext/ProfilePage a partir de user.hasCustomNotificationSound —
+// evita ter que passar o usuário por parâmetro em toda chamada de som
+let _hasCustomSound = false;
+export function setCustomSoundAvailable(v) { _hasCustomSound = !!v; }
+
+let _customAudio = null;
+function playCustomSound() {
+  if (!_customAudio) _customAudio = new Audio("/api/users/me/notification-sound");
+  _customAudio.currentTime = 0;
+  _customAudio.play().catch(() => {});
+}
+
 export function playNotification() {
   const themeId = getSelectedThemeId();
+
+  if (themeId === CUSTOM_THEME_ID) {
+    if (_hasCustomSound) playCustomSound();
+    return;
+  }
+
   const theme = SOUND_THEMES.find((t) => t.id === themeId);
   if (!theme) return;
   try { theme.play(); } catch {}
