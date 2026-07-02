@@ -582,7 +582,7 @@ export default function TicketDetailPage() {
 
       {/* Sub-header */}
       <div className="bg-white dark:bg-gray-900 border-b border-slate-200 dark:border-gray-700">
-        <div className="max-w-5xl mx-auto px-4 h-12 flex items-center gap-3 text-sm">
+        <div className="max-w-6xl mx-auto px-4 h-12 flex items-center gap-3 text-sm">
           <button
             onClick={() => {
               if (isDirty) { setShowUnsavedModal(true); return; }
@@ -621,7 +621,7 @@ export default function TicketDetailPage() {
         </div>
       </div>
 
-      <main className="max-w-5xl mx-auto p-4 md:p-6 grid lg:grid-cols-5 gap-5">
+      <main className="max-w-6xl mx-auto p-4 md:p-6 grid lg:grid-cols-5 gap-5">
 
         {/* ── Coluna principal ── */}
         <div className="lg:col-span-3 space-y-4">
@@ -1163,7 +1163,7 @@ export default function TicketDetailPage() {
         {/* ── Sidebar de ações ── */}
         <aside className="lg:col-span-2 space-y-4">
           {/* Mensagens ao solicitante — fixo no topo da coluna direita para não precisar rolar a página */}
-          <div className="lg:sticky lg:top-16 z-10 card p-5 space-y-3">
+          <div className="lg:sticky lg:top-16 lg:max-h-[calc(100vh-5rem)] lg:overflow-y-auto z-10 card p-5 space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold text-slate-900 dark:text-gray-100 flex items-center gap-2">
                 <Send size={14} className="text-brand-600" />
@@ -1182,7 +1182,7 @@ export default function TicketDetailPage() {
             {messages.length === 0 ? (
               <p className="text-sm text-slate-400 dark:text-gray-500">Nenhuma mensagem enviada ainda.</p>
             ) : (
-              <div className="max-h-96 overflow-y-auto space-y-2.5 pr-1">
+              <div className="max-h-[50vh] overflow-y-auto space-y-2.5 pr-1">
                 {messages.map((m) => (
                   <div key={m.id} className={`flex gap-2.5 ${m.fromUser ? "" : "flex-row-reverse"}`}>
                     {/* Avatar com iniciais reais */}
@@ -1227,7 +1227,7 @@ export default function TicketDetailPage() {
             <input ref={msgImgRef} type="file" accept="image/*" className="sr-only" onChange={handleMsgImage} />
             <div className="flex gap-2 pt-1">
               <textarea
-                rows={2}
+                rows={3}
                 className="field-input flex-1 text-sm resize-none"
                 placeholder="Escreva uma mensagem que o solicitante verá ao acompanhar o chamado..."
                 value={newMessage}
