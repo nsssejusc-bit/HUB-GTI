@@ -69,6 +69,14 @@ function DynamicField({ field, value, onChange }) {
   }
   if (field.type === "multiselect") {
     const arr = Array.isArray(value) ? value : [];
+    if (!field.options || field.options.length === 0) {
+      return (
+        <div>
+          <label className="field-label">{field.label}{field.required && " *"}</label>
+          <p className="text-xs text-slate-400 dark:text-gray-500 italic">Nenhuma opção configurada para este campo.</p>
+        </div>
+      );
+    }
     return (
       <div>
         <label className="field-label">{field.label}{field.required && " *"}</label>

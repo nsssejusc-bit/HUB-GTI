@@ -73,6 +73,9 @@ function FieldEditor({ field, index, total, onChange, onRemove, onMoveUp, onMove
           <span className="text-sm font-medium text-slate-700 dark:text-gray-300">{field.label || <span className="text-slate-400 italic">sem label</span>}</span>
           <span className="ml-2 text-xs text-slate-400 dark:text-gray-500">{FIELD_TYPES.find(t => t.value === field.type)?.label}</span>
           {field.required && <span className="ml-2 text-[10px] font-medium bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 rounded px-1 py-0.5">obrigatório</span>}
+          {(field.type === "select" || field.type === "multiselect") && (field.options?.length ?? 0) === 0 && (
+            <span className="ml-2 text-[10px] font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 rounded px-1 py-0.5">sem opções</span>
+          )}
         </div>
         <div className="flex items-center gap-1 shrink-0" onDragStart={(e) => e.stopPropagation()}>
           <button type="button" onClick={() => onMoveUp(index)}   disabled={index === 0}          className="p-1 rounded text-slate-400 hover:text-slate-700 dark:hover:text-gray-200 disabled:opacity-30 transition cursor-default"><ChevronUp   size={14} /></button>
@@ -186,6 +189,14 @@ function TypeModal({ existing, onClose, onSaved }) {
     const cleanFields = fields.map(({ _keyEdited, _uid, ...f }) => f);
     const keys = cleanFields.map(f => f.key);
     if (new Set(keys).size !== keys.length) { setErr("Chaves de campo duplicadas"); setSaving(false); return; }
+    const emptyOptionsField = cleanFields.find(
+      f => (f.type === "select" || f.type === "multiselect") && (f.options?.length ?? 0) === 0
+    );
+    if (emptyOptionsField) {
+      setErr(`O campo "${emptyOptionsField.label || emptyOptionsField.key}" precisa de ao menos uma opção`);
+      setSaving(false);
+      return;
+    }
     try {
       const payload = { name: name.trim(), color, active, fields: cleanFields };
       const res = isEdit

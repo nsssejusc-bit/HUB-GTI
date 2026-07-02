@@ -1696,6 +1696,14 @@ function CreateOsModal({ onClose, onCreate }) {
               }
               if (field.type === "multiselect") {
                 const arr = Array.isArray(formData[field.key]) ? formData[field.key] : [];
+                if (!field.options || field.options.length === 0) {
+                  return (
+                    <div key={field.key}>
+                      <label className="field-label">{field.label}{field.required && " *"}</label>
+                      <p className="text-xs text-slate-400 dark:text-gray-500 italic">Nenhuma opção configurada para este campo.</p>
+                    </div>
+                  );
+                }
                 return (
                   <div key={field.key}>
                     <label className="field-label">{field.label}{field.required && " *"}</label>
