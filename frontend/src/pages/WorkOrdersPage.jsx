@@ -7,7 +7,7 @@ import AppHeader from "../components/AppHeader";
 import { OS_STATUS_LABEL, OS_STATUS_STYLE } from "../lib/osConstants";
 import {
   ClipboardList, Plus, ChevronRight, MapPin,
-  Users, Filter, RefreshCw, Clock, Monitor, X, Check,
+  Users, Filter, RefreshCw, Clock, Monitor, X, Check, Search,
 } from "lucide-react";
 
 const STATUS_TABS = [
@@ -428,11 +428,14 @@ export default function WorkOrdersPage() {
   const [orders, setOrders]         = useState([]);
   const [units, setUnits]           = useState([]);
   const [types, setTypes]           = useState([]);
+  const [technicians, setTechnicians] = useState([]);
   const [loading, setLoading]       = useState(true);
   const [statusFilter, setStatus]   = useState("");
   const [tipoFilter, setTipo]       = useState("");
   const [unitFilter, setUnit]       = useState("");
+  const [techFilter, setTech]       = useState("");
   const [dateFilter, setDateFilter] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [showCreate, setShowCreate] = useState(false);
 
   // Auto-abre o modal quando vindo de outra OS (?newOs=1)
@@ -458,9 +461,10 @@ export default function WorkOrdersPage() {
   }, [tipoFilter, unitFilter, dateFilter]);
 
   useEffect(() => {
-    Promise.all([api.get("/units"), api.get("/work-order-types")]).then(([u, t]) => {
+    Promise.all([api.get("/units"), api.get("/work-order-types"), api.get("/technicians")]).then(([u, t, tech]) => {
       setUnits(u.data);
       setTypes(t.data);
+      setTechnicians(tech.data);
     });
   }, []);
 
@@ -485,10 +489,21 @@ export default function WorkOrdersPage() {
     nav(`/painel/os/${os.id}`);
   }
 
-  const hasFilters = tipoFilter || unitFilter || dateFilter;
-  const visible    = statusFilter ? orders.filter((o) => o.status === statusFilter) : orders;
-  const tabCounts  = STATUS_TABS.reduce((acc, tab) => {
-    acc[tab.key] = tab.key ? orders.filter((o) => o.status === tab.key).length : orders.length;
+  const hasFilters = tipoFilter || unitFilter || dateFilter || techFilter || searchQuery.trim();
+
+  const q = searchQuery.trim().toLowerCase();
+  const preFiltered = orders.filter((o) => {
+    if (techFilter && !o.tecnicos.some((t) => t.id === Number(techFilter))) return false;
+    if (q) {
+      const local = (o.formData?.local || o.formData?.nomeEvento || "").toLowerCase();
+      if (!o.osNumber.toLowerCase().includes(q) && !local.includes(q)) return false;
+    }
+    return true;
+  });
+
+  const visible   = statusFilter ? preFiltered.filter((o) => o.status === statusFilter) : preFiltered;
+  const tabCounts = STATUS_TABS.reduce((acc, tab) => {
+    acc[tab.key] = tab.key ? preFiltered.filter((o) => o.status === tab.key).length : preFiltered.length;
     return acc;
   }, {});
 
@@ -556,6 +571,16 @@ export default function WorkOrdersPage() {
           {/* Filtros */}
           <div className="flex items-center gap-2 flex-wrap">
             <Filter size={13} className="text-slate-400 dark:text-gray-500 shrink-0" />
+            <div className="relative">
+              <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-gray-500 pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Buscar por número ou local..."
+                className="field-input py-1.5 pl-7 text-xs w-auto min-w-0 max-w-[220px]"
+              />
+            </div>
             <select value={tipoFilter} onChange={(e) => setTipo(e.target.value)} className="field-input py-1.5 text-xs w-auto min-w-0 max-w-[220px]">
               <option value="">Todos os tipos</option>
               {types.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
@@ -563,6 +588,10 @@ export default function WorkOrdersPage() {
             <select value={unitFilter} onChange={(e) => setUnit(e.target.value)} className="field-input py-1.5 text-xs w-auto min-w-0 max-w-[180px]">
               <option value="">Todos os núcleos</option>
               {units.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+            </select>
+            <select value={techFilter} onChange={(e) => setTech(e.target.value)} className="field-input py-1.5 text-xs w-auto min-w-0 max-w-[200px]">
+              <option value="">Todos os técnicos</option>
+              {technicians.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
             <input
               type="date"
@@ -573,7 +602,7 @@ export default function WorkOrdersPage() {
             />
             {hasFilters && (
               <button
-                onClick={() => { setTipo(""); setUnit(""); setDateFilter(""); }}
+                onClick={() => { setTipo(""); setUnit(""); setTech(""); setDateFilter(""); setSearchQuery(""); }}
                 className="text-xs text-slate-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 transition"
               >
                 Limpar filtros
@@ -598,7 +627,7 @@ export default function WorkOrdersPage() {
             </div>
             {(hasFilters || statusFilter) && (
               <button
-                onClick={() => { setTipo(""); setUnit(""); setStatus(""); setDateFilter(""); }}
+                onClick={() => { setTipo(""); setUnit(""); setTech(""); setStatus(""); setDateFilter(""); setSearchQuery(""); }}
                 className="mt-3 text-brand-600 dark:text-brand-400 hover:underline text-sm font-medium"
               >
                 Limpar filtros
