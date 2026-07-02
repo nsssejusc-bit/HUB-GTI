@@ -1707,7 +1707,7 @@ function CreateOsModal({ onClose, onCreate }) {
                 return (
                   <div key={field.key}>
                     <label className="field-label">{field.label}{field.required && " *"}</label>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-col gap-1.5">
                       {(field.options || []).map((opt) => {
                         const checked = arr.includes(opt);
                         return (

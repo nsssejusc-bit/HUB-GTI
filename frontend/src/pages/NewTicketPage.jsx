@@ -1058,7 +1058,7 @@ export default function NewTicketPage() {
                                 !field.options || field.options.length === 0 ? (
                                   <p className="text-xs text-slate-400 dark:text-gray-500 italic">Nenhuma opção configurada para este campo.</p>
                                 ) : (
-                                <div className="flex flex-wrap gap-2">
+                                <div className="flex flex-col gap-1.5">
                                   {(field.options ?? []).map((opt) => {
                                     const arr = Array.isArray(val) ? val : [];
                                     const checked = arr.includes(opt);
